@@ -1,0 +1,42 @@
+"""``toml_escape`` is the one TOML string encoder: every value round-trips through ``tomllib``."""
+
+from __future__ import annotations
+
+import tomllib
+
+import pytest
+
+from dadaia_workspace.infrastructure.public_assets_common import toml_escape
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "plain",
+        'say "hi"',
+        "it's",
+        "caf\u00e9 \u2603",
+        "a\\b",
+        "a\\b\nc",
+        "a\nb",
+        'a\n"""b',
+        'a\nb"',
+        "\x01",
+        "\x7f",
+        "a\x01\nb\x7f",
+        "a\rb\nc",
+        "\nlead",
+        "\n\nlead",
+        "\n",
+    ],
+)
+def test_toml_escape_round_trips(value: str) -> None:
+    assert tomllib.loads(f"k = {toml_escape(value)}\n") == {"k": value}
+
+
+@pytest.mark.parametrize(
+    ("value", "text"),
+    [("plain", '"plain"'), ('a"b', '"a\\"b"'), ("a\nb", '"""\na\nb"""'), ("x\n", '"""\nx\n"""')],
+)
+def test_toml_escape_multi_line_opens_on_its_own_line(value: str, text: str) -> None:
+    assert toml_escape(value) == text

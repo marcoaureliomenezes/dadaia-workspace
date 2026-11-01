@@ -68,10 +68,6 @@ test-results/
 tests/e2e/panel/screenshots/
 img/
 
-# xdist-parallel / scratch test-run artefacts (never commit; README documents the zone)
-tests/tmp/*
-!tests/tmp/README.md
-
 # dadaia fcntl lock files (never commit — runtime only)
 .dadaia/states/.ws_lock
 .dadaia/states/ctx_locks/*.lock
@@ -115,8 +111,8 @@ pip-wheel-metadata/
 # the catch-all backstop is replaced by explicit per-area opt-in (every canon path
 # TRACKED BY DEFAULT) plus the push-time denylist scan, which is the boundary that
 # actually holds. Only the narrow scratch/private-notes class the original
-# catch-all ever actually hid (local-notes.md, tmp/ working dirs — see
-# test_source_repo_hygiene.py) still gets denied, per area. No future canonical
+# catch-all ever actually hid (local-notes.md, tmp/ working dirs) still gets
+# denied, per area. No future canonical
 # artifact class (this release's or any later one's) ever needs a new whitelist
 # line for content already inside one of the areas below.
 #
@@ -131,12 +127,13 @@ pip-wheel-metadata/
 # never left without one.
 /specs/*
 !/specs/constitution.md
+!/specs/AGENTS.md
 !/specs/memory/
 !/specs/memory/**
 !/specs/audits/
 !/specs/audits/**
 # F-20 (T-050-36 security review): the scratch/private-notes denies (local-notes.md,
-# tmp/ working dirs — see test_source_repo_hygiene.py) were carried to
+# tmp/ working dirs) were carried to
 # specs/releases/** but NOT to the other newly-opened areas this same inversion
 # tracks by default — an agent writing scratch material into specs/audits/<ts>/tmp/
 # (a shape DADAIA.md §5 makes natural) had it staged by default. Carried here too.

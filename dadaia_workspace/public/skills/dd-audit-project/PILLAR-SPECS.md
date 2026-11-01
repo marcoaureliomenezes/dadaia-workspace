@@ -1,57 +1,65 @@
 # PILLAR-SPECS — spec compliance
 
 Disclosed sibling of `SKILL.md`, pillar 2. Input: `git log` over every commit in the audit window.
-Also input: `dadaia doctor` against every release the window touches.
+Also input: `.dadaia/.venv/bin/dadaia doctor --context <ctx> --json` at HEAD.
 
 ## Commit-shape conformance
 
 1. Walk every commit in the window with `git log --format='%H%x09%s' --stat`.
-2. Classify each by its subject-line pattern and staged-path set against the five canonical shapes.
-3. The five shapes are defined once, at `dd-gitflow-default` §3a — this pillar reads that table, never restates it.
-4. Flag a commit matching none of the five shapes, or matching a message pattern while staging paths outside its set.
+2. Classify each by its subject-line pattern and staged-path set against the §3a shapes.
+3. The shapes are defined once, at `dd-gitflow-default` §3a — this pillar reads that table, never restates it.
+4. Flag a commit matching none of the shapes, or matching a message pattern while staging paths outside its set.
 5. Severity: registration/backlog/ADR isolation violations are MEDIUM.
-6. Severity: a bug fix that is not self-contained (code + regression test + `BUGS.jsonl` line alone) is HIGH.
-7. Report conformance per shape, never as one aggregate pass/fail — a finding must say which shape failed.
+6. Report conformance per shape, never as one aggregate pass/fail — a finding must say which shape failed.
 
-## Canon-v6 pattern compliance
+## Canon compliance
 
 ```bash
-dadaia doctor --context <ctx> --json
+.dadaia/.venv/bin/dadaia doctor --context <ctx> --json
 ```
 
-1. `--json` gives the structured sections, findings and `compliance(...)` scores.
+1. `--json` gives the structured sections and findings.
 2. Each finding reads `<CODE> <verdict> <message>`; the message carries its own remediation.
 3. Every non-zero-severity issue inside the window becomes a `FINDINGS-FORMAT.md` record with `pillar: "specs"`.
 4. Record a WARN that `--fix` can repair mechanically as a finding too — this pillar measures, it never fixes.
-6. Treat an archived release carrying no directory (only its `releases_histo.jsonl` summary) as the canon shape, not drift.
 
 ## `_RELEASE.json` milestone completeness
 
 1. For every release whose `_RELEASE.json` the window's commits touch, confirm the three canonical milestones.
-2. Milestones: `defined` (SPEC `Approved`), `implemented` (final-rc QA close), `shipped` (merge to `main`).
-3. Confirm each carries a `sha` (and, where applicable, a `pr`).
-4. Flag a release with a `shipped` milestone but no `defined`/`implemented` milestone — the chain has a gap.
-5. For an archived release, check the same via its `releases_histo.jsonl` summary.
+2. The three milestones and the fields each writes: `dd-release-implementation/RELEASE-EVENTS.md` §Milestones.
+3. Confirm each carries the fields that table gives it.
+4. Flag a release with a `shipped` milestone but a missing earlier one — the chain has a gap.
+5. For an archived release, check the same from `releases/_archive/<v>/_RELEASE.json`.
 
 ## SPEC provenance and the one exit
 
-1. For each release's SPEC in the window, confirm `**Consumes:**` names the backlog entry/entries it picked.
-2. Confirm the release-definition commit (shape 5) flipped those entries to `status: picked` in `BACKLOG.json`.
-3. Confirm each picked entry left `active[]` exactly once, at that release's closure, as one `backlog_histo.jsonl` record.
-4. Flag a consumed entry with no histo record, or with two — the one-exit contract is unmet.
+1. For each release's SPEC in the window, confirm `**Origin:** backlog:` names the backlog entry/entries it picked.
+2. Confirm each picked entry left `active[]` exactly once, at that release's closure, as one `backlog_histo.jsonl` record.
+3. Flag a consumed entry with no histo record, or with two — the one-exit contract is unmet.
+
+## Job files — the checks the code leaves to the audit
+
+Input: every `rc-<N>/tasks/job<n>.md` the window touches and the job commits behind it (`dd-release-definition` §5 teaches the rules).
+
+1. Tasks with overlapping `W:` sets that ran in parallel (`worktrees/AGENTS.md` §2) are MEDIUM.
+2. A cancelled task keeps its row and states why; one deleted, or kept without a reason, is MEDIUM.
+3. Every path changed by a job is in its PLAN `W:` set; a breach is MEDIUM.
+4. Each AC names its test level (unit, integration, E2E, or no test with its reason); one that names none is LOW.
+5. Post-approval changes: an approved SPEC or PLAN is never amended (`specs/releases/AGENTS.md` §2); an edit after `**Status:** Approved` is MEDIUM.
 
 ## Slop readout
 
 Input: the ratchet modules and the window `from-sha..HEAD`. Output: the "Slop readout" table in `AUDIT.md`
 (ratchet, baseline, HEAD, trend, verdict). Definition and signals: `dd-code-review`'s `SLOP.md`.
 
-1. Run `pytest tests/contract/test_slop_ratchets.py tests/contract/test_test_suite_ratchets.py`; record each count beside its pinned ceiling.
-2. Trend each ratchet over the window: the count at the from-sha against HEAD, via a temporary worktree under `.dadaia/tmp/` — never a stash.
-3. Read the density of every SPEC in the window: bytes, words, codes per 1,000 words, numbered families outside FR/AC/T-.
-4. Read the GC: each closure's recorded `dadaia doctor` score line, `archive/` tags whose branch survives.
+1. Run the repo's own ratchet checks; record each count beside its ceiling.
+2. Trend each ratchet over the window: the count at the from-sha against HEAD, read-only: `git archive <from-sha>` under `.dadaia/tmp/<agent>/<YYYYMMDD>/` or `git show <sha>:<path>` — never a worktree or a stash.
+3. Read the density of every SPEC in the window: bytes, words, codes per 1,000 words, numbered families outside FR/AC/`J<n>.T<k>`.
+4. Read the GC: the findings of `.dadaia/.venv/bin/dadaia doctor --context <ctx>` at HEAD, and `archive/` tags whose branch survives.
 5. Sample the ten commits with the most additions; apply `SLOP.md` S1-S5 to each diff — the audit proves the review worked, it never redoes it.
-6. One `FINDINGS-FORMAT.md` record per ratchet that rose or signal hit; ratchet rose HIGH, density over the ceiling MEDIUM, S4/S5 in a sample HIGH.
+6. Fixed hunt, every audit: for each question in the window's PLAN §1.1 tables, search code and law for a second answer — a restated rule, a second symbol; each is an S10 finding, HIGH.
+7. One `FINDINGS-FORMAT.md` record per ratchet that rose or signal hit; ratchet rose HIGH, S4/S5 in a sample HIGH, S10 HIGH.
 
 ## Findings
 
-- Every check above emits `pillar: "specs"` records via `FINDINGS-FORMAT.md`'s shape — never a bespoke report format.
+- Every check above emits `pillar: "specs"` records via `FINDINGS-FORMAT.md`'s shape.

@@ -1,9 +1,9 @@
 ---
 slug: specs-migration
 title: specs-migration
-tldr: dadaia specs upgrade walks a specs/ tree from pattern 6 to the canonical 7 and repairs template leftovers; dadaia migrate lifts a v1 context registry to v2.
-summary: The two upgrade verbs for existing state — dadaia specs upgrade (one live hop, 6 to 7, folding memory/TECHSTACK.md into ARCHITECTURE.md, plus lossless template repairs; below 6 it refuses without writing) and dadaia migrate (spec_contexts.json v1 to v2, planned, confirmed, atomic).
-tags: [migration, upgrade, specs, registry]
+tldr: specs init establishes canon and gitflow; specs upgrade reaches pattern 13; migrate brings a schema 1 context registry to the store's schema 3.
+summary: "The persisted-state upgrade verbs: specs init scaffolds or upgrades a dadaia tree and preserves a foreign tree in specs-bkp; specs upgrade runs the supported migration and repair set before stamping pattern 13; migrate updates the context registry atomically."
+tags: [migration, upgrade, specs, registry, onboarding]
 sources:
   - dadaia_workspace/features/migrate/**
   - dadaia_workspace/cli/commands/migrate.py
@@ -13,22 +13,34 @@ sources:
 
 ## Why one atom
 
-- Both verbs bring an older workspace's persisted state up to what this installation reads, and both live in `dadaia_workspace/features/migrate/`.
+- Every verb here brings an older or foreign persisted state up to what this installation reads; the version logic lives in `dadaia_workspace/features/migrate/` and `dadaia_workspace/core/specs_version.py` (pure: the pattern-version canon and the tree classifier), and every constitution read and frontmatter write in `dadaia_workspace/core/gitflow.py`.
+
+## `dadaia specs init`
+
+- `dadaia specs init [--context <ctx>] [--specs-dir <path>] [--name <project>] [--replace-foreign] [--principal <b>] [--integration <b>] [--work-prefix <p>]` is onboarding level 3a: it targets the context's main repo `specs/` (the bound context when `--context` is omitted); with no context resolvable it exits 1 with an `Agent action:` to choose a registered context and run `<cli> specs init --context` with it.
+- An absent `specs/` gets the canon scaffold ([[public-asset-distribution]]); a dadaia tree (stamped 6 or above) runs `specs upgrade`, then gains only its missing canon files; a constitution that is not UTF-8, whose frontmatter does not parse, or whose `gitflow:` block does not validate, is malformed and refused, exit 1, nothing written (fix: re-encode the failing line as UTF-8 in place, else repair its YAML); a specs path that exists and is not a directory (a file, FIFO, socket or device) is refused the same way, its fix `Agent action: move <path> aside, it is not a directory`; a symlinked `--specs-dir` is refused, exit 1, with one fix line pointing it at the real directory; anything else is foreign.
+- The project gitflow is the `gitflow: {principal: <name>, integration: <name>, work: <prefix>}` block of `specs/constitution.md` frontmatter ([[sdd-gate-v3]]); each flag wins over the tree's own valid block, which wins over detection — principal from the local `origin/HEAD` unless it is unset or the integration branch, else `master` when origin has it, else `main`; integration `develop`; work prefix `feature/`, a work branch cut from `origin/<work>` when origin has it, else the integration branch. The names must be valid branch names, principal and integration must differ, and the work prefix may not nest under a role name; an invalid result exits 1 before any write. The same flags twice is a no-op, an operator's custom names are never reset, and stdout names the gitflow written (`[gitflow] …`).
+- One frontmatter merge-writer serves both `specs_pattern_version` and `gitflow`: a written key is replaced in place together with its block value, through the kernel's one key-span function, a new one appended, every other key and the body kept byte for byte.
+- A foreign tree is replaced only with consent, `--replace-foreign`; without it the run exits 1, writes nothing and prints `fix: <cli> specs init --context <ctx> --replace-foreign`.
+- With consent, `specs/` is renamed to `specs-bkp/` in the same repo — tracked files through `git mv`, every byte kept — then scaffolded; when `specs-bkp/` already exists the second backup lands in `specs-bkp/<UTC timestamp>/`, the one backup location the publish commits.
+- It also installs the main repo's scoped law where absent, its `<repo-name>` rendered as the project (`--name`, else the main repo's directory name): `AGENTS.md` at the repo root, and `tests/AGENTS.md` only when `tests/` exists; an existing or symlinked target is never overwritten or written through.
+- In a git repo with no local work branch, `specs init` first cuts that branch (the name the one work-branch rule gives to create) from `origin/<work>`, else the integration branch, local then `origin`, else HEAD, and only then judges and writes the tree; a refused foreign tree cuts nothing. Every written path is printed (`[created]`, `[moved] ... (tracked files staged)`, the upgrade's own lines); on a branch it cut it then commits only the onboarding paths that differ — `specs/`, the `specs-bkp/` move, the repo law — leaving it checked out, printing `[committed] <branch>`; with the branch present it switches, cuts and commits nothing, and a missing directory is no git root. It never pushes: the project publication, `context baseline`, commits what remains and pushes ([[context-management]]).
+- [[workspace-doctor]]'s `GITFLOW-1` warns, in a git repo, when the committed constitution's block is absent or malformed — the text the gates read, which then fall back to the default — with one `Agent action:` to run `<cli> specs init --specs-dir <specs>` (no flags), then commit the constitution it writes; performing it clears the finding.
 
 ## `dadaia specs upgrade`
 
-- `dadaia specs upgrade [--specs-dir <path>] [--target <int>] [--dry-run]` reads the tree's `specs_pattern_version` and aims at the canonical version (7) by default; `--specs-dir` defaults to the bound context.
+- `dadaia specs upgrade [--specs-dir <path>] [--dry-run]` reads the tree's `specs_pattern_version` and stamps only canonical version 13; `CANON_AT` pins the scaffold fingerprint for that stamp, and `--specs-dir` defaults to the bound context.
 - A tree below 6 is refused with no filesystem write, naming the prerequisite: upgrade with an earlier dadaia-workspace line first.
-- A tree at 6 walks the one hop: `memory/TECHSTACK.md`'s body is appended under `## Tech Stack` at the end of `memory/ARCHITECTURE.md` and the file deleted, then the tree is re-stamped. A canonical memory still carrying the two-part Principles layout is left byte-identical for the doctor to name.
-- On every run, whatever the version: unfilled placeholder atoms are removed, a `releases/_ideas/` holding nothing but its `AGENTS.md` is removed, and Portuguese `**Status:**` tokens in live trio documents (never `_archive/`) are rewritten to `Approved`, `In review` or `Draft`.
-- `--dry-run` plans the same set and writes nothing; a run with nothing to do is a no-op.
-- [[workspace-doctor]]'s `SPECS-VERSION` warns on a tree below the canonical version.
+- A supported older tree folds `memory/TECHSTACK.md` into ARCHITECTURE and moves a flat candidate trio into its next `rc-<N>/` before receiving the current stamp. A failed guarded delete restores the source document, and a closed candidate is never rewritten.
+- Every run also applies the specs doctor's repair set and regenerates `catalog.json` and `index.md`'s `## Feature catalog` section, every other `index.md` line kept, when its owner check is red. Record ledgers are validated by their own scripts and are never reconstructed by upgrade.
+- Each change prints its action; `--dry-run` plans the same set without writing, and a canonical tree with nothing to repair reports a no-op.
+- `dadaia_workspace/core/specs_version.py`'s `state` is the one reader of a tree's state — `absent` (nothing there, a dangling symlink included), `file` (any non-directory), `malformed`, `foreign`, `upgradable` or `canonical`, the path's kind decided once by `core/gitflow.specs_path_kind` — with its one fix, naming the context when the caller knows it, else the tree as `--specs-dir`; onboarding's `specs` step reports it ([[workspace-init]]).
 
 ## `dadaia migrate`
 
-- Bare `dadaia migrate [--dry-run] [--yes]` migrates `.dadaia/states/spec_contexts.json` from schema 1 to 2: states `ativo`/`inativo` become `alive`/`dead`, `activated_at` becomes `alive_since`, `is_primary` is dropped, `dead_since` added, `states/primary_context.json` deleted and `.dadaia/sessions/` created.
+- Bare `dadaia migrate [--dry-run] [--yes]` migrates `.dadaia/states/spec_contexts.json` from schema 1 to the context store's one schema version, 3, which the store's writer stamps and `migrate` prints: states `ativo`/`inativo` become `alive`/`dead`, `activated_at` becomes `alive_since`, `is_primary` is dropped, `dead_since` added, `states/primary_context.json` deleted and `.dadaia/sessions/` created.
 - It prints the plan and asks for confirmation unless `--yes`. `dadaia reconcile` runs the same migration as one of its steps.
-- A registry at schema 2 or above, the context store's own schema 3 included, is nothing to do for both `dadaia migrate` and reconcile; a non-numeric schema version is refused with manual intervention required.
+- A registry at schema 2 or above, the context store's own schema 3 included, is nothing to do for both `dadaia migrate` and reconcile, `migrate` reporting the schema version the registry holds; a non-numeric schema version is refused with manual intervention required.
 - The context store refuses a schema 1 registry with `dadaia migrate` as the fix and reads schema 2 and 3 alike ([[context-management]]).
 
 ## Dependencies

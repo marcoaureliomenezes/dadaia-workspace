@@ -16,9 +16,13 @@ sources:
 - A product spanning several repositories is still one project: the context carries associated repositories, added by `dadaia context repo add` and removed by `dadaia context repo remove`, which live and die with it.
 - Specs, bind, memory, releases and backlog resolve only from the main repo; an associated repo's own `specs/` is never read.
 - The main repository owns production source and `specs/`; an associated repository owns production source only.
-- `dadaia context bind <ctx>` selects a context and nothing else, changing only the caller's own session record; a session without a harness-native id carries the binding in `DADAIA_CONTEXT`.
-- A bind carries a scope — the context's main repo plus its associated repos — and a bound session's MUTATING write into a repo another context owns is refused with the bind that would allow it; an unbound session is never scope-judged ([[sdd-gate-v3]]).
-- Context injection fires when the session record's `bound_at` is newer than that session's injection sentinel ([[context-management]]).
+- A project is born in two onboarding levels: `dadaia context create --main-repo <url>` makes it ALIVE with its repos cloned and hooked, binding no session; then `dadaia specs init --context <ctx>` gives the main repo its canonical `specs/` — on a repo with no work branch it cuts the local one and commits only the scaffold on it — `dadaia context bind <ctx>`, the only binder, binds the session, the first pass fills its memory in the `wt-backlog-first-pass` lane, and `dadaia context baseline <ctx>` publishes the main repo, append-only ([[context-management]], [[specs-migration]]).
+- The project declares its gitflow — principal, integration and work-branch prefix — in the `gitflow:` block of its `specs/constitution.md`, the default customized there; the pre-push gate and CI read it from committed data, and an associated repo follows its main repo's ([[sdd-gate-v3]]).
+- A dadaia specs tree is a `specs/` whose `constitution.md` carries `specs_pattern_version` 6 or above; any other `specs/` is foreign, and only after the operator's consent is it renamed to `specs-bkp/` inside the main repo (a second backup under `specs-bkp/<UTC timestamp>/`), the one backup location, before a canonical tree replaces it.
+- `dadaia context bind <ctx>` selects a context and nothing else, changing only the record of the caller's environment session id; a session without a harness-native id exports `DADAIA_SESSION_ID` before it binds, or carries the binding in `DADAIA_CONTEXT`.
+- A bind carries a scope — the context's main repo plus its associated repos — and a MUTATING file-tool write into a repo outside it is refused with the bind that would allow it, or the refused bind's fix when that bind would itself be refused ([[context-management]]), an unbound session with an id owning no repo; a write inside a worktree git linked from a repo of this workspace is in scope whatever the bind ([[sdd-gate-v3]]).
+- A repo checkout receives only merges: agents write a repo inside its worktrees and land them by the `merge` verb of `dadaia worktree`, audits aside ([[worktrees]]).
+- Context injection fires again when the session record's `bind_id` is not the one that session's injection sentinel recorded, or a compaction marker is newer than the sentinel ([[context-management]]).
 - No phase and no mode is enforced; concurrent sessions never block each other, and overlap surfaces through git.
 
 ## Runtime state
@@ -27,4 +31,4 @@ sources:
 
 ## Dependencies
 
-[[context-management]], [[sdd-gate-v3]], [[ARCHITECTURE]].
+[[context-management]], [[sdd-gate-v3]], [[worktrees]], [[ARCHITECTURE]].

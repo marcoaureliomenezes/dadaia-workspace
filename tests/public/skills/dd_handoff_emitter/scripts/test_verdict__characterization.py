@@ -1,0 +1,98 @@
+"""Characterization net for the public ``verdict.py`` seam."""
+
+from __future__ import annotations
+
+import json
+import os
+import sys
+from pathlib import Path
+
+import pytest
+
+from tests.fixtures.harness_env import suite_env
+from tests.helpers.oslib import read_text
+from tests.helpers.oslib import run as os_run
+from tests.helpers.skill_scripts import stage_skill_scripts
+from tests.helpers.worktree_ws import commit, diff_hash, git, make_workspace, run
+
+pytestmark = pytest.mark.slow(reason="runs the public scripts over a real Git worktree")
+
+_BODY = {
+    "self_pull": {"refs": ["specs/memory/ARCHITECTURE.md"]},
+    "artifact": {"type": "other"},
+    "metrics": {"finding_count": 0},
+}
+_NOW = "2026-10-09T12:34:56Z"
+
+
+def test_verdict_writes_the_exact_bound_handoff(tmp_path: Path) -> None:
+    (root := tmp_path / "workspace").mkdir()
+    make_workspace(root)
+    for skill in (
+        "dd-handoff-emitter",
+        "dd-gitflow-default",
+        "dd-bug-resolution",
+        "dd-release-implementation",
+    ):
+        stage_skill_scripts(skill, root / ".agents/skills" / skill / "scripts")
+    repo = root / "repos/r"
+    git(repo, "checkout", "-q", "feature/0.5.0")
+    name = "0.5.0/wt-backlog-note"
+    assert run(root, "new", "r", name).returncode == 0
+    tree = root / "worktrees/r" / name
+    head = commit(tree, "specs/note.md", "reviewed\n")
+    script = root / ".agents/skills/dd-handoff-emitter/scripts/verdict.py"
+
+    bootstrap = (
+        "import sys\nfrom pathlib import Path\n"
+        "sys.path.insert(0, str(Path(sys.argv.pop(1))))\n"
+        "import verdict\nimport _clock\n"
+        f"_clock.now_iso = lambda: {_NOW!r}\n"
+        "raise SystemExit(verdict.main(sys.argv[1:]))"
+    )
+    result = os_run(
+        [
+            sys.executable,
+            "-c",
+            bootstrap,
+            str(script.parent),
+            str(tree),
+            "--sha",
+            head,
+            "--context",
+            "catalog",
+            "--slug",
+            "characterization",
+            "--verdict",
+            "APPROVED",
+            "--reason",
+            "characterized",
+        ],
+        cwd=root,
+        env=suite_env(os.environ, root),
+        input=json.dumps(_BODY),
+        check=False,
+    )
+
+    assert (result.returncode, result.stderr) == (0, "")
+    target = (
+        root
+        / ".dadaia/states/verdicts/catalog/2026-10-09T123456Z-dd-code-reviewer-characterization.handoff.json"
+    )
+    assert result.stdout == f"{target}\n"
+    assert target.parent == root / ".dadaia/states/verdicts/catalog"
+    assert target.name == "2026-10-09T123456Z-dd-code-reviewer-characterization.handoff.json"
+    document = json.loads(read_text(target))
+    assert document == {
+        "schema_version": "handoff-v1.2",
+        "agent": "dd-code-reviewer",
+        "context": "catalog",
+        "produced_at": "2026-10-09T12:34:56Z",
+        "verdict": "APPROVED",
+        "verdict_reason": "characterized",
+        "scope": f"wt/{name}@{head}",
+        "reviewed_sha": head,
+        "diff_sha256": diff_hash(root, head),
+        **_BODY,
+    }
+    assert sorted((root / ".dadaia/states/verdicts").glob("**/*.handoff.json")) == [target]

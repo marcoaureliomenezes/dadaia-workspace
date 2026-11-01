@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "behavior-map-v1",
+  "title": "Behavior Map v1",
+  "description": "The single declared map from a root `AGENTS.md` map section to the member(s) that operationalize it: EVERY core skill under dadaia_workspace/public/skills/*/SKILL.md and EVERY scoped AGENTS.md/*-AGENTS.md source under dadaia_workspace/public/{data,scaffold,templates}/ (never the projected instance path — see the two citation-path bugs cited in the enforcer). It holds one row per member — a member (a skill name, or one scoped_agents_md path) maps to EXACTLY ONE row/section; a section MAY be owned by more than one row. `anchor` carries a `<!-- behavior: ... -->` comment-anchor id inside the section body, or null.",
+  "type": "object",
+  "required": ["schema_version", "rows"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "behavior-map-v1",
+      "description": "Schema version identifier. Must equal 'behavior-map-v1'."
+    },
+    "skill_md_line_soft": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Over it, doctor warns SKILL-MD-LENGTH and names the split into references/*.md and/or scripts/."
+    },
+    "skill_md_line_ceiling": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "The hard SKILL.md line limit, held by the library's contract test."
+    },
+    "standalone_skills": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$" },
+      "description": "The skills this project also distributes standalone, outside a dadaia workspace. The ONE data source for that set: every consumer of the set (contract tests, marketplace manifests) reads it here, never a literal roster of its own."
+    },
+    "declared_overlaps": {
+      "type": "array",
+      "description": "Pre-cleared applyTo activation-glob overlap groups among non-universal skills.",
+      "items": {
+        "type": "array",
+        "minItems": 2,
+        "items": { "type": "string", "minLength": 1 },
+        "uniqueItems": true
+      }
+    },
+    "rows": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/row" }
+    }
+  },
+  "$defs": {
+    "row": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["section", "anchor", "skill", "scoped_agents_md"],
+      "properties": {
+        "section": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^§[0-9]+ .+$",
+          "description": "The root `AGENTS.md` map section this row's member(s) operationalize, title-anchored: '§N <Section Title>' using the CURRENT numbering (never a bare '§N')."
+        },
+        "anchor": {
+          "type": ["string", "null"],
+          "description": "The <!-- behavior: <id> --> comment-anchor id inside the section body, or null when the section carries none."
+        },
+        "skill": {
+          "type": ["string", "null"],
+          "minLength": 1,
+          "description": "The single skill (under dadaia_workspace/public/skills/<name>/SKILL.md) this row owns, or null when the row is scoped_agents_md-only."
+        },
+        "scoped_agents_md": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1, "pattern": "^dadaia_workspace/public/" },
+          "uniqueItems": true,
+          "description": "Repo-relative POSIX SOURCE paths (never the projected instance path — the checkout-vs-instance bug this enforcer already guards against) under dadaia_workspace/public/{data,scaffold,templates}/ this row owns. May be empty when the row is skill-only."
+        }
+      },
+      "anyOf": [
+        { "properties": { "skill": { "type": "string" } }, "required": ["skill"] },
+        { "properties": { "scoped_agents_md": { "minItems": 1 } }, "required": ["scoped_agents_md"] }
+      ]
+    }
+  }
+}

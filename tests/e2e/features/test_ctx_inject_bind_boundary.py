@@ -1,42 +1,12 @@
-"""Seed-3 e2e: bind-driven context injection across the REAL process boundary.
+"""The ONE real-process SENTINEL of bind ->
+ctx_inject. `context bind` runs as its own process and the hook as another, both carrying
+the same CLAUDE_CODE_SESSION_ID: unbound -> no memory; bind X -> X injected; re-bind Y ->
+Y; a repeat prompt is silent; a same-context re-bind re-injects; the injection carries
+constitution.md. A bind under a distinct
+session id never bridges (test_one_bind.py row native-id-no-record-unbound).
+Hand-built workspace, never a real venv.
 
-This is the acceptance test for FR-W2 (ADR-G5, release v0.1.14; bound_at trigger,
-T-50-03, SPEC v0.5.0 FR1 coupling 1). It exercises the genuine ``dadaia context bind``
-CLI → ``ctx_inject`` hook chain across **two distinct real subprocesses** — the boundary
-the unit/contract suites cannot reach.
-
-Why a real bind subprocess (not CliRunner)
-------------------------------------------
-The bind CLI and the hook are separate processes; a test that ran bind in-process
-(CliRunner) and the hook in another process would not cross that process boundary the way
-production does. Here ``context bind`` runs as ``python -m dadaia_workspace.cli.main`` (its
-own process) and the hook runs via the sanctioned :func:`run_hook_subprocess` — exactly as
-a real harness delivers both.
-
-T-50-03: the SAME session id is exported as ``CLAUDE_CODE_SESSION_ID`` to BOTH the bind CLI
-and the hook, modeling the real harness shape (the bind CLI, run through the harness's own
-Bash tool, inherits the harness's native session-id env var; a real harness also delivers
-that same id to a hook subprocess). This is what lets the bind's session record resolve
-through the hook's own self-keyed leg (``_session_bound_context``) and drives the
-``bound_at`` injection trigger (``_session_bound_at``). The bind-epoch marker subsystem —
-the pre-T-50-03 cross-sid bridge for a bind with NO matching session-id env — is no longer
-consulted by the injection path (the accepted FR1 coupling), and T-50-04 deletes the
-subsystem outright.
-
-Seed-3 acceptance (SPEC §FR-W2, T-50-03 additions):
-
-  fresh unbound session → injection contains NO context memory (generic preflight +
-  ALIVE list); after ``dadaia context bind X`` → next prompt injects X's memory; re-bind
-  Y → Y injected; a repeat prompt for the same already-injected context is silent; a
-  SAME-CONTEXT re-bind (new pin) re-injects; a repeat prompt after THAT is silent again.
-
-NEVER builds a real venv: the workspace is a minimal hand-built tree (the
-``.dadaia/states/spec_contexts.json`` sentinel + per-context ``specs/memory`` only), the
-same shape the ctx_inject unit fixtures use. ``WorkspaceService.init`` is deliberately
-avoided.
-
-Intent: CONTRACT — v0.1.14 FR-W2 (T-50-03)
-Owner: dd-software-engineer
+Owner: dd-sw-engineer-sr
 """
 
 from __future__ import annotations
@@ -47,6 +17,7 @@ import sys
 from pathlib import Path
 
 from tests.fixtures.harness_env import claude_hook_env, run_hook_subprocess
+from tests.helpers.oslib import read_text, run, write_text
 
 
 def _add_context(workspace: Path, slug: str, *, tech: str) -> None:
@@ -55,7 +26,7 @@ def _add_context(workspace: Path, slug: str, *, tech: str) -> None:
     states.mkdir(parents=True, exist_ok=True)
     registry = states / "spec_contexts.json"
     if registry.is_file():
-        data = json.loads(registry.read_text(encoding="utf-8"))
+        data = json.loads(read_text(registry))
     else:
         data = {"schema_version": "2", "contexts": []}
     data["contexts"].append(
@@ -70,14 +41,13 @@ def _add_context(workspace: Path, slug: str, *, tech: str) -> None:
             "current_branch": "main",
         }
     )
-    registry.write_text(json.dumps(data), encoding="utf-8")
+    write_text(registry, json.dumps(data))
 
     mem = workspace / "repos" / slug / "specs" / "memory"
     (mem / "product").mkdir(parents=True, exist_ok=True)
-    (mem / "ARCHITECTURE.md").write_text(
-        f"# Architecture\n\n## Tech Stack\n\n{tech}", encoding="utf-8"
-    )
-    (mem / "product" / "catalog.json").write_text('{"features": []}', encoding="utf-8")
+    write_text(mem / "ARCHITECTURE.md", f"# Architecture\n\n## Tech Stack\n\n{tech}")
+    write_text(mem / "product" / "catalog.json", '{"features": []}')
+    write_text(mem.parent / "constitution.md", f"# {slug} CONSTITUTION-MARKER\n")
 
 
 def _real_bind(
@@ -85,7 +55,7 @@ def _real_bind(
 ) -> subprocess.CompletedProcess[str]:
     """Run ``dadaia context bind <ctx>`` as a genuine separate process.
 
-    T-50-03: *session_id*, when given, exports ``CLAUDE_CODE_SESSION_ID`` in the bind
+    *session_id*, when given, exports ``CLAUDE_CODE_SESSION_ID`` in the bind
     process's own env — modeling a REAL harness, where the bind CLI (run through the
     harness's own shell tool) and the hook are both children of the SAME harness process
     and inherit the SAME native session-id env var. This is what lets the bind's session
@@ -95,7 +65,7 @@ def _real_bind(
     a bind with no matching harness env, minting its own sid.
     """
     env = claude_hook_env(workspace, session_id=session_id) if session_id else None
-    proc = subprocess.run(
+    proc = run(
         [
             sys.executable,
             "-m",
@@ -106,8 +76,6 @@ def _real_bind(
         ],
         cwd=str(workspace),
         env=env,
-        capture_output=True,
-        text=True,
         timeout=60.0,
     )
     return proc
@@ -116,10 +84,10 @@ def _real_bind(
 def _inject(workspace: Path, session_id: str) -> str:
     """Run ctx_inject as a real subprocess; return stdout.
 
-    T-50-03: ``CLAUDE_CODE_SESSION_ID`` carries *session_id* (not popped) — matching how a
+    ``CLAUDE_CODE_SESSION_ID`` carries *session_id* (not popped) — matching how a
     real harness delivers BOTH the env var and the stdin payload field for the SAME live
     session, which is what lets this hook's own self-keyed leg
-    (``_session_bound_context``) and its injection trigger (``_session_bound_at``) resolve
+    (``_session_bound_context``) and its injection trigger (the record's ``bind_id``) resolve
     the record a same-harness bind just wrote. ``DADAIA_CONTEXT`` stays popped so no
     developer-shell override leaks context resolution into this run.
     """
@@ -131,8 +99,8 @@ def _inject(workspace: Path, session_id: str) -> str:
 
 
 def test_seed3_bind_drives_injection_across_real_process_boundary(tmp_path: Path) -> None:
-    """Seed-3 acceptance: unbound → no memory; bind alpha → alpha; re-bind beta → beta;
-    repeat → silent; SAME-CONTEXT re-bind (new pin, T-50-03) → re-injects; repeat → silent
+    """Unbound → no memory; bind alpha → alpha; re-bind beta → beta;
+    repeat → silent; SAME-CONTEXT re-bind (new pin) → re-injects; repeat → silent
     again.
 
     A SINGLE hook session id (``s-e2e``) is used across the whole scenario, exported as
@@ -146,7 +114,7 @@ def test_seed3_bind_drives_injection_across_real_process_boundary(tmp_path: Path
     sid = "s-e2e"
 
     # 1) Fresh unbound session → generic preflight: ALIVE list only, NO dispatcher
-    #    preflight restatement (FR30/T-044-60 deleted it from every emission path) and NO
+    #    preflight restatement (deleted from every emission path) and NO
     #    context memory.
     first = _inject(tmp_path, sid)
     assert "[no bound context]" in first
@@ -159,14 +127,15 @@ def test_seed3_bind_drives_injection_across_real_process_boundary(tmp_path: Path
     assert "- beta" in first
 
     # 2) Real `dadaia context bind alpha`, SAME session id → next prompt for the live hook
-    #    session injects ALPHA's memory (self-keyed session record, T-50-03) — the memory
-    #    prefix ONLY: no dispatcher preflight, no ALIVE-context list (FR30/T-044-60 — the
+    #    session injects ALPHA's memory (self-keyed session record) — the memory
+    #    prefix ONLY: no dispatcher preflight, no ALIVE-context list (the
     #    list is useful only in the unbound case).
     bind_alpha = _real_bind(tmp_path, "alpha", session_id=sid)
     assert bind_alpha.returncode == 0, bind_alpha.stderr or bind_alpha.stdout
 
     after_alpha = _inject(tmp_path, sid)
     assert "[alpha]" in after_alpha
+    assert "alpha CONSTITUTION-MARKER" in after_alpha  # every harness, one hook
     assert "end memory bootstrap" in after_alpha
     assert "ALPHA-MARKER" in after_alpha
     assert "BETA-MARKER" not in after_alpha
@@ -190,7 +159,7 @@ def test_seed3_bind_drives_injection_across_real_process_boundary(tmp_path: Path
     repeat = _inject(tmp_path, sid)
     assert repeat.strip() == ""
 
-    # 5) SAME-CONTEXT re-bind (new pin, T-50-03, SPEC v0.5.0 FR1 coupling 1): re-binding
+    # 5) SAME-CONTEXT re-bind (new pin): re-binding
     #    beta AGAIN refreshes bound_at and MUST re-inject even though the resolved name is
     #    unchanged — a re-bind is how a mode/release change reaches a live session.
     rebind_beta = _real_bind(tmp_path, "beta", session_id=sid)
@@ -204,38 +173,3 @@ def test_seed3_bind_drives_injection_across_real_process_boundary(tmp_path: Path
 
     # 6) Repeat prompt again, no new bind → silent.
     assert _inject(tmp_path, sid).strip() == ""
-
-
-def test_seed3_distinct_bind_sid_never_bridges_into_this_hook_session(tmp_path: Path) -> None:
-    """T-50-04 (SPEC v0.5.0 FR1): the bind-epoch marker subsystem that used to bridge a
-    bind performed under a DIFFERENT (unmatched) session id into this hook session's
-    injection is deleted outright — there is no attribution mechanism left to bridge
-    through. A bind with no matching harness env (its own minted sid) and no
-    ``DADAIA_CONTEXT`` leaves the hook session's injection unbound, durably: the THIRD
-    prompt proves this is not merely a one-shot omission.
-    """
-    from dadaia_workspace.core import session_store as session_identity
-
-    _add_context(tmp_path, "alpha", tech="# tech alpha\nPython 3.12 ALPHA-MARKER\n")
-
-    sid = "s-no-record"
-    # First prompt: unbound -> generic preflight, sentinel stamped.
-    first = _inject(tmp_path, sid)
-    assert "[no bound context]" in first
-
-    proc = _real_bind(tmp_path, "alpha", session_id=None)
-    assert proc.returncode == 0, proc.stderr or proc.stdout
-
-    # The hook session id has no session record of its own, and DADAIA_CONTEXT is unset —
-    # this session never resolves "alpha". The second prompt is therefore an ordinary
-    # silent repeat (still unbound, no change for THIS session) — never "[ctx]"/"[alpha]"
-    # and never re-emitted preflight.
-    assert session_identity.read_session(tmp_path, sid) is None
-    second = _inject(tmp_path, sid)
-    assert second.strip() == ""
-    assert "ALPHA-MARKER" not in second
-
-    # A further prompt confirms this is durable, not a one-shot omission.
-    third = _inject(tmp_path, sid)
-    assert third.strip() == ""
-    assert "ALPHA-MARKER" not in third

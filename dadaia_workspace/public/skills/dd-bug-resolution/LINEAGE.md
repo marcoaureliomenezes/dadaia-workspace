@@ -1,37 +1,47 @@
 # LINEAGE.md — Phase 0 in Full
 
-Sibling of `SKILL.md` (`dd-bug-resolution`, Phase 0). The one canonical statement of the lineage window, the filter, and the diff-trust rule.
-The audit's pillar 1 cites this section, never restates it — if the two disagree, this file is stale, fix it here.
+Sibling of `SKILL.md` (`dd-bug-resolution`, Phase 0). The canonical statement of the
+lineage window, filter and diff-trust rule. The audit's bug pillar cites this file instead
+of repeating it.
 
-## The window (stated once)
+## The window
 
 - The window runs from the newest archived audit to `HEAD`.
-- Read `specs/audits/_archive/audits_histo.jsonl` — an audit is not a release milestone.
-- Archived facts live in `releases/_archive/releases_histo.jsonl` (no per-release `_RELEASE.json` survives archiving).
-- The window is `[newest archived audit's sha, HEAD]`; the whole file when that histo is empty.
+- Read `specs/audits/_archive/audits_histo.jsonl`; an audit is not a release milestone.
+- A shipped release survives under `releases/_archive/<v>/`.
+- The window is `[newest archived audit sha, HEAD]`, or the whole history when the audit
+  history is empty.
+- Recover a historical audit record missing its sha with
+  `git log -S <audit-id> -- specs/audits`.
 
 ## The filter
 
-- A prior record matches when `surface` is an exact match — a closed enum, never a substring guess.
-- A prior record matches when `component` is a match — free text, judgement, not a string-equality check.
-- Cap: read at most the 20 most recent matching records in the window, ordered by `closed_at` (newest first).
-- Twenty is the number; a fixer wanting a wider read runs the audit (`dd-audit-project`) instead of widening phase 0.
+- A unit's bug history is the id-line query `git log -E --grep '^(fix|refactor)\(bugs\): ' -- <file>`, never `fix_files`; the ids it prints are looked up in the ledger.
+- Match `component` by engineering judgement; it is precise free text, not an enum.
+- A REBUILD is due where `bugs.py stats` and `append` say so; the label is `specs/bugs/AGENTS.md` §2's.
 
-## What to read — and what to distrust
+## Read persisted facts, inspect the named fix
 
-- A record carries no commit sha; find the fix by `git log -S<bug-id> -- specs/bugs/BUGS.jsonl` and read the commit it names.
-- A release-squash or ledger-only commit isolates nothing — say the trail is coarse instead of presenting it as "the fix".
-- Presenting a coarse diff as the prior fix is fabricated evidence.
+- A resolved record persists `cause`, `solution`, `caused_by` and `fix_sha`.
+- Inspect the fix with `git show <sha> --stat --patch`; `<sha>` is the fix commit of `specs/bugs/AGENTS.md` §2 (`git log -E --grep '^(fix|refactor)\(bugs\): .*<id>'`, keeping only a line naming `<id>` as a whole id), `fix_sha` only a hint. A release squash or a
+  ledger-only commit isolates no implementation; report that coarse trail honestly.
+- Follow `caused_by` through live and archived records. It names the bug or task whose
+  implementation wrote the lines this fix corrects; `none`: see Declare `caused_by`.
+- Bug-window maturity belongs to the next candidate's `SPEC.md` `## Bug window review`
+  (`dd-release-definition` §1 step 7): one KEEP leaves the first-level window; a REBUILD
+  leaves after its tested replacement and a following candidate with no child bug.
 
 ## Declare `caused_by`
 
-1. After reading the matching records, declare the link on this bug's own record — never on a prior one.
-2. `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py resolve <id> --caused-by <prior-bug-id>|none` is the one writer; it is validated against the ledger or the literal `none`.
-3. `caused_by: none` carries the same evidentiary weight as naming a bug — the window was read, no link found.
-4. Echo the declaration in the fix commit body: `caused_by:`, `evidence:` (what the prior diff did), `prior diffs read:`.
+1. Inspect blame for the production lines the fix replaces and the matching records.
+2. Choose the prior bug or task that wrote those lines. Use `none` only when blame's
+   candidate names no live or archived bug and no known release task.
+3. Resolve once the fix commit exists (`SKILL.md` Phase 6).
+
+4. `check` refuses a target naming no live or archived bug or known release task, and
+   refuses a lineage loop.
 
 ## Cost bound
 
-- At most 20 records read, at most 20 `git show` calls, per fix.
-- This is a reading discipline, not a mechanized scan — no CLI verb enforces the cap, no hook blocks a wider read.
-- The audit (pillar 1) measures how well the discipline is followed, over time, across the fleet.
+- Read at most 20 records and inspect at most 20 named fix commits per fix. A wider read
+  belongs to `dd-audit-project`.

@@ -1,0 +1,25 @@
+# Job 9 — adoption and discoverability (FR7; backlog `adoption-and-discoverability`)
+
+**Status:** Draft
+
+Wave 3, waits on Job 7 (T3 is the proof of the README's agent path, AC7.5). Paths are repository-relative to `repos/dadaia-workspace/`. Design and evidence: PLAN §2, §3 (AC7.1 and AC7.4 findings). Text and one generator: no behaviour of the tool changes, so the diff is an addition (PLAN §4). No URL changes: `Homepage` stays (AC7.3).
+
+- **Generator (T3, AC7.1).** `scripts/llms_full.py` (new, stdlib) reads `llms.txt`, resolves each link that is a file of this repo, and prints the pages' full text in `llms.txt`'s order, each under its path; links outside the repo are skipped, and `CHANGELOG.md` is skipped (PLAN §3: release-please writes it at the promote PR). `python scripts/llms_full.py > llms-full.txt` is the one writer; `llms.txt` gains a line linking `llms-full.txt`. The test imports the function from `scripts`, as `tests/scripts/test_mutate.py:18` imports `mutate`. T3 runs after T4 and T5: it embeds their pages.
+- **Docs (T4, AC7.4).** `docs/index.md` and `docs/quickstart.md` lose the defects of SPEC §1: `index.md:7` promises `pip install` where the path is `uvx`; `:50-54` spell `context bind`, `context baseline` and `context create` without the venv path the page uses elsewhere; both pages name `init --from`. `quickstart.md`: `:28` reads the work branch's version from the repo (`git -C repos/$SLUG branch --list 'feature/*' --format='%(refname:short)'`, the `feature/` prefix cut), never `0.1.0`; the second half of §1 becomes a third block that sets the variable it uses, opens the `rc-1/wt-rc` tree (`worktree new`) and runs `release.py new` in it; `:117` names `tasks/job<n>.md`. `tests/fixtures/quickstart.md` is byte-equal to the doc (guard `workspace-quickstart-fixture`, `scripts/guards/workspace.py:12-39`). If `release.py new --origin backlog:<id>` needs the entry on the work branch (its merge is verdict-gated), the block uses the origin `release.py new --help` allows without it, and says why in one sentence.
+- **README and keywords (T5, AC7.2, AC7.5).** `pyproject.toml` keywords gain `cursor`, `devin`, `github-copilot`, `agent-skills`; the README says each (it names Cursor, Devin and GitHub Copilot at `:101-103`; "agent skills" is added in the fast path). The agent section (`README.md:97`) opens with at most five lines: the install line, the root `AGENTS.md` map, `doctor`, `llms.txt` and `llms-full.txt`. The GitHub topics are set to the keywords at closure (PLAN §2).
+- **Memory.** The atoms these docs derive from move in the PE's closure pass, with `llms-full.txt` regenerated in the same shape-9 commit (PLAN §2, §3).
+- **Contract tests that stay green:** the rest of `tests/contract/test_docs_derived_from_memory.py` (the derived set, `llms.txt` lists every page, absolute README links, no dead verb), the tagline test, `tests/e2e/test_one_line_bootstrap.py`.
+
+**Gate law.** `verify:` is `python scripts/ci.py job`, no change. Definition of done: that run, `tests/contract/test_docs_derived_from_memory.py`, `tests/e2e/test_onboarding_journey.py` (needs `uvx` and network; a missing `uvx` skips only the quickstart class, `:296`), the own-diff self-check, the sweep greps.
+
+**Sweep greps.** `git grep -nE "pip install" -- docs/index.md` prints nothing; `git grep -n "0\.1\.0" -- docs/quickstart.md tests/fixtures/quickstart.md` prints nothing; `git grep -n 'tasks/<job>' -- docs` prints nothing; `git grep -c "init --from" -- docs/index.md docs/quickstart.md` prints 1 or more for each.
+
+Tasks: 5 (4 sr, 1 jr). T1 and T2 first; T4 and T5 after them; T3 last.
+
+| task | who | AC | `W:` | outcome |
+|---|---|---|---|---|
+| J9.T1 | sr | AC7.1, AC7.2, AC7.4 | `tests/contract/test_docs_derived_from_memory.py` | RED, contract. `llms-full.txt` equals the generator's output and `llms.txt` links it (next to `test_the_cli_reference_is_the_committed_output_of_the_generator`); the keywords hold the four names and each names something the README says; `docs/index.md` and `docs/quickstart.md` name `init --from` and no longer promise `pip install` (fail today: no generator, no file, no keywords) |
+| J9.T2 | sr | AC7.4 | `tests/e2e/test_onboarding_journey.py` | RED, E2E. `test_the_quickstart_block_runs_as_printed` unpacks and runs three blocks (today `[:2]` leaves the third undefined), with the project's bare repo carrying a version tag so a hard-coded `0.1.0` fails; it then asserts `specs/releases/<v>/rc-1/SPEC.md` and `_RELEASE.json` exist in the `rc-1/wt-rc` tree |
+| J9.T3 | sr | AC7.1 | `scripts/llms_full.py`, `llms-full.txt`, `llms.txt` | the Generator bullet; owner `test_docs_derived_from_memory.py`; the committed file is the generator's output |
+| J9.T4 | sr | AC7.4 | `docs/index.md`, `docs/quickstart.md`, `tests/fixtures/quickstart.md` | the Docs bullet; owner `test_onboarding_journey.py`; fixture and doc byte-equal |
+| J9.T5 | jr | AC7.2, AC7.5 | `README.md`, `pyproject.toml` | the README and keywords bullet, fully stated by it; owner `test_docs_derived_from_memory.py`; no other README line changes |

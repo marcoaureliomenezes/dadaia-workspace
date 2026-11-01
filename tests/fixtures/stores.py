@@ -1,0 +1,61 @@
+"""The real context registry in a tmp states dir — the store every non-CLI test uses."""
+
+import shutil
+import sys
+import sysconfig
+import venv
+from pathlib import Path
+
+from dadaia_workspace.core.platform import PLATFORM
+from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
+from tests.helpers.oslib import stub_cli
+
+
+def context_store(states_dir: Path) -> JsonContextStore:
+    """``JsonContextStore`` over *states_dir*; an absent registry created as ``init`` creates it."""
+    states_dir.mkdir(parents=True, exist_ok=True)
+    registry = states_dir / "spec_contexts.json"
+    if not registry.exists():
+        registry.write_text('{"contexts": []}', encoding="utf-8")
+    return JsonContextStore(states_dir)
+
+
+def own_venv_workspace(root: Path) -> Path:
+    """A registry plus a venv whose `python` and `dadaia` are this environment's own: a
+    process on that `python` is owned by *root* (no install)."""
+    tools = root / ".dadaia" / ".venv" / PLATFORM.venv_scripts_dir
+    tools.mkdir(parents=True)
+    (root / ".dadaia" / "states").mkdir()
+    (root / ".dadaia" / "states" / "spec_contexts.json").write_text('{"contexts": []}')
+    fake_venv(root, cli=True)
+    return root
+
+
+def own_venv_python(root: Path) -> Path:
+    return (
+        root / ".dadaia" / ".venv" / PLATFORM.venv_scripts_dir / f"python{PLATFORM.venv_exe_suffix}"
+    )
+
+
+def fake_venv(root: Path, cli: bool | str = False, pth: bool = False) -> Path:
+    """`root/.dadaia/.venv` as `venv.create` lays it out, without pip: the base interpreter
+    linked (copied on Windows, which needs a privilege for a link). With *cli*, this
+    environment's own `dadaia` console script is copied beside it: the installer's launcher (an
+    `.exe` on Windows, never a shebang text file).
+    With *cli* a source text, that script (its first line `#!python`) is wrapped as pip wraps a
+    console script: a launcher `.exe` on Windows, an executable shebang script elsewhere.
+    With *pth*, a `.pth` in its site-packages puts this process's `sys.path` on that `python`'s.
+    Returns that `python`."""
+    venv.create(root / ".dadaia" / ".venv", with_pip=False, symlinks=not PLATFORM.windows)
+    python = own_venv_python(root)
+    name = f"dadaia{PLATFORM.venv_exe_suffix}"
+    if isinstance(cli, str):
+        stub_cli(python.parent, "dadaia", cli, python)  # bound to this venv, as pip's is
+    elif cli:
+        shutil.copy2(Path(sys.executable).parent / name, python.with_name(name))
+    if pth:
+        env = str(root / ".dadaia" / ".venv")
+        site = Path(sysconfig.get_path("purelib", "venv", {"base": env, "platbase": env}))
+        site.mkdir(parents=True, exist_ok=True)
+        (site / "deps.pth").write_text("\n".join(p for p in sys.path if p) + "\n")
+    return python

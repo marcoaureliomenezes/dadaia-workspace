@@ -1,26 +1,12 @@
-"""The v6 specs/ canon table — ONE source for "what a specs/ tree contains" (v0.5.1
-candidate K4, "one canon table: scaffold is canon rendered, doctor is canon checked").
+"""The specs/ canon table — ONE source for "what a specs/ tree contains".
 
-Six bugs in six weeks shared one property violation: a fresh scaffold failed its own
-doctor (``fresh-specs-scaffold-fails-specs-doctor``, ``specs-init-creates-what-doctor
--refuses``, ``scaffold-artifacts-fail-own-workflow-gates``, ``fresh-release-scaffold
--emits-spec-doctor-warnings-042``, ``default-context-scaffold-fails-specs-doctor``,
-``release-new-rejects-semver-but-doctor-requires-it`` — all resolved, all in
-``specs/bugs/BUGS.jsonl``). The root cause: "what a specs tree contains" was hand-kept
-in three-to-four independent places (``specs_canon._CANON_FILE_PATTERNS``,
-``scaffolder.py``'s numbered ``_write`` blocks, ``doctor_structural.py``'s TREE-4/TREE-8
-required sets, ``doctor_closure_audit.py``'s ``check_archive_dirs_exist``) that could
-each drift from the others independently.
-
-This module is the fold target for all four: :data:`CANON` is the ONE declarative table;
-:func:`scaffold` renders every ``required_at_birth`` entry (scaffold is canon rendered);
+Scaffold and doctor read one table, :data:`CANON`, the ONE declarative table:
+:func:`scaffold` renders every ``required_at_birth`` entry;
 :func:`check_tree`/:func:`is_canon_path`/:func:`canon_violations` check a real tree
-against the SAME table (doctor is canon checked). The property this module exists to
-hold: ``scaffold(t); check_tree(t) == []`` — proved by
-``tests/unit/features/specs/test_canon_property.py``.
+against the SAME table. The property this module holds:
+``scaffold(t); check_tree(t) == []``.
 
-Pure module for its CHECKING half (:func:`is_canon_path`, :func:`canon_violations`,
-:func:`verdict_violations`): plain data in, plain data out, never touches a filesystem.
+Pure module for its CHECKING half (:func:`is_canon_path`, :func:`canon_violations`): plain data in, plain data out, never touches a filesystem.
 Its RENDERING half (:func:`scaffold`, :func:`scaffold_entry`) does
 real file I/O by design (that is the whole point of a scaffolder) but touches nothing
 outside the *specs_dir*/*public_dir* it is given.
@@ -30,18 +16,17 @@ copy (the drift class this module closes):
 
 * ``doctor_structural.StructuralValidator.check_tree8_canon_root`` — the doctor's
   full-tree conformance sweep.
-* ``features.chokepoints.service.push_gate_decision`` — the pre-push specs-canon gate
-  (SPEC v0.5.0): every path a push would newly publish under ``specs/`` is checked
-  against the SAME predicate, through the existing ``GitObjectReader`` port
+* ``features.chokepoints.push_gate.push_gate_decision`` — the pre-push specs-canon gate
+  every path a push would newly publish under ``specs/`` is checked
+  against the SAME predicate, through the injected git object reader
   (``list_tree_paths``) — never a second, hand-kept member list.
 
-The canon (operator, 2026-08-28) — the ONLY members permitted under ``specs/``:
+The canon — the ONLY members permitted under ``specs/``:
 
     AGENTS.md constitution.md memory/ releases/ backlog/ bugs/ audits/ ADRs/
 
     releases/{AGENTS.md, _archive/{releases_histo.jsonl, <M.m.p>/**},
-              <M.m.p>/{_RELEASE.json, SPEC.md, PLAN.md, TASKS.md, rc-N/{SPEC,PLAN,TASKS}.md,
-                       <alpha|rc>-N/{SPEC.md, PLAN.md, TASKS.md}}}
+              <M.m.p>/{_RELEASE.json, rc-<N>/{SPEC.md, PLAN.md, TASKS.md}}}
     backlog/{AGENTS.md, BACKLOG.json, _archive/backlog_histo.jsonl}
     bugs/{AGENTS.md, BUGS.jsonl, _archive/bugs_histo.jsonl}
     audits/{AGENTS.md, _archive/audits_histo.jsonl,
@@ -52,29 +37,32 @@ The canon (operator, 2026-08-28) — the ONLY members permitted under ``specs/``
 
 Nothing else — no ``.gitkeep``, no dotfiles, no ``remote-bugs/``, no ``reviews/``, no
 ``.md`` ADRs. Every path checked is POSIX-relative to ``specs/`` (e.g.
-``"releases/0.5.0/SPEC.md"``, never an absolute filesystem path or a
+``"releases/<M.m.p>/rc-<N>/SPEC.md"``, never an absolute filesystem path or a
 backslash-separated one) — the same shape both a filesystem walk (``Path.as_posix()``)
 and a git tree listing (``git ls-tree``'s own native output) already produce.
 """
 
 from __future__ import annotations
 
-import json
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from functools import partial
 from pathlib import Path
 from typing import Literal
 
-from dadaia_workspace.core.specs_version import (
-    CANONICAL_SPECS_VERSION,
-)
+from dadaia_workspace.core import clock, platform
+from dadaia_workspace.core.atomic_write import SymlinkRefusedError, atomic_write
+from dadaia_workspace.core.gitflow import DEFAULT, gitflow_value
+from dadaia_workspace.core.skill_owner import load_owner
+from dadaia_workspace.core.specs_version import CANONICAL_SPECS_VERSION
 from dadaia_workspace.core.workspace_layout import (
     CANON_ROOT_MEMBERS,
     MEMORY_TOPLEVEL_FILES,
+    REPO_LAW,
     REQUIRED_ROOT_DIRS,
     SPECS_CANON,
     CanonEntry,
+    render_registry_tables,
 )
 from dadaia_workspace.features.specs.memory_canon import (
     FIXED_SECTION_BY_PATH,
@@ -82,7 +70,7 @@ from dadaia_workspace.features.specs.memory_canon import (
     render_fixed_section,
 )
 
-#: The canon rows live in ``core.workspace_layout`` (0.4.7 FR5: ONE registry of
+#: The canon rows live in ``core.workspace_layout`` (ONE registry of
 #: canonical names, shared with the root law, the zone table and the projected
 #: ``specs/AGENTS.md`` canon table). This module is their renderer and checker.
 CANON: tuple[CanonEntry, ...] = SPECS_CANON
@@ -90,6 +78,7 @@ CANON: tuple[CanonEntry, ...] = SPECS_CANON
 __all__ = [
     "CANON",
     "CANON_ROOT_MEMBERS",
+    "REPO_LAW",
     "REQUIRED_ROOT_DIRS",
     "TEMPLATES",
     "CanonEntry",
@@ -99,30 +88,30 @@ __all__ = [
     "is_canon_path",
     "scaffold",
     "scaffold_entry",
+    "scaffold_repo_law",
 ]
 
 _CONSTITUTION_STUB = """\
 ---
 specs_pattern_version: {specs_pattern_version}
+gitflow: {gitflow}
 ---
 # Constitution — {project_name}
 
 > **Created:** {today}
 
-## Propósito
+## Purpose
 
-Declaração atômica do propósito do projeto e suas invariantes fundamentais.
+One statement of what this project is for.
 
-## Invariantes
+## Invariants
 
-1. (Definir invariantes aqui)
+1. (State the invariants every release must keep.)
 
-## Exclusões canônicas
+## Exclusions
 
-- (Definir o que este projeto não é)
+- (State what this project is not.)
 """
-
-_BACKLOG_STUB = '{"schema": "backlog-v1", "active": []}\n'
 
 
 # ---------------------------------------------------------------------------------
@@ -135,12 +124,8 @@ _BACKLOG_STUB = '{"schema": "backlog-v1", "active": []}\n'
 #                       several static templates hold literal JSON braces).
 # * ``"format"``      — ``template.format(**context)``; used only where every brace in
 #                       the template is a deliberate placeholder.
-# * ``"json_catalog"`` — one dedicated renderer (``json.dumps``, correctly escaped) —
-#                       the ONE entry needing computed, safely-escaped JSON content;
-#                       folding it into ``"format"`` would risk JSON injection from an
-#                       arbitrary ``project_name``.
 # ---------------------------------------------------------------------------------
-Kind = Literal["copy", "static", "format", "json_catalog"]
+Kind = Literal["copy", "static", "format"]
 
 TEMPLATES: dict[str, tuple[Kind, str]] = {
     "AGENTS.md": ("copy", "templates/specs-AGENTS.md"),
@@ -148,11 +133,13 @@ TEMPLATES: dict[str, tuple[Kind, str]] = {
     "memory/AGENTS.md": ("copy", "scaffold/memory/AGENTS.md"),
     **{f"memory/{name}": ("copy", f"scaffold/memory/{name}") for name in MEMORY_TOPLEVEL_FILES},
     "memory/product/index.md": ("copy", "scaffold/memory/product/index.md"),
-    "memory/product/catalog.json": ("json_catalog", ""),
     "releases/AGENTS.md": ("copy", "scaffold/releases/AGENTS.md"),
     "releases/_archive/releases_histo.jsonl": ("static", ""),
     "backlog/AGENTS.md": ("copy", "scaffold/backlog/AGENTS.md"),
-    "backlog/BACKLOG.json": ("static", _BACKLOG_STUB),
+    "backlog/BACKLOG.json": (
+        "static",
+        load_owner("dd-backlog-definition", "_backlog_store").render([]),
+    ),
     "backlog/_archive/backlog_histo.jsonl": ("static", ""),
     "bugs/AGENTS.md": ("copy", "scaffold/bugs/AGENTS.md"),
     "bugs/_archive/bugs_histo.jsonl": ("static", ""),
@@ -164,9 +151,8 @@ TEMPLATES: dict[str, tuple[Kind, str]] = {
 
 
 def is_canon_path(rel_posix: str) -> bool:
-    """True iff *rel_posix* (POSIX-relative to ``specs/``) is a v6-canon-conformant
-    file path — structural shape only, never sha-specific (see :func:`verdict_violations`
-    for the verdict business rule layered on top of the same path shape)."""
+    """True iff *rel_posix* (POSIX-relative to ``specs/``) is a canon-conformant
+    file path — structural shape only, never sha-specific."""
     return any(entry.pattern.match(rel_posix) for entry in CANON)
 
 
@@ -216,39 +202,18 @@ def check_tree(specs_dir: Path) -> list[Violation]:
 
 def default_public_dir() -> Path:
     """``dadaia_workspace/public/`` resolved relative to this installed module — the
-    same module-relative idiom already used by ``features.spec_artifacts.memory``
-    (retired by this task) and ``features.specs.doctor``'s CLI composition root."""
+    same module-relative idiom ``features.specs.doctor``'s CLI composition root uses."""
     return Path(__file__).resolve().parent.parent.parent / "public"
-
-
-def _today() -> str:
-    return datetime.now(tz=UTC).strftime("%Y-%m-%d")
 
 
 def _render(entry: CanonEntry, *, public_dir: Path, context: dict[str, str]) -> str:
     kind, template = TEMPLATES[entry.shape]
     if kind == "copy":
-        text = (public_dir / template).read_text(encoding="utf-8")
+        text = render_registry_tables(platform.read_text(public_dir / template))
     elif kind == "static":
         text = template
-    elif kind == "format":
-        text = template.format(**context)
     else:
-        text = (
-            json.dumps(
-                {
-                    "generated_at": f"{context['today']}T00:00:00Z",
-                    # The catalog's ONE writer is `memory.py catalog generate`, which
-                    # derives `context` from the tree's own directory name; a scaffold
-                    # writing the project label instead was invalid the moment it was
-                    # born (`memory.py check` regenerates and compares).
-                    "context": context["tree_name"],
-                    "features": [],
-                },
-                indent=2,
-            )
-            + "\n"
-        )
+        text = template.format(**context)
     section_id = FIXED_SECTION_BY_PATH.get(entry.dest or "")
     if section_id is None:
         return text
@@ -264,34 +229,73 @@ def scaffold(
 ) -> list[Path]:
     """Write every ``required_at_birth`` CANON entry — scaffold is canon rendered.
 
-    An existing target is left untouched unless *force*. Returns the paths actually
+    An existing target is left untouched unless *force*; a symlinked target is never
+    written through. Returns the paths actually
     (re)written, in :data:`CANON` order; a skipped (already-present, not forced) entry
-    is omitted — the caller that also needs skip/error bookkeeping is
-    ``features.specs.scaffolder.scaffold`` (the CLI-facing wrapper, which pre-checks
-    existence to report ``ScaffoldResult.skipped`` without changing this fold).
+    is omitted.
     """
     resolved_public = public_dir if public_dir is not None else default_public_dir()
     context = {
-        "today": _today(),
+        "today": clock.today(),
         "project_name": project_name,
-        "tree_name": specs_dir.resolve().parent.name,
         "specs_pattern_version": str(CANONICAL_SPECS_VERSION),
+        "gitflow": gitflow_value(DEFAULT),
     }
-    created: list[Path] = []
-    for entry in CANON:
+    writes: list[tuple[Path, Callable[[], str], bool]] = [
         # Only "no destination" disqualifies an entry: a required_at_birth row always
-        # has a renderer (``memory/product/catalog.json``'s is computed, not a template —
-        # a prior guard skipped it for having no template string and silently dropped it
-        # from every fresh scaffold: fresh-specs-scaffold-fails-specs-doctor's own class).
-        if not entry.required_at_birth or entry.dest is None:
+        # has a renderer (a skipped row once dropped silently from every fresh scaffold).
+        (
+            specs_dir / entry.dest,
+            partial(_render, entry, public_dir=resolved_public, context=context),
+            force,
+        )
+        for entry in CANON
+        if entry.required_at_birth and entry.dest is not None
+    ]
+    return _write_absent(specs_dir, writes)
+
+
+def scaffold_repo_law(
+    repo: Path, *, project_name: str, public_dir: Path | None = None
+) -> list[Path]:
+    """Install the repo's scoped law (:data:`REPO_LAW`) where absent — never overwritten:
+    once written it is the operator's. ``<repo-name>`` renders as *project_name*.
+    Returns the paths written."""
+    templates = (public_dir if public_dir is not None else default_public_dir()) / "templates"
+    return _write_absent(
+        repo,
+        [
+            (
+                repo / dest,
+                partial(_fill_repo_name, templates / template, project_name),
+                False,
+            )
+            for template, dest in REPO_LAW
+        ],
+    )
+
+
+def _fill_repo_name(template: Path, project_name: str) -> str:
+    return render_registry_tables(platform.read_text(template)).replace("<repo-name>", project_name)
+
+
+def _write_absent(root: Path, writes: list[tuple[Path, Callable[[], str], bool]]) -> list[Path]:
+    """The one scaffold write under *root*: each ``(target, render, overwrite)`` through
+    :func:`atomic_write`, which refuses a symlinked destination (CWE-59); intermediate
+    directories are checked for escape before ``mkdir``. An existing file (unless
+    *overwrite*) or a symlinked destination, dangling or not, is skipped."""
+    created: list[Path] = []
+    for target, render, overwrite in writes:
+        anchor = next(p for p in (target.parent, *target.parent.parents) if p.exists() or p == root)
+        if platform.is_link(root) or anchor.resolve() != root.resolve() / anchor.relative_to(root):
             continue
-        target = specs_dir / entry.dest
-        if target.exists() and not force:
+        if target.exists() and not overwrite:
             continue
         target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(
-            _render(entry, public_dir=resolved_public, context=context), encoding="utf-8"
-        )
+        try:
+            atomic_write(target, render())
+        except SymlinkRefusedError:
+            continue
         created.append(target)
     return created
 
@@ -299,7 +303,7 @@ def scaffold(
 def scaffold_entry(specs_dir: Path, rel_path: str, /, **context: str) -> Path:
     """Render and write ONE canon-conformant, on-demand entry — the generic sibling of
     :func:`scaffold`'s birth-time fold (e.g. ``scaffold_entry(specs_dir,
-    "releases/0.6.0/SPEC.md", release_id="0.6.0")``).
+    "releases/<id>/rc-<N>/SPEC.md", release_id="<id>")``).
 
     File-level no-clobber: refuses (``FileExistsError``) when *rel_path* already
     exists. Raises ``ValueError`` when *rel_path* matches no :data:`CANON` entry, or
@@ -317,8 +321,7 @@ def scaffold_entry(specs_dir: Path, rel_path: str, /, **context: str) -> Path:
     rendered = _render(
         entry,
         public_dir=default_public_dir(),
-        context={"today": _today(), **context},
+        context={"today": clock.today(), **context},
     )
-    target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text(rendered, encoding="utf-8")
+    atomic_write(target, rendered, ensure_parent=True)
     return target

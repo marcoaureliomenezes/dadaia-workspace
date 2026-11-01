@@ -7,11 +7,13 @@ import json
 import typer
 
 from dadaia_workspace import container
+from dadaia_workspace.cli._fail import fail
+from dadaia_workspace.cli.help_digest import write_digest
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
-from dadaia_workspace.features.reconcile import reconcile_workspace
 
 
 def reconcile(
+    ctx: typer.Context,
     expect_version: str = typer.Option(
         ..., "--expect-version", help="Exact installed dadaia-workspace version to certify."
     ),
@@ -19,29 +21,18 @@ def reconcile(
 ) -> None:
     """Reconcile state and projections after installing an exact candidate wheel."""
     workspace_root = resolve_workspace_root()
-    result = reconcile_workspace(
-        workspace_root,
-        expected_version=expect_version,
-        public_service=container.build_public_service(),
-        doctor_service=container.build_doctor_service(workspace_root),
-    )
+    result = container.reconcile_workspace(workspace_root, expected_version=expect_version)
     payload = result.to_dict()
     if json_output:
         typer.echo(json.dumps(payload, sort_keys=True))
     elif result.ok:
-        from dadaia_workspace.cli.help_digest import write_digest
-
-        write_digest(workspace_root)  # derived help digest rider; fail-soft
+        write_digest(
+            workspace_root, ctx.find_root().command
+        )  # derived help digest rider; fail-soft
         typer.echo(f"[ok] reconciled dadaia-workspace {result.actual_version}")
         for step in result.steps:
             typer.echo(f"  [ok] {step}")
     else:
-        typer.echo(f"[error] reconciliation failed: {result.error}", err=True)
-        if result.rollback_required:
-            typer.echo(
-                "[rollback-required] reinstall the previous exact provider version, then run "
-                "its matching 'dadaia public stage' and 'dadaia public install'.",
-                err=True,
-            )
+        fail(result.error, result.fix)
     if not result.ok:
         raise typer.Exit(1)

@@ -1,0 +1,15 @@
+schema_version = "1.4"
+
+[metadata]
+description = "A block-list bug: register it, RED test, root-cause fix, green suite, no assert rewritten"
+
+[verifier]
+timeout_sec = 300.0
+
+[agent]
+timeout_sec = 1800.0
+
+[environment]
+network_mode = "public"
+build_timeout_sec = 900.0
+os = "linux"

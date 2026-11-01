@@ -1,0 +1,71 @@
+"""For an ALIVE context whose repo is on disk, `context list` and `context show` both report the
+LIVE checked-out branch (one resolver, `repo_live_status`); with no repo on disk there is none.
+"""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+import pytest
+from typer.testing import CliRunner
+
+from dadaia_workspace.cli.main import app
+from tests.helpers.oslib import run, write_text
+
+_runner = CliRunner()
+_CTX = "live-branch-ctx"
+
+
+def _make_workspace_with_repo(root: Path) -> Path:
+    ws = root / "ws"
+    states = ws / ".dadaia" / "states"
+    states.mkdir(parents=True)
+    repo = ws / "repos" / _CTX
+    repo.mkdir(parents=True)
+    run(["git", "init", "-q", "-b", "main", str(repo)], check=True)
+    run(["git", "-C", str(repo), "config", "user.email", "t@t"], check=True)
+    run(["git", "-C", str(repo), "config", "user.name", "t"], check=True)
+    write_text(repo / "f.txt", "x")
+    run(["git", "-C", str(repo), "add", "."], check=True)
+    run(["git", "-C", str(repo), "commit", "-qm", "init"], check=True)
+    # The LIVE branch differs from the stored snapshot below.
+    run(["git", "-C", str(repo), "checkout", "-qb", "feature/v9.9.9"], check=True)
+    write_text(
+        states / "spec_contexts.json",
+        json.dumps(
+            {
+                "schema_version": "2",
+                "contexts": [
+                    {
+                        "name": _CTX,
+                        "state": "alive",
+                        "repo_slug": _CTX,
+                        "repo_url": "https://example.invalid/live-branch-ctx.git",
+                        "created_at": "2026-07-01T00:00:00+00:00",
+                        "alive_since": "2026-07-01T00:00:00+00:00",
+                        "dead_since": None,
+                        "current_branch": "main",
+                    }
+                ],
+            }
+        ),
+    )
+    return ws
+
+
+@pytest.mark.parametrize(("on_disk", "branch"), [(True, "feature/v9.9.9"), (False, None)])
+def test_list_and_show_report_the_live_branch_else_none(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, on_disk: bool, branch: str
+) -> None:
+    ws = _make_workspace_with_repo(tmp_path)
+    if not on_disk:
+        (ws / "repos" / _CTX).rename(tmp_path / _CTX)
+    monkeypatch.chdir(ws)
+
+    shown = json.loads(_runner.invoke(app, ["context", "show", _CTX, "--json"]).stdout)
+    listed = json.loads(_runner.invoke(app, ["context", "list", "--json"]).stdout)
+    row = next(r for r in listed if r["name"] == _CTX)
+
+    for payload in (shown, row):
+        assert payload["current_branch"] == branch, payload

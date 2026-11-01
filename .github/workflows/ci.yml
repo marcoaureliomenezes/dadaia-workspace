@@ -1,18 +1,25 @@
 name: CI
 
-# Gitflow law v2 (v0.4.4 FR3/FR4 / DADAIA.md §4 (Gitflow)): feature/{M.m.p} is the ONLY pushable
-# branch (its push triggers the full matrix below); develop and main advance by PR
-# only. Every PR is gated by pr-source-guard (both edges, one job); no job calls a model
-# API — the security review is the local dd-code-reviewer lens. hotfix/* carries no trigger.
+# Gitflow by role (specs/constitution.md `gitflow:`): the work branch and the rc, main and backlog
+# `wt/` kinds (`pushable()` in `_worktree_names.py`) are the ONLY pushable branches; the integration
+# and principal branches advance by PR only. Push events run the Linux jobs below; Windows and macOS run
+# only on pull requests. The triggers below are
+# literal (GitHub reads no file) and pinned to the library gitflow by the ci-triggers-gitflow
+# guard; pr-source-guard reads the gitflow itself. The security review is the local
+# dd-code-reviewer lens.
 on:
   push:
     branches:
       - main
       - develop
       - 'feature/**'
+      # a job branch (ADR 0190): its push runs the Linux checks its verdict names
+      - 'wt/**'
   pull_request:
     branches: [main, develop]
   workflow_dispatch:
+  # release.yml reuses this one check set before it publishes (ADR 0078).
+  workflow_call:
 
 permissions:
   contents: read
@@ -27,17 +34,17 @@ jobs:
   # GRADUATED to a hard gate in 0.1.8 rc-2 (F-01 fcntl crash fixed; green on both OSes).
   importability-smoke:
     name: Importability smoke (Windows/macOS)
+    if: ${{ github.event_name == 'pull_request' }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 10
     strategy:
       fail-fast: false
       matrix:
         os: [windows-latest, macos-latest]
-    env:
-      PYTHONUTF8: "1"
-      PYTHONIOENCODING: "utf-8"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
         with:
           python-version: "3.12"
@@ -54,31 +61,25 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
         with:
           python-version: "3.12"
       - name: Install Poetry
-        run: pipx install poetry==1.8.3
+        run: pipx install poetry==2.5.1
       - name: Cache poetry deps
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
         with:
           path: |
             ~/.cache/pypoetry
             ~/.cache/pip
-            .venv
           key: poetry-${{ runner.os }}-${{ hashFiles('poetry.lock') }}
       - name: Install dev deps
         run: poetry install --no-interaction --no-ansi --with dev
-      - name: ruff format --check
-        run: poetry run ruff format --check dadaia_workspace/ tests/
-      - name: ruff check
-        # Redirect ruff's cache outside the checkout (pyproject cache-dir removed in T-018-07).
-        run: RUFF_CACHE_DIR="$RUNNER_TEMP/ruff" poetry run ruff check dadaia_workspace/ tests/
-      - name: lint-imports (import-boundary contracts)
-        # Enforce the setup.cfg import-linter contracts (FR4). --no-cache keeps
-        # .import_linter_cache/ out of the checkout (repo-cleanliness law). No extra
-        # install: import-linter is provided by the `poetry install --with dev` above.
-        run: poetry run lint-imports --config setup.cfg --no-cache
+      # Every Linux job's commands live in scripts/ci.py, the one source (T-050-190).
+      - name: lint
+        run: poetry run python scripts/ci.py lint
 
   typecheck:
     name: Typecheck (mypy --strict)
@@ -86,79 +87,99 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
         with:
           python-version: "3.12"
       - name: Install Poetry
-        run: pipx install poetry==1.8.3
+        run: pipx install poetry==2.5.1
       - name: Cache poetry deps
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
         with:
           path: |
             ~/.cache/pypoetry
             ~/.cache/pip
-            .venv
           key: poetry-${{ runner.os }}-${{ hashFiles('poetry.lock') }}
       - name: Install
         run: poetry install --no-interaction --no-ansi --with dev
-      - name: mypy --strict
-        # Redirect mypy's cache outside the checkout (pyproject cache_dir removed in T-018-07).
-        # 0.4.7 FR3: the cache is redirected by [tool.mypy] cache_dir in pyproject.toml.
-        run: poetry run mypy --strict dadaia_workspace/
+      - name: typecheck
+        run: poetry run python scripts/ci.py typecheck
 
-  unit-fast:
-    name: Unit fast (pytest)
-    runs-on: ubuntu-latest
-    timeout-minutes: 2
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
-        with:
-          python-version: "3.12"
-      - name: Install Poetry
-        run: pipx install poetry==1.8.3
-      - name: Cache poetry deps
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
-        with:
-          path: |
-            ~/.cache/pypoetry
-            ~/.cache/pip
-            .venv
-          key: poetry-${{ runner.os }}-${{ hashFiles('poetry.lock') }}
-      - name: Install
-        run: poetry install --no-interaction --no-ansi --with dev
-      - name: pytest unit fast
-        run: poetry run pytest -q -m "unit and not slow and not quarantine" tests/unit -n auto --durations=25
-
-  contract-coverage:
-    name: Contract coverage (pytest)
+  guards:
+    name: Guards (scripts/guards)
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
         with:
           python-version: "3.12"
       - name: Install Poetry
-        run: pipx install poetry==1.8.3
+        run: pipx install poetry==2.5.1
       - name: Cache poetry deps
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
         with:
           path: |
             ~/.cache/pypoetry
             ~/.cache/pip
-            .venv
           key: poetry-${{ runner.os }}-${{ hashFiles('poetry.lock') }}
       - name: Install
         run: poetry install --no-interaction --no-ansi --with dev
-      - name: pytest unit/contract coverage
-        # Redirect coverage's data file outside the checkout (pyproject data_file removed in T-018-07).
-        env:
-          COVERAGE_FILE: ${{ runner.temp }}/.coverage
-        # -n auto: this was the only pytest job without xdist and the CI long pole
-        # (bug test-suite-real-venv-and-ci-longpole); pytest-cov combines per-worker
-        # coverage automatically.
-        run: poetry run pytest -q -m "(unit or contract) and not quarantine" -n auto --cov=dadaia_workspace --cov-report=term-missing --cov-fail-under=80 tests/unit tests/contract --durations=25
+      - name: guards
+        run: poetry run python scripts/ci.py guards
+
+  unit-fast:
+    name: Unit fast (pytest)
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+        with:
+          python-version: "3.12"
+      - name: Install Poetry
+        run: pipx install poetry==2.5.1
+      - name: Cache poetry deps
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
+        with:
+          path: |
+            ~/.cache/pypoetry
+            ~/.cache/pip
+          key: poetry-${{ runner.os }}-${{ hashFiles('poetry.lock') }}
+      - name: Install
+        run: poetry install --no-interaction --no-ansi --with dev
+      - name: unit-fast
+        run: poetry run python scripts/ci.py unit-fast
+
+  contract-coverage:
+    name: Contract coverage (pytest)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+        with:
+          python-version: "3.12"
+      - name: Install Poetry
+        run: pipx install poetry==2.5.1
+      - name: Cache poetry deps
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
+        with:
+          path: |
+            ~/.cache/pypoetry
+            ~/.cache/pip
+          key: poetry-${{ runner.os }}-${{ hashFiles('poetry.lock') }}
+      - name: Install
+        run: poetry install --no-interaction --no-ansi --with dev
+      - name: contract-coverage
+        run: poetry run python scripts/ci.py contract-coverage
 
   # CI matrix (T-018-21 / WS-2 → GRADUATED in 0.1.8 rc-2): unit + contract on Windows/macOS.
   # Ubuntu hard-gating jobs above remain separate companion jobs so the original required
@@ -166,105 +187,115 @@ jobs:
   # feature/0.1.8 graduation run recorded in CLOSURE) — no continue-on-error.
   unit-fast-cross:
     name: Unit fast (Windows/macOS)
+    if: ${{ github.event_name == 'pull_request' }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 8
     strategy:
       fail-fast: false
       matrix:
         os: [windows-latest, macos-latest]
-    env:
-      PYTHONUTF8: "1"
-      PYTHONIOENCODING: "utf-8"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
         with:
           python-version: "3.12"
       - name: Install Poetry
-        run: pipx install poetry==1.8.3
+        run: pipx install poetry==2.5.1
       - name: Install
         run: poetry install --no-interaction --no-ansi --with dev
+      # Poetry's editable builder writes no Scripts\dadaia.exe on Windows; pip's PEP 660 install does.
+      - name: Install the dadaia launcher
+        run: poetry run python -m pip install --no-deps -e .
       - name: pytest unit fast
-        run: poetry run pytest -q -m "unit and not slow and not quarantine" tests/unit -n auto --durations=25
+        run: poetry run pytest -q -m "small and not slow and not quarantine" tests -n auto --durations=25
 
   contract-coverage-cross:
     name: Contract coverage (Windows/macOS)
+    if: ${{ github.event_name == 'pull_request' }}
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 8
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
         os: [windows-latest, macos-latest]
-    env:
-      PYTHONUTF8: "1"
-      PYTHONIOENCODING: "utf-8"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
         with:
           python-version: "3.12"
       - name: Install Poetry
-        run: pipx install poetry==1.8.3
+        run: pipx install poetry==2.5.1
       - name: Install
         run: poetry install --no-interaction --no-ansi --with dev
-      - name: pytest unit/contract coverage
+      # Poetry's editable builder writes no Scripts\dadaia.exe on Windows; pip's PEP 660 install does.
+      - name: Install the dadaia launcher
+        run: poetry run python -m pip install --no-deps -e .
+      - name: pytest small and medium coverage
+        shell: bash
         env:
           COVERAGE_FILE: ${{ runner.temp }}/.coverage
         # -n auto: same long-pole fix as the ubuntu contract-coverage job (windows was 2:55).
-        run: poetry run pytest -q -m "(unit or contract) and not quarantine" -n auto --cov=dadaia_workspace --cov-report=term-missing tests/unit tests/contract --durations=25
+        run: poetry run pytest -q -m "not e2e and not quarantine" -n auto --cov=dadaia_workspace --cov-report=term-missing tests --durations=25
 
   integration:
     name: Integration (pytest)
     runs-on: ubuntu-latest
-    # v0.7.0 P6 ratchet: ~1.5x measured job wall; raising this needs a CLOSURE justification.
-    timeout-minutes: 6
+    # About 1.5x the job's frozen wall-clock budget.
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
         with:
           python-version: "3.12"
       - name: Install Poetry
-        run: pipx install poetry==1.8.3
+        run: pipx install poetry==2.5.1
       - name: Cache poetry deps
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
         with:
           path: |
             ~/.cache/pypoetry
             ~/.cache/pip
-            .venv
           key: poetry-${{ runner.os }}-${{ hashFiles('poetry.lock') }}
       - name: Install
         run: poetry install --no-interaction --no-ansi --with dev
-      - name: pytest integration
-        run: poetry run pytest -q -m "integration and not quarantine" tests/integration --durations=30
+      - name: integration
+        run: poetry run python scripts/ci.py integration
 
   e2e-python:
     name: E2E Python (pytest)
     runs-on: ubuntu-latest
-    # v0.7.0 P6 ratchet: ~1.5x measured job wall; raising this needs a CLOSURE justification.
-    timeout-minutes: 6
+    # The onboarding journey (uvx + real workspace venvs, ~2 min local) runs here instead of
+    # skipping.
+    timeout-minutes: 12
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
         with:
           python-version: "3.12"
       - name: Install Poetry
-        run: pipx install poetry==1.8.3
+        run: pipx install poetry==2.5.1
       - name: Cache poetry deps
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
         with:
           path: |
             ~/.cache/pypoetry
             ~/.cache/pip
-            .venv
           key: poetry-${{ runner.os }}-${{ hashFiles('poetry.lock') }}
       - name: Install
         run: poetry install --no-interaction --no-ansi --with dev
-      # The whole e2e tree, not `tests/e2e/features` alone: the journeys at the tree root
-      # (the push chokepoint, the denylist, and the one-line bootstrap through the
-      # installed console script) were outside every selector and ran nowhere in CI.
-      - name: pytest e2e python
-        run: poetry run pytest -q -m "e2e and not quarantine" tests/e2e --durations=30
+      # The onboarding journey drives `uvx --from <wheel>`.
+      - name: Install uv
+        run: pipx install uv==0.11.16
+      - name: e2e-python
+        run: poetry run python scripts/ci.py e2e-python
 
   pr-title:
     name: PR title (conventional commits)
@@ -273,6 +304,8 @@ jobs:
     timeout-minutes: 2
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          fetch-depth: 0
       - name: Validate PR title
         env:
           PR_TITLE: ${{ github.event.pull_request.title }}
@@ -288,19 +321,19 @@ jobs:
     timeout-minutes: 2
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
-      - name: Fail if projection or runtime files are git-tracked
-        run: bash .github/scripts/check_no_repo_local_claude.sh
+        with:
+          fetch-depth: 0
+      - name: repo-hygiene
+        run: python3 scripts/ci.py repo-hygiene
 
   doctor:
     name: Compliance (workspace/specs/ledgers sections)
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
+      # Full history: the CLOSURE memory-window check (RELEASE-TREE / LEDGER-RELEASE-SCHEMA)
+      # diffs the memory entry's since..until and until..HEAD; a shallow clone lacks them.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
-        # Full history: SPEC-DOC-044's liveness set is the head, its parents and each
-        # merged line's first parent (features.chokepoints.verdict.live_verdict_shas);
-        # a depth-1 checkout hides a merge commit's parents and calls the verdict the
-        # merge just consumed stale — the same reason the verdict-gate job fetches depth 0.
         with:
           fetch-depth: 0
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
@@ -312,42 +345,86 @@ jobs:
       # v0.1.25 R1/ADR-D). Its `ledgers` section carries BL-SCHEMA/CONFLICT/STALE and its
       # `specs` section the SPEC-DOC + RELEASE-TREE rules over committed repository truth;
       # any error-class finding fails the job. An absent document is trivially clean.
-      - name: dadaia doctor
-        run: dadaia doctor --specs-dir specs --source-root .
+      - name: doctor
+        run: python scripts/ci.py doctor
 
   pr-source-guard:
-    name: PR source guard (both gitflow v2 edges, one job)
+    name: PR source guard (both gitflow edges, one job)
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request' && (github.base_ref == 'main' || github.base_ref == 'develop')
-    timeout-minutes: 1
+    if: github.event_name == 'pull_request'
+    timeout-minutes: 2
     steps:
+      # The PR's code evaluates the BASE branch's gitflow data: the roles that admit a PR
+      # come from the constitution it merges into, never from the PR itself.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+        with:
+          python-version: "3.12"
+      - name: Read the base branch's constitution
+        env:
+          BASE_REF: ${{ github.base_ref }}
+          BASE_SPECS: ${{ runner.temp }}/base-specs
+        run: |
+          python -m pip install --quiet pyyaml==6.0.3
+          mkdir -p "$BASE_SPECS"
+          git fetch --quiet --depth=1 origin "refs/heads/$BASE_REF"
+          # Absent file: read_gitflow falls back to the default gitflow and warns.
+          git show "FETCH_HEAD:specs/constitution.md" > "$BASE_SPECS/constitution.md" || rm -f "$BASE_SPECS/constitution.md"
       - name: Refuse a PR whose head does not match its base's permitted source
         env:
           # head.ref/base_ref are fork-influenceable input: never interpolate them
           # into the shell command string — read from the environment and compare.
           HEAD_REF: ${{ github.event.pull_request.head.ref }}
           BASE_REF: ${{ github.base_ref }}
+          BASE_SPECS: ${{ runner.temp }}/base-specs
+          PYTHONPATH: .
         run: |
-          if [ "$BASE_REF" = "main" ]; then
-            # Rule 1: main accepts the promote PR from develop and release-please's
-            # release PR (ADR 0021: promote is merging the release PR), nothing else.
-            if [ "$HEAD_REF" != "develop" ] && [ "$HEAD_REF" != "release-please--branches--main" ]; then
-              echo "::error::Gitflow law: main accepts PRs from 'develop' or the release-please release PR only. Got head '$HEAD_REF'."
-              echo "::error::Fix: merge your branch into develop, push develop, and open the PR develop -> main."
-              exit 1
-            fi
-            echo "PR head is $HEAD_REF - gitflow source rule satisfied (main)."
-          elif [ "$BASE_REF" = "develop" ]; then
-            # Rule 2 (v0.4.4 FR4): develop accepts a PR only from feature/{M.m.p} — no
-            # 'v' prefix, M.m.p numeric. Derived from the SAME pattern as
-            # features/chokepoints/service.py::_FEATURE_RE
-            # (r"^feature/\d+\.\d+\.\d+$") — the ONE pattern source (A3.2); POSIX ERE
-            # has no \d, so [0-9]+ is its exact translation, never a second, drifted
-            # regex literal.
-            if ! echo "$HEAD_REF" | grep -Eq '^feature/[0-9]+\.[0-9]+\.[0-9]+$'; then
-              echo "::error::Gitflow law (DADAIA.md §4 (Gitflow)): develop accepts PRs from 'feature/{M.m.p}' only (no 'v' prefix). Got head '$HEAD_REF'."
-              echo "::error::Fix: rebuild your work on a feature/M.m.p branch and open the PR feature/M.m.p -> develop."
-              exit 1
-            fi
-            echo "PR head matches feature/M.m.p - gitflow source rule satisfied (develop)."
-          fi
+          python - <<'PY'
+          import os, sys
+          from pathlib import Path
+          from dadaia_workspace.core.gitflow import read_gitflow
+
+          flow, warning = read_gitflow(Path(os.environ["BASE_SPECS"]))
+          if warning:
+              print(f"::warning::{warning}")
+          head, base = os.environ["HEAD_REF"], os.environ["BASE_REF"]
+          if base == flow.principal:
+              # ADR 0021: the principal accepts the integration branch's promote PR and
+              # release-please's release PR, nothing else.
+              ok = head in (flow.integration, f"release-please--branches--{flow.principal}")
+              want = f"'{flow.integration}' or the release-please release PR"
+          elif base == flow.integration:
+              # Dependabot targets the integration branch (dependabot.yml).
+              ok = flow.role_of(head) == "work" or head.startswith("dependabot/")
+              want = f"'{flow.work_prefix}<M.m.p>' or a Dependabot update branch"
+          else:
+              ok, want = True, ""
+          if not ok:
+              print(f"::error::Gitflow law: {base} accepts PRs from {want} only. Got head '{head}'.")
+              sys.exit(1)
+          print(f"PR head {head} - gitflow source rule satisfied ({base}).")
+          PY
+
+  # Deploy gate of a PR to main: passes only on an eval run of its content (evals/scripts/gate.py).
+  # Model-free: git and gh only, no secret.
+  eval-gate:
+    name: Eval gate
+    if: github.event_name == 'pull_request' && github.base_ref == 'main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: eval-gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: python3 evals/scripts/gate.py "$HEAD_SHA"

@@ -1,86 +1,64 @@
 # What the bug ledger taught
 
-Every bug this workspace has is one line in `specs/bugs/BUGS.jsonl`: one record per
-bug, appended once, keyed by its id, with git history as that line's change log and no
-git-derived fact in the record. Each record names its `surface`, its `component`, the
-evidence of its red loop and its seam test, whether the fix left the feature smaller or
-larger (`diff_direction`), and its lineage: `caused_by`, the id of the bug whose fix
-made this one possible.
+Every bug is one record in `specs/bugs/BUGS.jsonl`, appended once and keyed by id. The
+record keeps product facts: where the defect appeared, what contract failed and, after
+resolution, its `cause`, `solution`, `caused_by` and `fix_sha`. Git remains the history
+of that line and the authority for the implementation diff.
 
-That last field is why the ledger reads as a history rather than a pile. Follow
-`caused_by` and bug families appear — chains of records on the same surface, each one
-the price of the previous fix.
+`caused_by` turns the ledger into a navigable history. Follow it and bug families appear:
+each link says which prior bug or task wrote the lines corrected by the later fix. Inspect
+the fix commit, found by its `fix(bugs)` or `refactor(bugs)` id line, to see what actually changed.
 
 ## Measuring the ledger
 
-<!-- derived-from: bug-ledger sha256:9534ded07707 -->
-
-The numbers are never copied into a page; the ledger's own verbs measure them.
+The ledger verbs report current counts without copying them into prose:
 
 ```bash
-python3 .agents/skills/dd-bug-resolution/scripts/bugs.py stats
-python3 .agents/skills/dd-bug-resolution/scripts/bugs.py status --all
+python3 .agents/skills/dd-bug-resolution/scripts/bugs.py stats --specs <specs-dir>
+python3 .agents/skills/dd-bug-resolution/scripts/bugs.py status --all --specs <specs-dir>
 ```
 
-`status` is `open | resolved | superseded | deferred | rejected`, and a terminal status
-is reached only through its transition, each refusing an incomplete call: `resolve`
-requires the red-loop, seam and diff evidence and the `caused_by` link; `supersede`
-names the record that replaces it; a reopen is a new record. Nothing is closed by
-agreement.
+Current bug status is `open | resolved | superseded | rejected`. A terminal status is
+written only by its transition; each transition's flags are `bugs.py <verb> --help`. A
+reopen is a new record.
+
+Candidate maturity is not stored on the bug. The next candidate's `SPEC.md`
+`## Bug window review` judges each fix and never schedules work; the window rule is in
+`dd-bug-resolution/LINEAGE.md`, and the review step is in `dd-release-definition/SKILL.md`,
+Pick the set, step 7. The release summary's scope is in
+`dd-release-implementation/RELEASE-EVENTS.md`.
 
 ## Lesson 1 — a per-caller fix breeds the next caller's bug
 
-<!-- derived-from: context-management sha256:0227a5e43894 -->
-<!-- derived-from: bug-ledger sha256:9534ded07707 -->
+When a guard lives at only the caller that was caught, the next unguarded caller becomes
+the next bug. The structure that ends the family is one deep module every writer uses.
+The context registry is the example: `create`, `repo add` and `init --from` share one ownership
+check, and `INV-6` reports a slug owned by more than one context.
 
-When a guard lives at the caller that was just caught, the next caller without it is
-the next bug in the family, and each such fix is `net-positive`: it grows the feature.
-The structure that ends the family is one guarded seam every writer delegates to. The
-context registry is the example: a repo slug belongs to one context, and `create`,
-`repo add` and `dadaia import` pass one ownership check; `INV-6` reports any
-multi-owner slug already on disk.
+## Lesson 2 — a per-measurement exclusion breeds another measurement bug
 
-## Lesson 2 — a per-measurement exclusion breeds the next measurement's bug
+When each measurement walks the tree independently, each acquires its own exclusions.
+One enumeration restores locality: guard checks operate on the same tracked-file set, so
+scratch output is outside the measurement by construction.
 
-<!-- derived-from: QUALITY sha256:56577c91b65d -->
+## Lesson 3 — a derived cache breeds an environment-specific bug
 
-When each measurement walks the tree itself and is fixed by its own special-case
-exclusion, the next measurement counts the same stray files. The structure that ends
-the family is one enumeration: every suite ratchet enumerates the same set —
-`tests/helpers/suite_files.tracked_test_files()` over `git ls-files -- tests` — so
-scratch files a concurrent xdist worker writes are outside the measurement by
-construction, not by a list somebody has to remember to extend.
+A ledger field that caches a fact available from git becomes wrong wherever history has a
+different shape, especially in a shallow checkout. Find the fix by its id line, with the
+write-once `fix_sha` only a hint a rewrite may orphan; derive numstat and direction from that
+commit.
 
-## Lesson 3 — a derived cache breeds a bug per environment that derives it
+## Standing order
 
-<!-- derived-from: bug-ledger sha256:9534ded07707 -->
-<!-- derived-from: QUALITY sha256:56577c91b65d -->
+- Read each touched file's history, the id-line query of `dd-bug-resolution/LINEAGE.md`,
+  before proposing a fix, within the cap it sets.
+- Declare `caused_by: <bug-id> | <task-id> | none` per `dd-bug-resolution` LINEAGE.md,
+  Declare `caused_by`. A fix whose `caused_by` names a culprit, or that lands on a unit already fixed
+  in the window, is the REBUILD of that unit in the same lane (`specs/bugs/AGENTS.md`, Resolution).
+- Prefer a deletion-shaped fix. If the production diff grows, route it through the
+  architecture lens.
+- Derive the bug-surface delta from `git show` of the fix commit, found by its `fix(bugs)` or `refactor(bugs)` id line, and report it in review evidence.
+- Keep one home per definition and let ratchets move downward.
+- Treat an eval BLOCK as a contract failure to diagnose, not a verdict to waive.
 
-A record that caches a fact git already knows is wrong in every environment that
-derives it differently — a shallow checkout first among them. The structure that ends
-the family is deleting the cache: a bug record carries no git-derived fact, and git
-history is that line's change log. No CI job fetches history for a bug record's sake.
-
-## The standing order the lessons produced
-
-<!-- derived-from: QUALITY sha256:56577c91b65d -->
-<!-- derived-from: bug-ledger sha256:9534ded07707 -->
-
-The workspace is in a permanent state of architecture review, oriented by its bug
-history:
-
-- Read the ledger before proposing a fix. Resolution opens with lineage over at most
-  the 20 most recent records sharing this bug's surface or component, and the link is
-  declared at resolution as `caused_by: <bug-id> | none`.
-- Prefer the deletion-shaped fix. A fix whose diff grows the touched feature is routed
-  to the architecture lens before it lands.
-- Record the direction. Every resolution states `diff_direction`, and every review
-  verdict states the bug-surface delta from `bugs.py stats` — "tests green" is not a
-  verdict.
-- Let numbers refuse growth. Module size, complexity, nesting, private-symbol imports
-  in tests and the slop counts are pinned at their measured values and move downward
-  only.
-- Keep one home per number. Two homes for one parameter guarantee two different values.
-
-Next: [the bug loop](bug-loop.md) — register, RED, fix, resolve, in commands. Or start
-at the [quickstart](quickstart.md).
+Next: [the bug loop](bug-loop.md), or start at the [quickstart](quickstart.md).

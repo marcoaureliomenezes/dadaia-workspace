@@ -2,45 +2,31 @@
 """The ONE write path onto the backlog files: read -> apply -> validate -> replace.
 
 Every write goes through :func:`commit`: build the candidate bytes, run the SAME `check`
-they will be validated by, then `os.replace` atomically. A concurrent write is detected
+they will be validated by, then an atomic replace. A concurrent write is detected
 by the file's own (size, mtime) and re-applied once — a race surfaces and retries.
 
-An exit is a removal plus an append, ordered so a crash leaves the entry live rather
-than lost: the histo record is written first, the removal lands last.
+An exit is a removal plus an append: the PAIR is checked first, then the histo record is
+written and the removal lands last, so a crash leaves the entry live rather than lost.
 """
 
 from __future__ import annotations
 
 import json
-import os
-import sys
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-
-from _backlog_check import document_findings, histo_findings  # noqa: E402
-from _backlog_schema import HISTO, LEDGER  # noqa: E402
+import _commit
+import _jsonl
+from _backlog_check import pair_findings
+from _backlog_schema import HISTO, LEDGER
+from _ledger import private_refusal, replace
+from _platform import read_text
+from _refusal import Refusal
+from _specs import script
 
 Items = list[dict[str, Any]]
-SCRIPT = Path(__file__).parent / "backlog.py"
-
-
-class Refusal(Exception):
-    """A write this script refuses, carrying the one `fix:` line that unblocks it."""
-
-    def __init__(self, message: str, fix: str = "") -> None:
-        super().__init__(message)
-        self.fix = fix
-
-
-def _stamp(path: Path) -> tuple[int, int] | None:
-    try:
-        info = path.stat()
-    except FileNotFoundError:
-        return None
-    return (info.st_size, info.st_mtime_ns)
+SCRIPT = script(Path(__file__).parent / "backlog.py")
 
 
 def read_active(path: Path) -> Items:
@@ -48,81 +34,45 @@ def read_active(path: Path) -> Items:
     read in full refuses the read rather than being silently rewritten without it."""
     if not path.is_file():
         return []
-    try:
-        document = json.loads(path.read_text(encoding="utf-8"))
-    except json.JSONDecodeError as exc:
-        raise Refusal(
-            f"{path.name} is not valid JSON ({exc.msg}) — refusing to rewrite a document "
-            "this script cannot read in full",
-            f"{SCRIPT} check --specs <specs>",
-        ) from exc
-    active = document.get("active") if isinstance(document, dict) else None
+    document = _jsonl.parse_object(read_text(path), SCRIPT("check"))
+    active = document.get("active")
     if not isinstance(active, list):
         raise Refusal(
             f"{path.name} carries no 'active' array — it is not a backlog-v1 document",
-            f"{SCRIPT} check --specs <specs>",
+            SCRIPT("check"),
         )
     return active
 
 
-def serialize(active: Items) -> str:
+def render(active: Items) -> str:
+    """The bytes of a ``BACKLOG.json`` holding *active*."""
     return json.dumps({"schema": "backlog-v1", "active": active}, indent=2) + "\n"
 
 
-def _validated(active: Items) -> str:
-    text = serialize(active)
-    findings = document_findings(text)
-    if findings:
-        detail = "; ".join(str(f["message"]) for f in findings[:5])
-        raise Refusal(
-            f"the resulting {LEDGER} would not pass check — nothing was written ({detail})",
-            f"{SCRIPT} check --specs <specs>",
-        )
-    return text
+def commit(
+    specs: Path, apply: Callable[[Items], Items], record: dict[str, Any] | None = None
+) -> Items:
+    """Apply *apply* to ``active[]`` and, with *record*, append that one exit to the histo.
 
-
-def _replace(path: Path, text: str) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_name(f".{path.name}.{os.getpid()}.tmp")
-    tmp.write_text(text, encoding="utf-8")
-    os.replace(tmp, path)
-
-
-def commit(path: Path, apply: Callable[[Items], Items]) -> Items:
-    """Apply *apply* to *path*'s ``active[]`` and replace the document atomically.
-
-    The candidate bytes are validated BEFORE the replace, so a refused write leaves the
-    file byte-identical. When the file changed under the computation, the change is
-    re-read and re-applied ONCE; a second concurrent write refuses with a retry `fix:`.
+    The candidate PAIR is checked BEFORE either write (`_commit.commit` is the loop), so a
+    refused write leaves both files byte-identical.
     """
-    before = _stamp(path)
-    written = apply(read_active(path))
-    text = _validated(written)
-    if _stamp(path) != before:
-        before = _stamp(path)
-        written = apply(read_active(path))
-        text = _validated(written)
-        if _stamp(path) != before:
-            raise Refusal(
-                f"{path.name} changed twice under this write — nothing was written",
-                "re-run this command",
-            )
-    _replace(path, text)
-    return written
+    path = specs / LEDGER
+    appended = _jsonl.serialize([record] if record else [])
 
-
-def append_histo(path: Path, record: dict[str, Any]) -> None:
-    """Append one validated terminal record to the append-only exit ledger. The record
-    is validated ALONE — a pre-v6 line already in the file is history, not this write's
-    business, and re-validating the whole file would refuse every exit on a repo that
-    has one."""
-    line = json.dumps(record, sort_keys=True, ensure_ascii=False) + "\n"
-    findings = histo_findings(line)
-    if findings:
-        raise Refusal(
-            f"the {HISTO} record this exit would write does not pass check — nothing was "
-            f"written ({findings[0]['message']})",
-            f"{SCRIPT} check --specs <specs>",
+    def validate(written: Items, before: Items, old: str, _moved: Items) -> str:
+        new = [*(i for i in written if i not in before), *([record] if record else [])]
+        why = private_refusal(new, path)
+        if why is not None:
+            raise Refusal(*why)
+        return _commit.validated(
+            render(written),
+            f"{LEDGER} + {HISTO}",
+            lambda t: pair_findings(t, old + appended),
+            SCRIPT("check"),
         )
-    existing = path.read_text(encoding="utf-8") if path.is_file() else ""
-    _replace(path, existing + line)
+
+    return _commit.commit(
+        path, read_active, apply, validate, replace, specs / HISTO,
+        (lambda old, _moved: old + appended) if record else None,
+    )  # fmt: skip

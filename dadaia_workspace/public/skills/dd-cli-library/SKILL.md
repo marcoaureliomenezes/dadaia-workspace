@@ -1,8 +1,7 @@
 ---
 name: dd-cli-library
 description: >
-  Operate the dadaia-workspace CLI: bind a context, check state, author
-  backlog/release artifacts, register a bug, manage dev servers, discover any
+  Operate the dadaia-workspace CLI: bind a context, check state, manage dev servers, discover any
   command. Use whenever a task needs the CLI; the non-obvious idioms live here, the
   authoritative surface is --help.
 ---
@@ -15,45 +14,42 @@ line here and `--help` disagree, `--help` wins.
 ## Core idioms
 
 1. Open `.dadaia/AGENTS.md` (the area's scoped law) and follow it.
-2. `dadaia --help` lists the groups; `dadaia <group> --help` the subcommands; add `--json` to read commands for machine-readable output.
-3. `dadaia harness list` names this workspace's projected runtimes; `dadaia harness add <name>` registers one more.
-4. Run `dadaia capabilities --json` first in any new or upgraded session.
-5. Bind the session: `dadaia context bind <ctx>` — `--print-env` emits `DADAIA_CONTEXT`/`DADAIA_SESSION_ID` for `eval $(…)`; the bind sets the write scope to the context's main repo plus its associated repos (`.dadaia/AGENTS.md`).
-6. Workspace compliance: `dadaia doctor --context <ctx> [--json]` — clean before any implementation write; `--fix` MOVES slop to `.dadaia/reaped/` (7-day hold) and nothing is deleted before its own TTL; `--fix --expired-only` reaps without touching slop (`.dadaia/AGENTS.md`).
-7. Pass explicit `--context`/`--release-id` on every command.
-8. Converge a runtime: resolve `provider.distribution_version` from `dadaia capabilities --json`, then `dadaia reconcile --expect-version "$v" --json`, then `dadaia certify --json` — a failed certify check is a release blocker.
-9. On a failing command: preserve the evidence trail (command, exit code, output); classify and register a genuine bug (`dd-bug-registration`) before any workaround.
-
-- Invoke `.dadaia/.venv/bin/dadaia` and `.dadaia/.venv/bin/pip` directly, with absolute paths.
+2. Invoke the CLI by its venv path (`.dadaia/.venv/bin/dadaia`; Windows `.dadaia/.venv/Scripts/dadaia.exe`), never a bare `dadaia`: `.dadaia/.venv/bin/dadaia --help` lists the groups, `<group> --help` the subcommands; add `--json` to read commands for machine-readable output.
+3. `.dadaia/.venv/bin/dadaia harness list` names this workspace's projected runtimes; `.dadaia/.venv/bin/dadaia harness add <name>` registers one more.
+4. Run `.dadaia/.venv/bin/dadaia capabilities --json` first in any new or upgraded session.
+5. Bind: `.dadaia/AGENTS.md`, heading "Context, scope and races".
+6. Workspace compliance: `.dadaia/.venv/bin/dadaia doctor --context <ctx> [--json]`; `--fix` semantics: `.dadaia/AGENTS.md`, heading "Doctor — the one scan and reaper".
+7. Pass an explicit `--context` on every command that takes it.
+8. Converge a runtime: `v=$(.dadaia/.venv/bin/dadaia capabilities --json | <the venv's python> -c 'import json,sys;print(json.load(sys.stdin)["provider"]["distribution_version"])')`, then `.dadaia/.venv/bin/dadaia reconcile --expect-version "$v" --json`, then `.dadaia/.venv/bin/dadaia certify --json` — a failed certify check is a release blocker.
+9. On a failing command: preserve the evidence trail (command, exit code, output); propose a genuine bug (`dd-bug-registration`, heading "Propose") before any workaround.
 
 ## Workspace state is CLI-owned
 
-- Never edit `.dadaia/states/*.json`, never `git clone` into `repos/`, never
-  `rm -rf repos/<slug>/`, never hand-write `.dadaia/dist/` — `dadaia context
-  alive|dead` and `dadaia import|export` own those.
-- Lifecycle: `dadaia context create <ctx> --main-repo <slug> [--associated-repos a,b]` → `dadaia context alive` → bind → `dadaia context dead` → `dadaia context delete`; `context dead` removes the repo from disk — never run it mid-switch.
-- An unborn remote is born once by `dadaia context baseline <ctx> --yes --push`; every later write is an ordinary commit.
-- The associated set is written by `dadaia context repo add <ctx> <slug> [--url <url>]` / `dadaia context repo remove <ctx> <slug>` and READ only by `dadaia context show <ctx> --json`, whose `associated_repos` carries slug, url, on-disk and branch.
-- Portability: `dadaia export` writes `.dadaia/dist/spec-contexts.json` (overwritten each run); on the destination `dadaia import <file>` registers each unknown context DEAD, then `dadaia context alive <slug>` clones it; verify with `dadaia context list`.
+- Each `.dadaia/states/` file changes through its owning verb (`.dadaia/states/AGENTS.md`); `repos/` clones and `.dadaia/dist/` change only through the `dadaia` verbs that own them, `worktree pause` and `worktree resume` among them; their index is `.dadaia/.venv/bin/dadaia help tree`.
+- Onboarding levels: the root `AGENTS.md`, heading "Onboarding — three levels"; retire with `context dead` → `context delete`.
+- Verb index (flags: `--help`): `.dadaia/.venv/bin/dadaia init`, `.dadaia/.venv/bin/dadaia export`, `.dadaia/.venv/bin/dadaia context list`, `.dadaia/.venv/bin/dadaia context alive`, `.dadaia/.venv/bin/dadaia context dead`, `.dadaia/.venv/bin/dadaia context session-check`, `.dadaia/.venv/bin/dadaia context delete`, `.dadaia/.venv/bin/dadaia context repo add`, `.dadaia/.venv/bin/dadaia context repo remove`, `.dadaia/.venv/bin/dadaia ci push-gate-check`, `.dadaia/.venv/bin/dadaia ci ref-gate-check`, `.dadaia/.venv/bin/dadaia specs upgrade`, `.dadaia/.venv/bin/dadaia migrate`, `.dadaia/.venv/bin/dadaia help tree`, `.dadaia/.venv/bin/dadaia worktree`.
 
-## Dev-server law
+## Dev servers
 
 - The registry (`.dadaia/states/server_registry.json`) is the one record of who holds
-  which local port; every verb is `python3 <skill-dir>/scripts/registry.py <verb>` (the
-  script walks up from cwd to the nearest `.dadaia/`; `--registry <path>` overrides).
+  which local port; every verb is `python3 .agents/skills/dd-cli-library/scripts/registry.py <verb>` (the
+  script walks up from cwd to the nearest `.dadaia/states/spec_contexts.json`; `--registry <path>` overrides).
 - Open a port in this order: `list` → `next --project <name> --json` → start the server on
   loopback → `register --port N --project <name> [--pid <pid>] [--ttl <hours>]` — idempotent
   for the same project; a port held by another project exits 1 naming the owner.
-- Work ends with the port released (`release --port N`, or `--project <name>` for all);
+- A visual unit ends with its server running and its URL reported; the port is released (`release --port N`, or `--project <name>` for all) once the operator confirms;
   on a conflict `list --status all`, `clean` (stale = TTL expired or pid gone), then `next`.
 - `scan [--json]` lists listeners no entry covers (Linux `ss`; empty elsewhere).
 
+- Stop only the PIDs you started, never by name or pattern: `pkill -f` and `pgrep -f` waiters match processes you did not start.
+- Run a gate unpiped, or under `set -o pipefail`, and record its exit code; a piped exit code is the last command's.
+
 ## Done when
 
-- The command run matches live `--help`, not a remembered table.
-- `dadaia doctor` clean before any implementation write; `certify --json` green before promoting a runtime; every dev server started is registered.
+- Each command run was checked against its live `--help` this session.
+- `certify --json` green before promoting a runtime; every dev server started is registered.
 
 ## References
 
-- `dd-bug-registration` — the ask-first proposal a genuine bug takes before `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py append`.
+- `dd-bug-registration` — the ask-first proposal a genuine bug takes before `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py append --specs <specs-dir>`.
 - `dd-handoff-emitter` — emit/validate the final handoff.

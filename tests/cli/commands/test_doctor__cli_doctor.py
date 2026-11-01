@@ -1,0 +1,90 @@
+"""dadaia doctor CLI — happy path + degraded states (v2 model: ALIVE/DEAD)."""
+
+import json
+from pathlib import Path
+
+import pytest
+from typer.testing import CliRunner
+
+from dadaia_workspace.cli.main import app
+from dadaia_workspace.core.cli_line import fix_line
+from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES
+from dadaia_workspace.features.workspace.service import WorkspaceService
+from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
+from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
+from tests.helpers.oslib import make_executable, read_text, write_text
+
+_runner = CliRunner()
+
+
+@pytest.fixture
+def workspace(tmp_path: Path, monkeypatch) -> Path:
+    WorkspaceService(
+        public_assets=FileSystemPublicAssetManager(),
+        python_env=VenvPythonEnvironmentManager(),
+    ).init(tmp_path, harnesses=L1_ENTRY_HARNESSES)
+    # VENV-1 skeleton: the conftest anti-disk-exhaustion backstop fakes the venv
+    # builder, so materialize the entrypoint doctor checks — otherwise every doctor
+    # run carries a VENV-1 issue and the truthful exit-code assertions can't isolate
+    # the invariant under test.
+    from dadaia_workspace.core.platform import PLATFORM
+
+    venv_bin = tmp_path / ".dadaia" / ".venv" / PLATFORM.venv_scripts_dir
+    venv_bin.mkdir(parents=True, exist_ok=True)
+    entry = venv_bin / f"dadaia{PLATFORM.venv_exe_suffix}"
+    write_text(entry, "#!/bin/sh\n")
+    make_executable(entry)
+    monkeypatch.chdir(tmp_path)
+    return tmp_path
+
+
+def test_doctor_detects_and_holds_a_dead_contexts_stale_repo(workspace: Path) -> None:
+    """A DEAD context's stale repo dir is reported, then --fix HOLDS
+    it under .dadaia/reaped/ — never deletes it."""
+    states = workspace / ".dadaia" / "states"
+    ctx_data = {
+        "schema_version": "2",
+        "contexts": [
+            {
+                "name": "stale-ctx",
+                "state": "dead",
+                "repo_slug": "stale-ctx",
+                "repo_url": "",
+                "created_at": "2026-01-01T00:00:00Z",
+                "alive_since": None,
+                "dead_since": "2026-05-01T00:00:00Z",
+                "current_branch": None,
+            }
+        ],
+    }
+    write_text(states / "spec_contexts.json", json.dumps(ctx_data))
+    stale_repo = workspace / "repos" / "stale-ctx"
+    stale_repo.mkdir(parents=True)
+    write_text(stale_repo / "work.txt", "keep\n")
+
+    detect_result = _runner.invoke(app, ["doctor"])
+    # Issues found => non-zero.
+    assert detect_result.exit_code == 1, detect_result.output
+    assert "Context 'stale-ctx' is dead but repo 'stale-ctx' is on disk" in " ".join(
+        detect_result.output.split()
+    )
+
+    fix_result = _runner.invoke(app, ["doctor", "--fix"])
+    # All issues repaired in the same run => healthy exit 0.
+    assert fix_result.exit_code == 0, fix_result.output
+    assert not stale_repo.exists()
+    held = list(workspace.glob(".dadaia/reaped/*/repos/stale-ctx/work.txt"))
+    assert [read_text(p) for p in held] == ["keep\n"]
+
+
+@pytest.mark.parametrize("disarmed", [".claude/settings.json", ".dadaia/hooks/claude-pre-gate"])
+def test_both_doctors_give_one_answer_on_a_disarmed_gate(workspace: Path, disarmed: str) -> None:
+    """A deleted gate wire fails `doctor` AND
+    `public doctor`, each with the one fix `<ws venv>/dadaia public install`."""
+    (workspace / disarmed).unlink()
+    for argv in (["doctor"], ["public", "doctor"]):
+        result = _runner.invoke(app, argv)
+        assert result.exit_code == 1, result.output
+        fixes = [ln for ln in result.output.splitlines() if ln.endswith(" public install")]
+        assert len(fixes) == 1, result.output
+        assert fixes == [f"fix: {fix_line(workspace, 'public', 'install')}"], fixes

@@ -1,0 +1,108 @@
+"""``.dadaia/references/<clone>/`` holds operator-placed reference clones. The doctor's
+zone walk never flags one (``references`` is an OPERATOR zone, never walked). No
+lifecycle verb resolves, binds or GCs one — proven at the shared resolution seam, on the real
+bind/show resolution path, and on the whole ``DoctorService.fix()`` sweep. Nothing here
+writes under ``specs/``.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+from pathlib import Path
+
+import pytest
+
+from dadaia_workspace.cli._specs_resolution import (  # noqa: E402
+    resolve_context_for_cli,
+)
+from dadaia_workspace.core import invocation  # noqa: E402
+from dadaia_workspace.features.spec_context.doctor import DoctorService  # noqa: E402
+from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
+from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
+from tests.fixtures.stores import context_store
+from tests.helpers.oslib import read_text, write_text
+
+
+def _init_workspace(root: Path) -> None:
+    """Minimal initialized-workspace skeleton (registry + repos/ + sessions dir)."""
+    (root / ".dadaia" / "states").mkdir(parents=True)
+    write_text(
+        root / ".dadaia" / "states" / "spec_contexts.json",
+        json.dumps({"schema_version": "2", "contexts": []}),
+    )
+    (root / ".dadaia" / "sessions").mkdir(parents=True)
+    (root / "repos").mkdir(parents=True)
+
+
+def _plant_reference_clone(root: Path, clone: str = "mattpocock-skills") -> Path:
+    """Plant an operator-owned reference clone with real file content under it, the way
+    ``git clone`` would — the content is what a foreign-tree-acting verb would destroy."""
+    clone_dir = root / ".dadaia" / "references" / clone
+    (clone_dir / ".git").mkdir(parents=True)
+    write_text(clone_dir / "README.md", "# reference material\n")
+    return clone_dir
+
+
+def _make_doctor(root: Path, store: JsonContextStore | None = None) -> DoctorService:
+    return DoctorService(
+        context_store=store or context_store(root / ".dadaia" / "states"),
+        git_client=GitSubprocessClient(),
+        workspace_root=root,
+    )
+
+
+# ---------------------------------------------------------------------------
+# doctor-clean
+# ---------------------------------------------------------------------------
+
+
+def test_reference_clone_reports_doctor_clean(tmp_path: Path) -> None:
+    """``references`` reads canon at the ``.dadaia/`` top level and nothing beneath it is
+    ever an entry of the walk (OPERATOR zones are never walked)."""
+    _init_workspace(tmp_path)
+    _plant_reference_clone(tmp_path)
+
+    findings = _make_doctor(tmp_path).scan()
+
+    assert [f.verdict.value for f in findings if f.path == "references"] == ["canon"]
+    assert not any("references/" in f.path for f in findings), findings
+
+
+# ---------------------------------------------------------------------------
+# Outside the context lifecycle, proven at the shared seam AND on real verb paths
+# ---------------------------------------------------------------------------
+
+
+def test_no_resolution_path_selects_a_reference_clone(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A cwd inside ``.dadaia/references/<clone>/`` is outside ``<root>/repos/``: the shared seam
+    (``core.invocation.resolve``) selects nothing, and the bind/show path raises instead of inventing one."""
+    _init_workspace(tmp_path)
+    monkeypatch.chdir(_plant_reference_clone(tmp_path))
+
+    assert invocation.resolve(env=os.environ, cwd=Path.cwd()).context_name is None
+    with pytest.raises(ValueError, match="No caller-owned Spec Context is selected"):
+        resolve_context_for_cli(None)
+
+
+def test_doctor_fix_gc_sweep_never_touches_a_reference_clone(tmp_path: Path) -> None:
+    """Real verb call path: the whole, real ``DoctorService.fix()`` GC sweep
+    (``dadaia doctor --fix``) — run alongside other genuinely GC-eligible state — must
+    leave the reference clone's directory and its content byte-for-byte untouched.
+    Lifecycle verbs acting on foreign trees destroyed work before; GC is no exception."""
+    _init_workspace(tmp_path)
+    clone_dir = _plant_reference_clone(tmp_path)
+    before = read_text(clone_dir / "README.md")
+
+    # Plant genuinely reapable state alongside it (``WS-states-slop``), so fix() has
+    # real work to do.
+    (tmp_path / ".dadaia" / "states" / "ctx_locks").mkdir(parents=True)
+    write_text(tmp_path / ".dadaia" / "states" / "ctx_locks" / "stale.lock.json", "{}")
+
+    actions = _make_doctor(tmp_path).fix()
+
+    assert read_text(clone_dir / "README.md") == before
+    assert (clone_dir / ".git").exists()
+    assert not any("references" in a.lower() for a in actions), actions

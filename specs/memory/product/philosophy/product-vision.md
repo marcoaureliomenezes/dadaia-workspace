@@ -1,8 +1,8 @@
 ---
 slug: product-vision
 title: product-vision
-tldr: One workspace folder, an agent at its root, projects in repos inside, governance outside every repo; multi-project x multi-repo, never a monorepo; no slop.
-summary: The founding paradigm and the pillars of dadaia-workspace, plus the two usage paths — a human from a shell, an agent from the root AGENTS.md map — reading one truth.
+tldr: One workspace keeps project repositories inside it and governance outside; each context spans one main repository and any associated repositories.
+summary: The product paradigm, evidence and coupling principles, and the human and agent paths through one current product truth.
 tags: [vision, paradigm, pillars]
 sources:
   - AGENTS.md
@@ -10,31 +10,33 @@ sources:
   - specs/constitution.md
 ---
 
-## The paradigm
+## Paradigm
 
-- One workspace folder; the agent session launches at its root, always.
-- Projects live in repos inside it (`repos/<slug>/`); governance — the root `AGENTS.md` map, the scoped `AGENTS.md` files, `.agents/skills`, `.agents/agents`, `.dadaia/` — lives outside every repo.
-- A project is a context: one main repo, where `specs/` lives, plus its associated repos; a workspace holds many contexts and a context many repos — never a monorepo; a single-repo context is the minimal case ([[spec-context-project]], [[context-management]]).
-- The same canonical rules reach every harness through the one authored set ([[agentic-entities]]).
+- An agent session starts at the workspace root; a session launched elsewhere loads no persona and no hook, so it stands in for no role; on a harness whose registry row names its subagent, Claude Code and Codex, `context bind` and every write verb of `verdict.py`, `backlog.py`, `release.py` and `worktree.py` refuse it ([[context-management]]). Product repositories live under `repos/<slug>/`; governance, projections, skills and runtime state live outside them.
+- A context is one main repository, where `specs/` lives, plus associated repositories. A workspace holds many contexts and a context may span many repositories; this is not a monorepo ([[context-management]]).
+- Repository changes land from canonical worktrees. Audits are the sole direct specs exception ([[worktrees]]).
+- The same authored law reaches every registered harness through native files or projections ([[agentic-entities]]).
 
-## Identity and pillars
+## Product principles
 
-- dadaia-workspace is the operating environment around repositories developed with AI agents; its unit is the context.
-- Current context — agents bind explicitly and receive only the relevant project, memory, release and task state.
-- Documents are the lifecycle — backlog, SPEC, PLAN, TASKS, `_RELEASE.json` and `BUGS.jsonl` carry ordered work; no runtime drives agents through steps ([[release-lifecycle]], [[bug-ledger]], [[backlog-ledger]]).
-- Deterministic boundaries — path class, bind scope, root hygiene, venv-rooting and the push gate are mechanical, each refusal carrying its own runnable fix; what cannot be mechanical is written as law ([[sdd-gate-v3]]).
-- Visible concurrency — sessions may race, git exposes overlap, and nothing waits on a lock.
-- No mechanism without a demand — a capability exists only while it earns its maintenance cost, and deleted surface beats accreted surface.
-- No slop — runtime state, reports, handoffs, caches, projections and temporary files have canonical homes and never leak into repositories.
-- Claude Code, Codex, Kimi Code, Cursor, Devin and GitHub Copilot are the entry harnesses, one registry record each; public assets originate once, stage once, and are read natively or through per-entry symlinks ([[public-asset-distribution]]).
-- Success is evidenced by reviews, task markers, commands and artifacts, never inferred from prose.
+- Simplicity and lightness are the first law: the lightest solution that works wins, and a heavier one is chosen only when a lighter one was tried and failed. A requirement applied to every task, job or deletion is a gate, states its measured cost per run, and that cost never exceeds one run of the job's `verify:` gate as it stood before the change without the operator's ruling. The `verify:` line and the merge checks are gates: a change to one states its measured cost against the line it replaces, never against itself, and needs the operator's ruling; no step after the implementer's hand-back reruns a check the merge runs; a heavier gate is never the recommended option. A new gate names the heavier one it deletes.
+- Context is explicit: a bind scopes the session to one context's repository set and injects its constitution and memory.
+- Documents are the lifecycle: backlog, approved definition, job files, release state and record stores carry progress; no workflow engine advances them.
+- Mechanical boundaries cover path class, bind scope, root hygiene, the verdict writer and push publication. Each refusal carries one fix line: a runnable command, an `Agent action:` an agent performs (one act may chain up to three steps), or an `Operator action:` only for an act the law reserves to the operator ([[sdd-gate-v3]]).
+- Concurrency remains visible through git; no lock hides overlap.
+- The version's agentic scorecard, every cell at 9 or more by two independent judges, is the final candidate's last implementation job, before the promote and never after the closure summary.
+- Evidence is produced by the mechanism that judged the artifact and binds to the judged sha.
+- Features and fixes spend future options when they add coupling. Delivery alternates with deletion, simplification or decoupling that restores options.
+- Mechanisms without a current demand are removed, and runtime state, reports, handoffs, caches and projections stay in their canonical homes.
+- A test, or an existing assert, leaves a suite only on the operator's order; a bug fix hardens the contract test in that contract's one home.
 
-## Two usage paths
+## Two entry paths
 
-- A human installs from PyPI and drives it from a shell: `dadaia init <dir> --harness <name> --repo <url>` provisions a workspace with its first project ALIVE and bound, `dadaia context create`/`alive`/`bind` add the next ones, and `dadaia doctor` lists findings with a runnable fix under each; `README.md` is that path ([[pypi-distribution]], [[workspace-init]], [[workspace-doctor]]).
-- An agent reads the root `AGENTS.md` map — flow, roles, gate invariants, where things live, the index of every scoped law and skill — opens the scoped `AGENTS.md` of its area, and works inside the gate, the ledger scripts and the handoff contract; `llms.txt` at the repository root is its index ([[sdd-gate-v3]], [[agent-comms]]).
-- Both paths read one truth: every human- and agent-facing document derives from a named memory atom under its content hash ([[QUALITY]] P-29).
+- A human initializes the workspace, creates or adopts a context, initializes its specs, completes the first memory pass and publishes the project. `doctor` reports the next real-state step and one fix line ([[workspace-init]], [[workspace-doctor]]).
+- An agent reads the root map, the scoped law for the area, the relevant memory and the approved release artifacts, then works through the owning ledger scripts and worktree gates.
+- A repository declares one tracked `verify:` command. The job, rc and hotfix merges run it and refuse a repository that declares none; task merges enforce RED/implementation separation without a second repository command ([[worktrees]]).
+- Human documents and agent-facing indices are reconciled from current product memory. The CLI reference is generated from the live command tree; text identity is not a product-truth mechanism.
 
 ## Dependencies
 
-[[spec-context-project]], [[context-management]], [[sdd-gate-v3]], [[release-lifecycle]], [[bug-ledger]], [[backlog-ledger]], [[ARCHITECTURE]], [[public-asset-distribution]], [[pypi-distribution]], [[QUALITY]], [[agentic-entities]].
+[[spec-context-project]], [[context-management]], [[sdd-gate-v3]], [[release-lifecycle]], [[worktrees]], [[public-asset-distribution]], [[workspace-init]], [[workspace-doctor]], [[agentic-entities]].

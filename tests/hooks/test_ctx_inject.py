@@ -1,0 +1,742 @@
+"""ctx_inject driven as a real harness does: a subprocess, the session id on stdin.
+
+Covers bind-driven injection, compaction re-entry, the catalog digest, associated repos
+injecting nothing, a lost bind told once, and the Cursor/Copilot envelopes and
+new-session injection.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import sys
+from pathlib import Path
+from typing import Any
+
+import pytest
+
+from dadaia_workspace.core import clock, platform, session_store
+from dadaia_workspace.core.cli_line import fix_line
+from tests.fixtures.harness_env import (
+    claude_hook_env,
+    codex_hook_env,
+    kimi_hook_env,
+    run_hook_subprocess,
+)
+from tests.helpers.oslib import read_text, rmtree_readonly, run, write_text
+from tests.helpers.oslib import run as os_run
+from tests.helpers.oslib import write_text as os_write_text
+
+
+def _ws(root: Path, *contexts: dict[str, Any]) -> Path:
+    """Register *contexts* (``name`` plus optional ``slug``/``state``/``stack``/``catalog``/
+    ``index``/``atoms``/``assoc``) and write each main repo's memory; ``atoms`` maps a path under
+    ``product/`` to an atom file's text."""
+    states = root / ".dadaia" / "states"
+    states.mkdir(parents=True)
+    entries = []
+    for c in contexts:
+        slug = c.get("slug", c["name"])
+        entry = {"name": c["name"], "repo_slug": slug, "state": c.get("state", "alive"),
+                 "repo_url": "", "created_at": "2026-09-30T00:00:00+00:00"}  # fmt: skip
+        product = root / "repos" / slug / "specs" / "memory" / "product"
+        product.mkdir(parents=True)
+        if c.get("canonical"):  # the specs the bind step waits behind, in the git repo they live in
+            run(["git", "init", "-q", str(root / "repos" / slug)], check=True)
+            write_text(
+                product.parents[1] / "constitution.md", "---\nspecs_pattern_version: 99\n---\n"
+            )
+        write_text(
+            product.parent / "ARCHITECTURE.md",
+            f"# Architecture\n\n## Tech Stack\n\n{c.get('stack', 'Python 3.12')}\n",
+        )
+        if "index" in c:
+            write_text(product / "index.md", c["index"])
+        else:
+            write_text(product / "catalog.json", c.get("catalog", '{"features": []}'))
+        for rel, text in c.get("atoms", {}).items():  # the atom files: the owner's answer
+            (product / rel).parent.mkdir(parents=True, exist_ok=True)
+            write_text(product / rel, text)
+        if "assoc" in c:  # an associated repo carrying its OWN memory tree
+            entry["associated_repos"] = [{"slug": "assoc", "url": "https://example.invalid/a.git"}]
+            assoc = root / "repos" / "assoc" / "specs" / "memory"
+            assoc.mkdir(parents=True)
+            write_text(assoc / "ARCHITECTURE.md", f"# A\n\n## Tech Stack\n\n{c['assoc']}\n")
+        entries.append(entry)
+    os_write_text(
+        states / "spec_contexts.json", json.dumps({"schema_version": "2", "contexts": entries})
+    )
+    return root
+
+
+def _bind(root: Path, sid: str, context: str) -> None:
+    """What ``dadaia context bind`` persists: the record author's output stamped by the clock."""
+    session_store.write_session(
+        root,
+        sid,
+        session_store.new_binding_record(
+            session_id=sid,
+            context=context,
+            runtime="claude-code",
+            pid=os.getpid(),
+            now=clock.now_iso(),
+        ),
+    )
+
+
+def _run(
+    root: Path,
+    sid: str,
+    *,
+    event: str | None = None,
+    source: str | None = None,
+    extra: dict[str, str] | None = None,
+) -> str:
+    env = claude_hook_env(  # the env id is the one id channel: bind sees no stdin
+        root,
+        session_id=sid,
+        extra={**(extra or {}), **({"DADAIA_HOOK_EVENT": event} if event else {})},
+    )
+    env.pop("DADAIA_CONTEXT", None)
+    payload: dict[str, object] = {"session_id": sid}
+    if source:  # Claude Code's SessionStart re-entry
+        payload.update(hook_event_name="SessionStart", source=source)
+    result = run_hook_subprocess("ctx_inject", payload, env)
+    assert result.returncode == 0, result.stderr
+    return result.stdout
+
+
+_UNBOUND = "[no bound context]"
+_A = "[alpha]"
+
+
+@pytest.mark.parametrize(
+    "steps",
+    [
+        pytest.param(
+            [
+                ("prompt", _UNBOUND),
+                ("bind", "alpha"),
+                ("prompt", _A),
+                ("prompt", ""),
+                ("bind", "beta"),
+                ("prompt", "[beta]"),
+                ("prompt", ""),
+            ],
+            id="bind-injects-once-and-a-rebind-to-another-context-reinjects",
+        ),
+        pytest.param(
+            [
+                ("prompt", _UNBOUND),
+                ("bind", "alpha"),
+                ("prompt", _A),
+                ("prompt", ""),
+                ("bind", "alpha"),
+                ("prompt", _A),
+                ("prompt", ""),
+            ],
+            id="same-context-rebind-reinjects-T-50-03",
+        ),
+        pytest.param(
+            [
+                ("prompt", _UNBOUND),
+                ("bind", "alpha"),
+                ("prompt", _A),
+                ("prompt", ""),
+                ("PostCompact", _A),
+                ("prompt", _A),
+                ("prompt", ""),
+            ],
+            id="kimi-postcompact-reemits-and-the-next-prompt-reinjects-once",
+        ),
+        pytest.param(
+            [
+                ("prompt", _UNBOUND),
+                ("prompt", ""),
+                ("PostCompact", _UNBOUND),
+                ("prompt", _UNBOUND),
+                ("prompt", ""),
+            ],
+            id="unbound-postcompact-reemits-the-generic-preflight",
+        ),
+        pytest.param(
+            [("PostCompact", _UNBOUND), ("prompt", _UNBOUND)],
+            id="postcompact-without-record-or-env-binds-nothing",
+        ),
+        pytest.param(
+            [("bind", "alpha"), ("PostCompact", _A), ("prompt", _A)],
+            id="kimi-postcompact-omits-bound-context-bootstrap-bind-before-any-prompt",
+        ),
+        pytest.param(
+            [
+                ("prompt", _UNBOUND),
+                ("bind", "alpha"),
+                ("prompt", _A),
+                ("prompt", ""),
+                ("compact", _A),
+                ("prompt", ""),
+            ],
+            id="claude-compact-reinjection-missing-sessionstart-compact-restamps",
+        ),
+        pytest.param(
+            [
+                ("prompt", _UNBOUND),
+                ("bind", "alpha"),
+                ("prompt", _A),
+                ("prompt", ""),
+                ("clear", _A),
+                ("prompt", ""),
+            ],
+            id="sessionstart-clear-reinjects-the-bound-context",
+        ),
+        pytest.param([("clear", _UNBOUND), ("prompt", "")], id="sessionstart-clear-unbound"),
+        pytest.param(
+            [("bind", "alpha"), ("prompt", _A), ("lose", ""), ("prompt", "")], id="lost-bind"
+        ),
+        pytest.param(
+            [
+                ("prompt", _UNBOUND),
+                ("bind", "alpha"),
+                ("prompt", _A),
+                ("resume", ""),
+                ("startup", _A),
+            ],
+            id="sessionstart-resume-continues-a-new-session-injects",
+        ),
+        pytest.param(
+            [("bind", "alpha"), ("SessionStart", _A), ("SessionStart", _A)],
+            id="AC1.2-every-new-session-of-a-sessionstart-only-harness-injects",
+        ),
+    ],
+)
+def test_injection_sequence(tmp_path: Path, steps: list[tuple[str, str]]) -> None:
+    """Each prompt/event emits the header it names, or nothing (``""``): injection fires once
+    per bind; PostCompact stamps the marker and leaves the sentinel for the next prompt;
+    SessionStart(compact|clear) re-injects and restamps at once."""
+    _ws(tmp_path, {"name": "alpha", "canonical": True}, {"name": "beta", "stack": "Node 20"})
+    marker = tmp_path / ".dadaia" / "tmp" / "hooks" / "ctx-compact-s"
+    for kind, want in steps:
+        if kind == "bind":
+            _bind(tmp_path, "s", want)
+            continue
+        if kind == "lose":
+            session_store.session_record_path(tmp_path, "s").unlink()
+            assert "context bind alpha" in _run(tmp_path, "s")  # told once
+            continue
+        if kind == "prompt":
+            out = _run(tmp_path, "s")
+        elif kind in ("PostCompact", "SessionStart"):  # the lane's own env names the event
+            out = _run(tmp_path, "s", event=kind)
+            assert marker.is_file() is (kind == "PostCompact")
+        else:
+            out = _run(tmp_path, "s", source=kind)
+            assert not marker.exists()
+        assert out.startswith(want) if want else out == "", (kind, out)
+
+
+_NO_MEMORY = ("end memory bootstrap", "Python 3.12")
+
+
+@pytest.mark.parametrize(
+    ("contexts", "bound", "present", "absent"),
+    [
+        pytest.param([{"name": "alpha"}], None, [_UNBOUND], _NO_MEMORY, id="unbound-no-memory"),
+        pytest.param(
+            [{"name": "alpha"}, {"name": "beta"}],
+            None,
+            [_UNBOUND, "=== ALIVE contexts", "- alpha\n- beta\n"],
+            (),
+            id="unbound-lists-the-alive-contexts-A30.1",
+        ),
+        pytest.param(
+            [{"name": "x", "state": "dead"}],
+            None,
+            [
+                _UNBOUND,
+                "\nNext (agent step context): no ALIVE Spec Context",
+                "context create with a context name and --main-repo set to the main repo's",
+            ],
+            _NO_MEMORY,
+            id="no-alive-context-prints-the-doctor-step-AC6.2",
+        ),
+        pytest.param(
+            [{"name": "alpha"}],
+            ("other-sess", "alpha"),
+            [_UNBOUND],
+            _NO_MEMORY,
+            id="a-foreign-session-bind-never-leaks-FR-W2-02",
+        ),
+        pytest.param(
+            [{"name": "beta"}, {"name": "alpha", "stack": "Node 20"}],
+            ("s", "alpha"),
+            [_A, "Node 20", "end memory bootstrap"],
+            ("[beta]", "ALIVE contexts"),
+            id="own-record-beats-first-alive-ctx-inject-ignores-session-bind-first-alive-proxy",
+        ),
+        pytest.param(
+            [{"name": "alpha", "assoc": "ASSOC-ONLY-MARKER"}],
+            ("s", "alpha"),
+            [_A, "Python 3.12"],
+            ("ASSOC-ONLY-MARKER",),
+            id="associated-repo-memory-never-injected-A19.1",
+        ),
+        pytest.param(
+            [{"name": "pretty", "slug": "actual-dir"}],
+            ("s", "pretty"),
+            ["[pretty]", "Python 3.12"],
+            (),
+            id="registry-name-maps-to-its-repo-slug-F003",
+        ),
+        pytest.param(
+            [{"name": "alpha", "index": "# product index\n- feature A\n"}],
+            ("s", "alpha"),
+            ["# product index\n- feature A"],
+            (),
+            id="index-md-fallback-without-a-catalog",
+        ),
+    ],
+)
+def test_first_emission(
+    tmp_path: Path,
+    contexts: list[dict[str, Any]],
+    bound: tuple[str, str] | None,
+    present: list[str],
+    absent: tuple[str, ...],
+) -> None:
+    """A first emission carries only the memory of the context THIS session bound; unbound, none."""
+    _ws(tmp_path, *contexts)
+    if bound:
+        _bind(tmp_path, *bound)
+    out = _run(tmp_path, "s")
+    assert all(p in out for p in present), out
+    assert not any(a in out for a in absent), out
+
+
+@pytest.mark.parametrize("event", [None, "SessionStart"], ids=["prompt", "session-start"])
+def test_the_first_event_of_an_unrecorded_session_leaves_a_live_record(
+    tmp_path: Path, event: str | None
+) -> None:
+    _ws(tmp_path, {"name": "alpha"})
+
+    _run(tmp_path, "fresh", event=event)
+
+    record = session_store.live_session(tmp_path, "fresh")
+    assert record is not None and record["session_id"] == "fresh"
+    assert "context" not in record and "bind_id" not in record
+
+
+@pytest.mark.parametrize(
+    ("payload_id", "recorded"),
+    [("codex-payload-sess", "codex-payload-sess"), ("../pay/1", "pay1")],
+    ids=["plain", "traversal-sanitized"],
+)
+def test_a_codex_prompt_records_the_payload_session(
+    tmp_path: Path, payload_id: str, recorded: str
+) -> None:
+    _ws(tmp_path, {"name": "alpha"})
+
+    result = run_hook_subprocess("ctx_inject", {"session_id": payload_id}, codex_hook_env(tmp_path))
+
+    assert result.returncode == 0, result.stderr
+    record = session_store.live_session(tmp_path, recorded)
+    assert record is not None and record["session_id"] == recorded
+    assert sorted(p.name for p in (tmp_path / ".dadaia" / "sessions").glob("*.json")) == [
+        f"{recorded}.json"
+    ]
+
+
+@pytest.mark.parametrize("event", [None, "SessionStart"], ids=["prompt", "session-start"])
+def test_a_codex_session_bound_under_its_payload_id_is_injected_and_never_told_to_bind(
+    tmp_path: Path, event: str | None
+) -> None:
+    """The env carries no Codex id: heartbeat, Bind and next step all read the payload's."""
+    _ws(tmp_path, {"name": "alpha"})
+    _bind(tmp_path, "cx-sess", "alpha")
+    env = codex_hook_env(tmp_path, extra={"DADAIA_HOOK_EVENT": event} if event else None)
+
+    result = run_hook_subprocess("ctx_inject", {"session_id": "cx-sess"}, env)
+
+    assert result.returncode == 0, result.stderr
+    assert _A in result.stdout and "Python 3.12" in result.stdout, result.stdout
+    assert "context bind" not in result.stdout
+
+
+def test_a_kimi_prompt_with_only_a_payload_id_leaves_no_record_and_no_bind_step(
+    tmp_path: Path,
+) -> None:
+    """Kimi's shell carries no id, so its payload id binds nothing and `context bind` is no step."""
+    _ws(tmp_path, {"name": "alpha"})
+    env = kimi_hook_env(tmp_path, extra={"DADAIA_RUNTIME": "kimi-code"})
+
+    result = run_hook_subprocess("ctx_inject", {"session_id": "kimi-sess"}, env)
+
+    assert result.returncode == 0, result.stderr
+    assert _UNBOUND in result.stdout
+    assert "context bind" not in result.stdout
+    assert not list((tmp_path / ".dadaia" / "sessions").glob("*.json"))
+
+
+def test_env_override_injects_context_memory(tmp_path: Path) -> None:
+    """A session with no id (a Kimi shell, no payload id) is bound by DADAIA_CONTEXT."""
+    _ws(tmp_path, {"name": "ctx"})
+    env = kimi_hook_env(tmp_path, extra={"DADAIA_CONTEXT": "ctx"})
+    result = run_hook_subprocess("ctx_inject", {}, env)
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.startswith("[ctx]")
+    assert "Python 3.12" in result.stdout
+
+
+def test_memory_text_reaches_a_cp1252_pipe_as_utf8(tmp_path: Path) -> None:
+    """The injected memory is UTF-8 whatever codec the host pipe defaults to."""
+    _ws(tmp_path, {"name": "ctx", "stack": "checks \u2713"})
+    env = kimi_hook_env(
+        tmp_path, extra={"DADAIA_CONTEXT": "ctx", "PYTHONIOENCODING": "cp1252", "PYTHONUTF8": "0"}
+    )
+    result = run_hook_subprocess("ctx_inject", {}, env)
+    assert (result.returncode, "checks \u2713" in result.stdout) == (0, True), result.stderr
+
+
+@pytest.mark.parametrize(
+    ("extra", "event", "key"),
+    [
+        ({"DADAIA_HOOK_OUTPUT": "codex-json", "DADAIA_HOOK_EVENT": "SessionStart"}, "SessionStart", ""),
+        ({"DADAIA_HOOK_OUTPUT": "cursor-json"}, None, "additional_context"),
+        ({"DADAIA_HOOK_OUTPUT": "copilot-json"}, None, "additionalContext"),
+    ],
+    ids=["codex-json-envelope", "AC1.2-cursor-top-level", "AC1.2-copilot-top-level"],
+)  # fmt: skip
+def test_output_contract_envelopes(
+    tmp_path: Path, extra: dict[str, str], event: str | None, key: str
+) -> None:
+    """Each output mode is its vendor's documented envelope: the native ``hookSpecificOutput``,
+    or (Cursor, Copilot sessionStart) one top-level context key."""
+    _ws(tmp_path, {"name": "ctx"})
+    out = json.loads(_run(tmp_path, "s", extra=extra))
+    envelope = out["hookSpecificOutput"] if event else out
+    assert list(out) == [key or "hookSpecificOutput"]
+    assert envelope.get("hookEventName") == event
+    assert envelope[key or "additionalContext"].startswith(_UNBOUND)
+
+
+def test_emissions_attach_the_derived_help_digest(tmp_path: Path) -> None:
+    """The digest rides every emission, read from .dadaia/agentic/help-digest.md."""
+    _ws(tmp_path)
+    (tmp_path / ".dadaia" / "agentic").mkdir()
+    write_text(tmp_path / ".dadaia" / "agentic" / "help-digest.md", "# dadaia CLI digest (vX)\n")
+    assert "# dadaia CLI digest (vX)" in _run(tmp_path, "s")
+
+
+def _atom(slug: str, summary: str = "short") -> str:
+    return (
+        f"---\nslug: {slug}\ntitle: {slug}\ntldr: handoffs\nsummary: {summary}\n"
+        f"tags: [handoff]\n---\n\n# {slug}\n"
+    )
+
+
+def test_injected_catalog_is_tldr_digest_and_measurably_smaller(tmp_path: Path) -> None:
+    """The injected catalog keeps slug/title/tldr/path only (never the heavy
+    ``summary`` nor ``rank``), is under half the raw bytes, and the file on disk is untouched."""
+    feature = {
+        "rank": 1,
+        "slug": "agent-comms",
+        "title": "agent-comms",
+        "tldr": "handoffs",
+        "summary": "heavy self-pull text " * 60,
+        "tags": ["handoff"],
+        "path": "specs/memory/product/agents/agent-comms.md",
+    }
+    raw = json.dumps({"context": "ctx", "features": [feature, {**feature, "slug": "b"}]})
+    heavy = "heavy self-pull text " * 60
+    _ws(
+        tmp_path,
+        {
+            "name": "ctx",
+            "catalog": raw,
+            "atoms": {
+                "agents/agent-comms.md": _atom("agent-comms", heavy),
+                "agents/b.md": _atom("b", heavy),
+            },
+        },
+    )
+    _bind(tmp_path, "s", "ctx")
+    out = _run(tmp_path, "s")
+    block = out[out.index("{") : out.rindex("}") + 1]
+    assert json.loads(block)["features"][0] == {
+        "slug": "agent-comms",
+        "title": "agent-comms",
+        "tldr": "handoffs",
+        "path": "specs/memory/product/agents/agent-comms.md",
+    }
+    assert len(block) < len(raw) * 0.5
+    assert read_text(tmp_path / "repos/ctx/specs/memory/product/catalog.json") == raw
+
+
+def test_the_digest_is_the_atom_files_when_the_catalog_names_a_ghost(tmp_path: Path) -> None:
+    """Catalog and files disagree: the catalog names a feature with no atom file, and the atom
+    file has no catalog entry. The files are the owner's answer."""
+    ghost = json.dumps(
+        {"features": [{"slug": "ghost", "title": "ghost", "tldr": "x", "path": "p"}]}
+    )
+    _ws(tmp_path, {"name": "ctx", "catalog": ghost, "atoms": {"agents/real.md": _atom("real")}})
+    _bind(tmp_path, "s", "ctx")
+
+    out = _run(tmp_path, "s")
+
+    assert '"slug": "real"' in out
+    assert '"slug": "ghost"' not in out
+
+
+def test_the_digest_is_built_from_files_when_the_catalog_is_unreadable(tmp_path: Path) -> None:
+    """A catalog that does not parse is not injected raw: the atom files still answer."""
+    _ws(
+        tmp_path,
+        {"name": "ctx", "catalog": "{not json", "atoms": {"agents/real.md": _atom("real")}},
+    )
+    _bind(tmp_path, "s", "ctx")
+
+    out = _run(tmp_path, "s")
+
+    assert '"slug": "real"' in out
+    assert "{not json" not in out
+
+
+def test_an_unreadable_atom_is_a_finding_with_the_check_that_names_it(tmp_path: Path) -> None:
+    """An atom whose frontmatter does not parse is printed as a finding that names the file and
+    the `memory.py check` fix line, never silently dropped from the emission."""
+    _ws(
+        tmp_path,
+        {
+            "name": "ctx",
+            "atoms": {"agents/broken.md": "---\nslug: [unclosed\n---\n\n# broken\n"},
+        },
+    )
+    _bind(tmp_path, "s", "ctx")
+
+    out = _run(tmp_path, "s")
+
+    assert "broken.md" in out
+    assert "memory.py check" in out
+
+
+# The hook under ``runpy``, with an audit hook counting subprocess spawns and the filesystem
+# operations under the workspace (cwd): CPython's own audit events, the seam itself. Import
+# opens and the import system's re-listing of a ``sys.path`` dir another process changed lie
+# outside the workspace, so they are never counted; an open by file descriptor names no path.
+_COUNTING_DRIVER = """
+import os, runpy, sys
+_SEAM = ("open", "os.listdir", "os.scandir", "os.mkdir", "os.remove", "os.rename",
+         "subprocess.Popen")
+ops = [0]
+ROOT = os.getcwd()
+def _counts(event, args):
+    if event == "subprocess.Popen":
+        return True
+    if event not in _SEAM or isinstance(args[0], int):
+        return False
+    try:
+        return os.path.commonpath([ROOT, os.path.abspath(os.fsdecode("." if args[0] is None else args[0]))]) == ROOT
+    except ValueError:
+        return False
+sys.addaudithook(lambda event, args: ops.__setitem__(0, ops[0] + _counts(event, args)))
+try:
+    runpy.run_module("{hook}", run_name="__main__")
+except SystemExit:
+    pass
+finally:
+    sys.stderr.write(f"\\nOPS={{ops[0]}}\\n")
+"""
+
+
+def _ops(root: Path, hook: str, bound: bool, path: Path | None = None) -> int:
+    if bound:
+        _bind(root, "s", "c0")
+    pythonpath = str(path) if path else os.environ.get("PYTHONPATH", "")
+    env = {**claude_hook_env(root, session_id="s"), "PYTHONPATH": pythonpath}
+    env.pop("DADAIA_CONTEXT", None)
+    done = run([sys.executable, "-c", _COUNTING_DRIVER.format(hook=hook)], input=json.dumps({"session_id": "s"}), env=env, cwd=root, check=True, timeout=30)  # fmt: skip
+    return int(done.stderr.rsplit("OPS=", 1)[1])
+
+
+@pytest.mark.parametrize(
+    ("hook", "bound"),
+    [
+        pytest.param(
+            "ctx_inject",
+            False,
+            id="ctx_inject-unbound",
+        ),
+        pytest.param(
+            "ctx_inject",
+            True,
+            id="ctx_inject-bound",
+        ),
+        pytest.param("sdd_post_gate", True, id="sdd_post_gate"),
+    ],
+)
+def test_hook_lane_cost_does_not_grow_with_the_registry(
+    tmp_path: Path, hook: str, bound: bool
+) -> None:
+    """A hook lane's filesystem and subprocess operations are the same at 2 and at 20 contexts."""
+    two, twenty = (
+        _ops(
+            _ws(tmp_path / str(n), *({"name": f"c{i}"} for i in range(n))),
+            f"dadaia_workspace.hooks.{hook}",
+            bound,
+        )
+        for n in (2, 20)
+    )
+    assert twenty == two > 0
+
+
+def test_hook_lane_cost_ignores_a_sys_path_dir_another_process_changes_mid_run(
+    tmp_path: Path,
+) -> None:
+    """The import system re-lists a ``sys.path`` dir whose mtime moved (another test worker
+    writing into the checkout does that); the count is of the workspace's own operations."""
+    path = tmp_path / "path"
+    path.mkdir()
+    (tmp_path / "off").mkdir()
+    # Both write one file; only churn's lands in a ``sys.path`` dir, so the delta is the re-list.
+    (path / "quiet.py").write_text(f"open({str(tmp_path / 'off' / 'x')!r}, 'w').close()\nimport colorsys\n")  # fmt: skip
+    (path / "churn.py").write_text("open(__file__ + 'x', 'w').close()\nimport colorsys\n")  # fmt: skip
+    os.utime(path, (0, 0))  # the write below always moves the mtime, whatever the clock tick
+    quiet, churn = (
+        _ops(_ws(tmp_path / hook, {"name": "c0"}), hook, False, path) for hook in ("quiet", "churn")
+    )
+    assert churn == quiet
+
+
+def test_hook_lane_cost_is_the_same_whatever_bytecode_cache_the_parent_holds(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The count does not depend on whether the parent env's bytecode cache is cold or warm."""
+    warm = tmp_path / "warm"
+    pkg = Path(__file__).parents[2] / "dadaia_workspace"
+    os_run([sys.executable, "-m", "compileall", "-q", str(pkg)], env={**os.environ, "PYTHONPYCACHEPREFIX": str(warm), "PYTHONDONTWRITEBYTECODE": ""}, check=True)  # fmt: skip
+    counts = []
+    for n, prefix in enumerate((tmp_path / "cold", warm)):
+        monkeypatch.setenv("PYTHONPYCACHEPREFIX", str(prefix))
+        counts.append(
+            _ops(_ws(tmp_path / str(n), {"name": "c0"}), "dadaia_workspace.hooks.ctx_inject", True)
+        )
+    assert counts[0] == counts[1]
+
+
+def test_two_same_second_binds_each_reinject_once(tmp_path: Path) -> None:
+    """Two binds the real record author writes in one wall second carry the same ``bound_at``;
+    each still injects, and a prompt with no new bind after it is silent."""
+    _ws(tmp_path, {"name": "alpha"})
+    now = clock.now_iso()
+    for _ in range(2):
+        session_store.write_session(
+            tmp_path,
+            "s",
+            session_store.new_binding_record(
+                session_id="s", context="alpha", runtime="r", pid=1, now=now
+            ),
+        )
+        assert _A in _run(tmp_path, "s")
+        assert _run(tmp_path, "s") == ""
+
+
+def test_naive_bound_at_reads_as_utc_in_any_zone(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A ``bound_at`` without an offset is UTC, as ``session_store.is_live`` reads it."""
+    import time
+
+    from dadaia_workspace.hooks import ctx_inject
+
+    if not hasattr(time, "tzset"):
+        pytest.skip("time.tzset is absent on Windows; the zone cannot be pinned")
+    monkeypatch.setenv("TZ", "America/Sao_Paulo")
+    time.tzset()
+    try:
+        session_store.write_session(tmp_path, "s1", {"bound_at": "2026-10-11T04:00:00"})
+        assert ctx_inject._session_bound_at(tmp_path, "s1") == 1791691200.0
+    finally:
+        monkeypatch.undo()
+        time.tzset()
+
+
+@pytest.mark.parametrize(
+    ("record", "fix"),
+    [
+        pytest.param("{not json", ("doctor", "--fix"), id="unreadable-names-doctors-fix"),
+        pytest.param(
+            '{"session_id": "s", "last_seen_at": "2999-01-01T00:00:00+00:00"}',
+            ("context", "bind", "alpha"),
+            id="readable-live-unbound-names-the-bind",
+        ),
+    ],
+)
+def test_the_next_step_names_a_fix_the_session_can_run(
+    tmp_path: Path, record: str, fix: tuple[str, ...]
+) -> None:
+    """A record that does not read leaves the session ungoverned, so `context bind` is refused:
+    SessionStart names the act that clears the record instead."""
+    _ws(tmp_path, {"name": "alpha", "canonical": True})
+    write_text(session_store.session_record_path(tmp_path, "s", create=True), record)
+
+    out = _run(tmp_path, "s", event="SessionStart")
+
+    assert f"fix: {fix_line(tmp_path, *fix)}" in out, out
+    assert (fix_line(tmp_path, "context", "bind", "alpha") in out) is (fix[0] == "context"), out
+    assert ("Next (command step bind): This session's record does not read." in out) is (
+        fix[0] == "doctor"
+    ), out
+
+
+@pytest.mark.parametrize("bound", [True, False], ids=["bound-session", "no-session-id"])
+def test_a_main_repo_that_is_not_a_git_repository_never_crashes_the_session_start(
+    tmp_path: Path, bound: bool
+) -> None:
+    """The first-pass step's git read failing leaves SessionStart exit 0 with no traceback."""
+    _ws(tmp_path, {"name": "alpha", "canonical": True})
+    repo = tmp_path / "repos" / "alpha"
+    rmtree_readonly(repo / ".git")
+    sid = "s" if bound else None
+    if bound:
+        _bind(tmp_path, "s", "alpha")
+    env = claude_hook_env(tmp_path, session_id=sid, extra={"DADAIA_HOOK_EVENT": "SessionStart"})
+    for var in ("DADAIA_CONTEXT", "DADAIA_SESSION_ID", "CLAUDE_CODE_SESSION_ID"):
+        env.pop(var, None)
+    if bound:
+        env["DADAIA_SESSION_ID"] = "s"
+
+    result = run_hook_subprocess("ctx_inject", {"session_id": sid}, env)
+
+    assert result.returncode == 0, result.stderr
+    assert "Traceback" not in result.stderr, result.stderr
+    fix = f"fix: Agent action: run {platform.git_inline(repo, 'status')} and repair what it reports until it exits 0"
+    assert fix in result.stdout, result.stdout
+
+
+@pytest.mark.parametrize("step", ["first-pass", "publish"])
+def test_a_missing_git_never_crashes_the_session_start(tmp_path: Path, step: str) -> None:
+    """git off PATH leaves SessionStart exit 0, no traceback, the state line and its one fix,
+    whether the step's act or its pending check is what reads git."""
+    _ws(tmp_path, {"name": "alpha", "canonical": True})
+    if step == "publish":  # the first pass is done: real text in every stub, and one atom
+        memory = tmp_path / "repos" / "alpha" / "specs" / "memory"
+        for name in ("QUALITY.md", "product/index.md", "product/x.md"):
+            write_text(memory / name, "# Real\n\nreal content\n")
+        write_text(memory / "product" / "catalog.json", '{"features": [{"slug": "x"}]}')
+    _bind(tmp_path, "s", "alpha")
+    nogit = tmp_path / "nogit"
+    nogit.mkdir()
+    env = claude_hook_env(tmp_path, session_id="s", extra={"DADAIA_HOOK_EVENT": "SessionStart"})
+    for var in ("DADAIA_CONTEXT", "DADAIA_SESSION_ID", "CLAUDE_CODE_SESSION_ID"):
+        env.pop(var, None)
+    env["DADAIA_SESSION_ID"] = "s"
+    env["PATH"] = str(nogit)
+
+    result = run_hook_subprocess("ctx_inject", {"session_id": "s"}, env)
+
+    assert result.returncode == 0, result.stderr
+    assert "Traceback" not in result.stderr, result.stderr
+    fix = "fix: Operator action: make git runnable here"
+    line = f"Next (operator step {step}): git could not run in {tmp_path / 'repos' / 'alpha'}: "
+    (state,) = [ln for ln in result.stdout.splitlines() if ln.startswith(line)]
+    assert result.stdout.count(f"{state}\n{fix}\n") == 1, result.stdout
+    assert result.stdout.count(fix) == 1, result.stdout

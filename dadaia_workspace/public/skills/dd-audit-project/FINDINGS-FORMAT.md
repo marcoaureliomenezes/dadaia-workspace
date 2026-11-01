@@ -1,42 +1,35 @@
 # FINDINGS-FORMAT — one record per finding
 
-Disclosed sibling of `SKILL.md`. Every claim any pillar makes becomes exactly one line appended to
-`specs/audits/<YYYYMMDD>-<slug>/FINDINGS.jsonl`, validating
-`dadaia_workspace/public/schemas/audits/finding-record-v1.schema.json` — the schema is the source of field semantics.
+Disclosed sibling of `SKILL.md`. Every claim becomes one line in
+`specs/audits/<YYYYMMDD>-<slug>/FINDINGS.jsonl`, validated by
+`.agents/skills/dd-audit-project/scripts/schemas/finding-record-v1.schema.json`. The schema owns
+field semantics.
 
-## Fields
+## Writes
 
-| Field | Mutability | Set by |
-|---|---|---|
-| `id` | immutable-core | `<audit-slug>-F<nnn>`, appended once |
-| `pillar` | immutable-core | `bugs` \| `specs` \| `memory` |
-| `severity` | immutable-core | `LOW` \| `MEDIUM` \| `HIGH` \| `CRITICAL` |
-| `refs` | immutable-core | file:line, bug ids, commit shas, and/or release ids the claim is anchored to |
-| `claim` | immutable-core | one sentence stating what the record asserts |
-| `evidence` | immutable-core | the reproducible command plus a redacted one-line result — never a path alone |
-| `disposition` | mutable-governance | `open` at append; rewritten by `python3 .agents/skills/dd-audit-project/scripts/audit.py disposition` |
-| `release` | mutable-governance | `null` until dispositioned |
-| `reason` | mutable-governance | `null` until dispositioned |
+An append authors the immutable core. Every later change uses the disposition verb.
 
-- An append is file-tool authoring (the immutable core, like an ADR); every later change is a verb.
-- No write-time seam guards the append, so the evidence rule below is a hand discipline.
+## Evidence
 
-## The evidence rule — reproducible command, never a path
+- Record the reproducible command and its redacted one-line result.
+- Example: `git show <sha> --stat -- <module> -> 2 files changed, old path deleted`.
+- A `.dadaia/tmp/**` capture may accompany that evidence, but it expires and is never the
+  sole citation.
+- Remove runner-absolute paths and private data before writing the line.
 
-- `evidence` is always the reproducible command plus a redacted one-line result.
-- Example: `git show <sha> --stat -- <module> -> 2 files changed, second render path added`.
-- Never a bare pointer into `.dadaia/tmp/**` — that lane expires one day after its mtime.
-- A `.dadaia/tmp/**` capture may accompany the command+result as a convenience pointer, never the sole citation.
-- Strip runner-absolute paths from a tool's raw output (`lint-imports`, `pytest`, ratchet scripts) by hand before writing the line.
+## Append, disposition and close
 
-## Appending
+1. Append one schema-valid JSON object as one line.
+2. Move a finding with:
 
-1. Append with ordinary file tools: read the existing file, add one line, write.
-2. Before the S3-equivalent close of any audit, run the folder through the push-time detector (`dadaia ci push-gate-check` over the range).
-3. Record a zero-hit result from that detector run.
+   ```bash
+   python3 .agents/skills/dd-audit-project/scripts/audit.py disposition --specs <specs-dir> \
+     <audit> <finding-id> --disposition <terminal-disposition> \
+     [--release <id>] [--reason <reason>]
+   ```
 
-## Disposition and close — by verb
-
-- `python3 .agents/skills/dd-audit-project/scripts/audit.py disposition <dir> <finding-id> --disposition resolved|superseded|deferred|rejected --release <id> [--reason]` rewrites the three governance fields in place; every immutable field stays byte-identical.
-- `--reason` is required for `deferred` and `rejected`; a second disposition of the same finding is refused.
-- `python3 .agents/skills/dd-audit-project/scripts/audit.py close <dir> --sha <window-end>` refuses while any finding is `open`, appends the one `audits_histo.jsonl` record and deletes the directory — all-or-nothing.
+3. The finding schema defines dispositions and their required evidence. A later
+   disposition replaces only the finding's governance triple; its immutable fields
+   remain unchanged.
+4. `audit.py close <audit> --sha <window-end> --specs <specs-dir>` refuses while any finding is `open`, then
+   appends one audit-history record and deletes the live directory.

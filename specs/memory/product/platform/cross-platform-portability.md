@@ -1,27 +1,38 @@
 ---
 slug: cross-platform-portability
 title: cross-platform-portability
-tldr: Linux, macOS and Windows through one platform capability seam, injected adapters, Python hooks and cross-OS CI legs.
-summary: dadaia_workspace/core/platform.py is the single capability source and the container selects adapters; security failures are loud, non-security features degrade explicitly, unsupported critical capabilities fail at construction.
+tldr: Linux, macOS and Windows through one OS boundary, the kernel's _platform.py, deciding every host fact; core/platform.py is the package's door to it.
+summary: The kernel module dd-bug-resolution/scripts/_platform.py decides every host fact — text codec and newlines, child processes, whether git is on PATH, venv layout, exec bit, process liveness and listeners, filesystem swap and links, the sandbox home, shell spelling and the action labels of a fix line — as functions over one capability value; skill scripts import it as a sibling, the package reaches it through core/platform.py, tests through tests/helpers/oslib.py; no port, adapter pair or file lock exists for portability.
 tags: [platform, cross-platform, portability, windows, macos, linux]
 sources:
   - dadaia_workspace/core/platform.py
-  - dadaia_workspace/infrastructure/file_permission_*.py
-  - dadaia_workspace/infrastructure/signal_shutdown_*.py
-  - dadaia_workspace/infrastructure/process_probe_adapter.py
-  - dadaia_workspace/core/protocols/**
+  - dadaia_workspace/public/skills/dd-bug-resolution/scripts/_platform.py
 ---
 
-## Seam and validation
+## The boundary
 
-- The package imports and the CLI starts on Linux, macOS and Windows with no platform check scattered in feature code: `dadaia_workspace/core/platform.py` is the capability source and `dadaia_workspace/container.py` selects adapters.
-- Two ports cover file permissions and shutdown, each with a POSIX and a Windows adapter under `dadaia_workspace/infrastructure/`; process probing is one adapter, `dadaia_workspace/infrastructure/process_probe_adapter.py`.
-- No file lock exists anywhere: context and session state are coordinated without locking.
-- Security controls fail loudly when a platform cannot provide them, non-security features degrade with an explicit log, and an unsupported critical capability fails at service construction.
-- Harness governance hooks are Python modules invoked through per-harness wrappers; the git pre-push hook is a shell script and runs whatever the harness supports ([[sdd-gate-v3]]).
-- Skill scripts are stdlib Python and degrade per host: the dev-server registry judges only TTL where no POSIX liveness probe exists ([[server-registry]]).
-- CI runs Windows and macOS legs beside Linux; repository contracts refuse new unauthorized platform branches.
+- The package imports and the CLI starts on Linux, macOS and Windows with no platform check scattered in feature code: the kernel's `dd-bug-resolution/scripts/_platform.py` is the one module that reads `sys.platform` or spells a shell word, shared by the package and every skill script ([[bug-ledger]]).
+- Each host fact is one kernel function over a `Caps` value (`scripts_dir` `bin`/`Scripts`, `exe_suffix` empty/`.exe`, `windows`): the venv layout (`venv_dir`, `venv_tool`, `python_in`, `cli_path`, `cli_argv`), path rooting and separators, the exec bit, process liveness, listeners and file owner, the atomic swap and links, the variables a child reads its home from, text I/O and child processes, a passthrough run that hands a child this process's own stdin, stdout and stderr included.
+- `core/platform.py` is the package's door: its `PLATFORM` singleton (`venv_scripts_dir`, `venv_exe_suffix`, `windows`) is the current host's capabilities, each door function feeds it to the kernel, and the functions that read no capability are handed out unchanged; `python_in` also takes another host's capabilities, so a renderer spells a file for a host it does not run on; a test swaps `PLATFORM` to judge another host. Tests reach the OS only through `tests/helpers/oslib.py`, which re-exports the kernel.
+- Text is UTF-8 with LF on every host: a read of bytes that are not UTF-8 is refused with an `Agent action:` to re-encode the named line of that file in place, the doctor reports such a file once per path as `SPEC-DOC-002` ([[workspace-doctor]]); child output is decoded as UTF-8 with bad bytes replaced, and every entry point makes its stdout and stderr UTF-8.
+- On Windows a file held open is retried briefly, by one bounded retry the atomic swap and every text read share, before the call raises (a real denial still raises after it); a junction counts as a link; a symlink the host refuses falls back to a copy ([[public-asset-distribution]]).
+
+## Shell spelling
+
+- Every runnable line a fix or message prints comes from one producer, the kernel's `command(*argv)`, with real values; `inline` is the same words inside a sentence, and `quote` and `head` spell one word. The kernel's `cli_words` builds the workspace CLI's words, `core/cli_line.py` a door over it, and `mkdir_line` is the one directory-creating line, an interpreter call that runs unchanged under sh, bash, cmd and PowerShell ([[sdd-gate-v3]]).
+- Every `Agent action:` and `Operator action:` label comes from one producer, the kernel's `act(kind, text)` (`agent` or `operator`; any other kind, or a text already holding a label, raises, so no act sentence nests a second label), which the package reaches through `core/platform.py` and calls bare, and its one reader `act_kind(fix)` names the kind a fix line's label spells, `None` for a command; a contract test greps every `.py` and `.sh` file of the package and finds a label literal only in the producer and in the one fix line of the POSIX pre-push shim, which runs no Python.
+- POSIX spells each word with `shlex` quoting. Windows spells backslashes as `/`, leaves letters and digits of any alphabet and `._-/:+` bare (`=` too, except in the command head), and wraps any other word, a number-like word and the empty word in double quotes — the one form Git Bash, cmd and PowerShell all read alike.
+- On Windows a word holding `"`, `$`, `` ` ``, `%`, `!`, a line break, a typographic quote or a Unicode space other than blank and tab has no spelling, nor has a command head that would need quotes (a head holding a blank among them). A line with such a word is printed as `Agent action: run <the words as they are>, quoting <word> for your shell`, never as a runnable line.
+- A test hands printed lines to every installed shell (Git Bash, cmd, PowerShell where present) and checks the words come back unchanged.
+
+## Validation
+
+- Portability needs no port and no adapter pair: `container.py` selects nothing per platform, and no file lock exists anywhere — context and session state are coordinated without locking.
+- `core` imports no OS primitive (`fcntl`, `signal`, `subprocess`, `msvcrt`); the import-linter contract `core-no-os-primitives` measures it ([[ARCHITECTURE]] P-03).
+- Harness governance hooks are Python modules invoked through per-harness wrappers (sh scripts, or `cmd.exe` batches where a harness's Windows shell is cmd); the git hooks are shell shims that find the workspace venv and run Python behind the boundary ([[sdd-gate-v3]]).
+- Skill scripts are stdlib Python; the dev-server registry judges a PID's liveness on every host and lists listeners only where `/proc` and `ss` exist ([[server-registry]]).
+- CI runs Windows and macOS legs beside Linux, and `pyproject.toml` declares exactly those three OS classifiers.
 
 ## Dependencies
 
-[[workspace-init]], [[sdd-gate-v3]], [[ARCHITECTURE]], [[public-asset-distribution]], [[server-registry]].
+[[workspace-init]], [[sdd-gate-v3]], [[ARCHITECTURE]], [[public-asset-distribution]], [[server-registry]], [[bug-ledger]], [[workspace-doctor]].

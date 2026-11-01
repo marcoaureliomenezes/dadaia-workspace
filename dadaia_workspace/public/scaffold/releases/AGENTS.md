@@ -2,44 +2,44 @@
 
 Scope: this file governs only `specs/releases/`.
 
-- `RELEASE_PY` below is `python3 .agents/skills/dd-release-implementation/scripts/release.py` — this ledger's ONE writer.
+- `RELEASE_PY` below is `python3 .agents/skills/dd-release-implementation/scripts/release.py` — the writer of every `_RELEASE.json` field; only `summary` and an authorization `note` are hand-written (`dd-release-implementation`'s `RELEASE-EVENTS.md`).
+- `phase` and each milestone move only by a `RELEASE_PY` verb (`--help` lists them).
 
-- Exactly ONE live release directory, ever: a bare SemVer id, created only by `RELEASE_PY new <id>`,
-  which writes `SPEC.md` + `_RELEASE.json` (DEFINITION) in one transaction and refuses a second one.
-- The release has OPEN scope: it grows by stacked closed-scope CANDIDATES, each trio written at the release root.
-- A closed candidate's trio is overwritten in place by the next candidate's `RELEASE_PY new`; that trio lives in git at its CLOSURE commit, which is the whole archive.
-- Canonical release state: `_RELEASE.json` — one mutable document (`phase`/milestones) plus an append-only `log`; a legacy `RELEASE.json` is renamed by `dadaia doctor --fix` (SPEC-DOC-046, ADR 0007).
-- No `_RELEASE.jsonl` event stream, no `CLOSURE.md`, no `reviews/` directory, no `segment`/`audited` fields.
+- Exactly ONE live release directory, ever: a bare SemVer id, created only by `RELEASE_PY new <id> --specs <specs-dir>`,
+  which writes the next `rc-<N>/SPEC.md` + `_RELEASE.json` (DEFINITION) in one transaction and refuses a second one.
+- The release has OPEN scope: it grows by CANDIDATES, each born by `RELEASE_PY new <id> --specs <specs-dir>` in its own `rc-<N>/`.
+- Canonical release state: `_RELEASE.json` — one mutable document (`phase`/milestones) plus an append-only `log`.
 
 ## 1. Structure
 
-- `<release-id>/{SPEC.md, PLAN.md, TASKS.md, _RELEASE.json}` — the live release, its trio flat at the root.
-- `_archive/**` and any candidate folder under a release are history: read, never written, never rewritten, never ranked.
+- `<release-id>/` — the live release: only `_RELEASE.json` at its root, one `rc-<N>/` per
+  candidate; `specs/AGENTS.md` §1 is the canonical candidate-artifact set. The live candidate
+  is the highest `rc-<N>/`; every lower one is history and retains the shape it closed with.
+  A flat candidate set at the root is off-canon (TREE-8).
+- `_archive/**` is history: read-only history.
 
 ## 2. Authoring rules
 
-- Three flows, one `**Origin:**` per SPEC (`SPEC-DOC-048`): Flow 1 `backlog:<ids>` is the default weight, full memory pass; Flow 2 `bugs:<ids>` composes bugs, memory pass surgical or none; Flow 3 `operator-demand` is the heaviest — grill first, full memory pass.
-- SDD lifecycle order PER CANDIDATE: grill -> `SPEC.md` (Draft) -> operator approval -> `PLAN.md` -> `TASKS.md` -> implementation -> closure -> develop merge -> promote-or-continue gate.
-- Candidate closure order: memory update -> closure narrative in `_RELEASE.json`'s `log` -> disposition sweep -> artifact GC -> merge -> gate (continue = the next candidate's `RELEASE_PY new`; promote = merging the release PR).
+- One `**Origin:**` line per SPEC, the first counting: `operator-demand`, or `backlog:<ids>; bugs:<ids>; findings:<ids>`, each kind at most once, a finding id in full (`<audit-id>-F<nnn>`); `RELEASE_PY check --specs <specs-dir>` judges it and traces each id back.
+- SDD lifecycle order PER CANDIDATE: as-is review -> grill -> SPEC (Draft) -> PLAN -> job files -> operator approval of SPEC and PLAN -> implementation -> closure -> promote-or-continue gate (`dd-gitflow-default` steps 8-9).
 - Full arc, gate cadence, the step-by-step ladder: `dd-release-implementation`'s `RC-FLOW.md`.
-- A candidate's SPEC.md fits 24 KB and TASKS.md 12 KB; measure with `wc -c` before the definition commit.
-- A `v`-prefixed id is minted nowhere — the bare axis (`^\d+\.\d+\.\d+$`) is the only current one.
+- A candidate is closed: created, implemented, or cancelled into the next; never amended (shape 8 records approval only); a new AC goes to the next rc.
+- A candidate is defined in its own `rc-<N>/`, authored in its `wt-rc` tree (`worktrees/AGENTS.md` §1): rc N+1 is drafted there while rc N implements and enters by `RELEASE_PY new <id> --specs <specs-dir>` at rc N's CLOSURE;
+  its `## Bug window review` judges rc N's bug fixes; one rc implements at a time.
+- Recommended size, never a gate: SPEC.md within 24 KiB, each job file within 12 KiB.
+- Release ids are bare SemVer (`^\d+\.\d+\.\d+$`).
 
 ## 3. Tasks — the auditable trace
 
-- Read SPEC, PLAN and TASKS before implementing; all three must carry `**Status:** Approved`.
-- Reserve before writing: flip `[ ] -> [-]`; one `[-]` at a time unless TASKS declares disjoint write sets.
-- Complete the work inside the task's declared write set; a completed task group is one commit.
-- Flip `[-] -> [x]` and commit as `conventional-commit(task-id): description`.
-- `phase` and the `defined`/`implemented` milestones move only by `RELEASE_PY phase`; `ARCHIVED` is written by no verb.
+- Read SPEC, PLAN and every job file before implementing; the approval precondition's home is `specs/AGENTS.md`. Tasks live in `tasks/job<n>.md` (`dd-release-definition` §5).
+- The `W:` is exact: every file the task touches, with derived files it re-records; the commit body names each file and why. Current task ids are `J<n>.T<k>`.
 
 ## 4. _RELEASE.json
 
-- The active release's phase is its `phase` field — read directly, no reconciliation, no event-stream replay.
+- The active release's phase is its `phase` field — read directly.
 - Who sets which milestone, and the exact shape per field: `dd-release-implementation`'s `RELEASE-EVENTS.md`.
 
 ## 5. Promote
 
-- Version, CHANGELOG and tag come from release-please over Conventional Commits, through one release PR on `main`.
-- Promote is merging that PR; `RELEASE_PY phase CLOSURE --sha <sha> --pr <n>` records it in the candidate's note.
-- The publish jobs run in the same workflow, gated on `release_created`; no verb and no agent mints a version.
+- Promote is the integration → principal merge (`dd-gitflow-default`, step 10); `RELEASE_PY ship --specs <specs-dir>` records it: `shipped`, one `delivered` histo line, the whole release directory moved to `_archive/<id>/`, never deleted.
+- Version, CHANGELOG and tag belong to the project's own release pipeline; no verb and no agent mints a version.

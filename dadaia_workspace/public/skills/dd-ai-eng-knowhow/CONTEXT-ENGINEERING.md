@@ -1,12 +1,11 @@
 # CONTEXT-ENGINEERING.md — Authoring and Auditing the AI-Entity Surface
+Sections: 1. Token Economy · 2. Instruction Hierarchy and Attention Ordering · 3. Persona-Consistency Invariants · 4. Model-Tier Selection Decision Protocol · 5. Recursive Scope-Drift Detection · Applying this file
 
 Sibling of [`SKILL.md`](SKILL.md) (`dd-ai-eng-knowhow`, authoring depth).
 Persona files, skills, and rules are themselves prompts — every shipped line is paid for in tokens by every downstream invocation.
-The craft: maximize behavior-change-per-token under a hard context budget, keeping every persona structurally identical.
+The craft: maximize behavior-change-per-token under a hard context budget, keeping every persona's shared structure consistent.
 
-- Five disciplines, ordered by how often you reach for them: token economy, instruction hierarchy.
-- Disciplines (continued): consistency invariants, tier selection, scope-drift detection.
-- Apply them in that order when authoring; apply them in reverse when reviewing someone else's change (safety first).
+- Five disciplines, ordered by how often you reach for them: token economy, instruction hierarchy, consistency invariants, tier selection, scope-drift detection.
 
 ---
 
@@ -16,17 +15,17 @@ The craft: maximize behavior-change-per-token under a hard context budget, keepi
 cost(file) = tokens(file) x invocations(file) x unit_price(tier)
 ```
 
-- A persona body is re-read on every invocation; a skill body only when loaded; an `always_on` rule on every turn of every in-scope agent.
+- A persona body is re-read on every invocation; a skill body only when loaded; the root `AGENTS.md` map on every turn of every agent.
 - The first question for any line: does it change behavior often enough to justify its lifetime token cost in this layer?
 
 | Layer | Read frequency | Rule of thumb |
 |---|---|---|
-| `always_on` rule | Every turn, every in-scope agent | Reserve for invariants that must never be forgotten; keep terse |
+| Root `AGENTS.md` map | Every turn, every agent | Reserve for invariants that must never be forgotten; keep terse |
 | Agent persona body | Every invocation of that one agent | Lean on frontmatter for hard rules |
 | Skill body | Only when the skill is loaded | Right home for deep protocols and tables |
 | Frontmatter (any) | Parsed by tooling, not re-reasoned | Put machine-enforced hard rules here |
 
-- Corollary: depth belongs in skills, not personas — an inlined 40-line protocol pays every dispatch, a referenced skill only when needed.
+- Corollary: depth belongs in skills, not personas (which surface holds what: `.dadaia/agentic/data/CONTEXT-MAP.md`) — an inlined 40-line protocol pays every dispatch.
 - A table compresses roughly 3-5x versus prose carrying the same machine-readable signal.
 
 | Content shape | Use | Reason |
@@ -39,9 +38,8 @@ cost(file) = tokens(file) x invocations(file) x unit_price(tier)
 - "First... then... however... unless..." prose is almost always a table in disguise — convert it.
 - Inline content only if: short (<=~3 lines), needed on essentially every invocation, and changes behavior at the point of reading.
 - Otherwise link to the canonical source and carry only a one-line orientation pointer.
-- Shared protocol (workspace-protocol, tmp-file guardrail, SDD gate flow, task-manager flow) is authored once, referenced everywhere.
 - Restating shared protocol in N personas multiplies lifetime cost by N and drifts N ways.
-- Smell: the same paragraph appears verbatim in two or more files — a missing link or a missing skill (see §5).
+- Smell: the same paragraph appears verbatim in two or more files — a missing link or a missing skill (see Recursive Scope-Drift Detection).
 - Token estimation for audits: `tokens ~= words x 1.33` (English), `tokens ~= words x 1.20` (Portuguese).
 - Compute via `wc -w` on the file body, multiply by rate, multiply by invocation frequency for lifetime-cost.
 
@@ -53,58 +51,50 @@ cost(file) = tokens(file) x invocations(file) x unit_price(tier)
 - Refusal templates must be encountered before the agent reasons itself into accepting an out-of-scope task.
 - Reordering sections moves the agent's attention and changes which constraints dominate on conflict.
 
-| # | Section | Answers the question | Form |
-|---|---|---|---|
-| 1 | Identity | What IS this agent? | One paragraph |
-| 2 | Scope | What does it write / NOT write? | Table preferred |
-| 3 | Forbidden actions + `[SCOPE ERROR]` | How does it refuse? | Verbatim refusal block |
-| 4 | Stack expertise | What technical depth does it have? | Sub-headed by stack |
-| 5 | Workflow protocol | TDD / task-manager / release resolution | Steps |
-| 6 | Security rules | What must it never do? | OWASP-style table where applicable |
-| 7 | Collaboration patterns | Who does it hand off to? | Named-agent table |
-| 8 | Write permissions | Where may it write? | Table mirroring `paths.write_allowlist` |
-| 9 | Report contract | What does it emit at the end? | Steps / template ref |
-| 10 | CLI reference | What tools does it drive? | Command list |
+| # | Section | Answers the question |
+|---|---|---|
+| 1 | Owns | What does it write, and what is its gate role? |
+| 2 | Never | What must it refuse, and how (the `[SCOPE ERROR]` block)? |
+| 3 | Procedure | How does it work? |
+| 4 | Outputs | What does it emit, and where may it write? |
+| 5 | References | What does it consult? |
 
-- Ordering logic: who -> what -> how-it-refuses -> what-it-knows -> how-it-works -> what-it-must-not.
-- Ordering logic (continued): who-it-talks-to -> where-it-writes -> what-it-emits -> how-it-operates.
-- Refusal (3) precedes capability (4) deliberately — an agent that knows its limits before its powers is harder to talk out of scope.
+- Ordering logic: what-it-owns -> what-it-refuses -> how-it-works -> what-it-emits -> what-it-consults.
+- Refusal (2) precedes procedure (3) deliberately — an agent that knows its limits before its powers is harder to talk out of scope.
 - Do not reorder without a documented reason; reordering changes behavior.
 
 Audit protocol — detecting order drift:
 
 1. Extract the section spine: `grep -n '^## ' <persona>.md`.
-2. Map each heading to a canonical slot (1..10); omission is allowed, reordering is not.
+2. Map each heading to a canonical slot (1..5); omission is allowed, reordering is not.
 3. Verify mapped slot numbers are strictly non-decreasing top-to-bottom.
 4. Any inversion (a later slot above an earlier one) is an ORDER-DRIFT finding.
-5. Classify: inversion of 1/2/3 = HIGH; inversion among 4..10 = MEDIUM; extra non-canonical section = LOW.
+5. Classify: inversion of 1/2/3 = HIGH; inversion among 4..5 = MEDIUM; extra non-canonical section = LOW.
 6. Fix by moving sections to restore canonical order — never rewrite content while reordering.
 
 ---
 
 ## 3. Persona-Consistency Invariants
 
-Five invariants MUST hold across all personas. Inconsistencies are bugs — file them in a refactor report.
+Four invariants MUST hold across the full personas (reviewer, product engineer, sr); the lighter `dd-researcher` and `dd-sw-engineer-jr` are exempt from I2 and I3, and I4 binds every agent but `dd-researcher`. An inconsistency is an AI-surface lens finding (`dd-code-review`, The six lenses).
 
 | # | Invariant | What must match |
 |---|---|---|
-| I1 | Frontmatter schema | Same keys, same order (see below); no `tier`/`model` frontmatter key |
-| I2 | Body section order | The canonical 10-section spine of §2 |
+| I1 | Frontmatter schema | Shared core keys and order match; role-specific extensions follow the core; no `tier`/`model` frontmatter key |
+| I2 | Body section order | The canonical five-section spine of Instruction Hierarchy and Attention Ordering |
 | I3 | `[SCOPE ERROR]` block format | Opener, one-line identity, explicit redirect per foreign domain |
-| I4 | TDD / task-manager reservation flow | Identical `[ ]`->`[-]`->`[x]` flow, referenced (not restated) |
-| I5 | Handoff JSON contract | All agents emit via `dd-handoff-emitter` against the same schema version |
+| I4 | Handoff JSON contract | All agents emit via `dd-handoff-emitter` against the same schema version |
 
-- I1 reference key list (on-disk today): `name`, `description`, `dispatch_band`, `activity_class`, `concurrency_relationship`.
-- I1 reference key list (continued): `gate_role`, `tools`, `skills`, `maxTurns`, `input_contract`, `paths.write_allowlist`.
+- I1 reference: the shared core is `name`, `description`, `read_only`, `tools`, `skills`, in that order; a role-specific extension follows it.
+- No persona sets `maxTurns`: a capped subagent stops mid-work and returns no report; the main thread stops a runaway one.
 - Model resolution is a separate policy-overlay mechanism, never asserted in persona frontmatter.
 
 Detection method:
 
 1. I1: `grep -n '^[a-z_]*:' <persona>.md`, diff the key list against the on-disk reference (re-derive if the schema changes).
-2. I2: run the §2 audit protocol.
+2. I2: run the audit protocol of Instruction Hierarchy and Attention Ordering.
 3. I3: `grep -A12 '\[SCOPE ERROR\]' <persona>.md`; verify opener, one-line identity, and a correct redirect per domain.
-4. I4: confirm the persona references the task-manager flow rather than restating it.
-5. I5: confirm `dd-handoff-emitter` is in the skills list and the report section cites the current schema.
+4. I4: confirm `dd-handoff-emitter` is in the skills list and the report section cites the current schema.
 
 Fix protocol:
 
@@ -128,18 +118,9 @@ Fix protocol:
 | Volume | Occasional -> high-frequency / bulk |
 
 - The dominant task drives the tier — not the easiest or the rarest.
-- Tier names are derived from `core/model_registry.py` — never hand-maintain a copy that can drift.
-
-| Registry tier | Workload character |
-|---|---|
-| `deep` | Heavy synthesis, recursive analysis, persona/skill authoring, fleet audit, security reasoning |
-| `dispatch` | Orchestration, dispatch authority, review verdicts, broad-context implementation |
-| `standard` | Mid-cost general implementation |
-| `fast` | High-volume mechanical reformatting, bulk renames, deterministic transforms |
-
-- Current per-runtime model ids and Codex reasoning-effort come from `core/model_registry.py`, never hand-copied.
-- On Codex the tiering axis is (model id x model_reasoning_effort); on Claude it is the model id.
-- Quote the registry entry (id + tier) when recommending a move; take the price from the provider's published table, never from memory.
+- Tier aliases and Codex model ids come from `core/model_registry.py` (`TIER_CODEX`), never hand-copied; Claude resolves the alias itself. Reasoning effort is the template cell's effort.
+- The tiering axis is (model x effort): on Claude the alias and `effort:`; on Codex the `TIER_CODEX` id and `model_reasoning_effort`.
+- Quote the template cell (alias + effort), and on Codex its `TIER_CODEX` id, when recommending a move; take the price from the provider's published table, never from memory.
 - Move up a tier only when depth/breadth/error-cost are all high; move down only when the task is mechanical and high-volume.
 
 Justify a tier BUMP (down -> up):
@@ -164,24 +145,16 @@ Justify a tier DOWNGRADE (up -> down):
 
 - The AI-entity surface is recursive: an agent can edit another agent's file.
 - Failure signature: agent A "fixes" agent B's persona -> B's behavior shifts -> agent C (dispatches B) breaks, far from the edit.
-- Defense: three detection rules applied before the edit lands, plus a topology guard for the self-edit case.
+- Defense: two detection rules applied before the edit lands, plus a topology guard for the self-edit case.
 
-Detection rule 1 — write_allowlist agreement (frontmatter vs body):
-
-1. Extract the frontmatter `paths.write_allowlist` globs and the body Write-permissions table rows.
-2. Diff them; a body-granted/frontmatter-omitted path is a FALSE-PROMISE drift.
-3. A frontmatter-granted/body-omitted path is a SILENT-PRIVILEGE drift.
-4. The frontmatter is authoritative by convention — fix both so they match the SPEC's authorized scope, never wider.
-5. Widening an allowlist requires an operator-approved release task (privilege-escalation control).
-
-Detection rule 2 — forbidden-actions table propagates via release, not spot-edit:
+Detection rule 1 — forbidden-actions table propagates via release, not spot-edit:
 
 1. Compare each persona's `[SCOPE ERROR]` redirect set against the reference.
 2. A single persona whose redirect set differs from all others is spot-edit drift.
 3. If the reference changed: open a fleet-wide release task and update all personas together.
 4. If one persona drifted: restore it to the reference — never "improve" one persona's refusal block in isolation.
 
-Detection rule 3 — self-edit risk + topology-guard protocol:
+Detection rule 2 — self-edit risk + topology-guard protocol:
 
 1. Any dispatch-graph/allowlist/tool-grant change is the highest-risk operation.
 2. Confirm an operator-approved release task authorizes the specific change — no self-granted privileges.
@@ -191,18 +164,18 @@ Detection rule 3 — self-edit risk + topology-guard protocol:
 6. The security lens reviews any change adding a powerful tool or widening an allowlist.
 7. Re-validate frontmatter via the workspace reader test so the parse still succeeds.
 
-Re-verify topology invariants whenever: `write_allowlist` changes, `tools` changes (esp. adding `Agent`), or a persona is added/removed.
+Re-verify topology invariants whenever: `tools` changes (esp. adding `Agent`), or a persona is added/removed.
 Re-verify topology invariants also when a `[SCOPE ERROR]` redirect set changes.
 
 - Skill-extraction trigger: when two or more personas restate the same protocol, extract it into `public/skills/<name>/SKILL.md`.
-- Replace every inline copy with a one-line reference — a skill loads once and is referenced; inline content loads N times and drifts N ways.
+- Replace every inline copy with a one-line reference to its one owner — a skill loads once; inline content loads N times.
 - This is the highest-leverage move when an efficiency audit finds repeated context across personas.
 
 ---
 
 ## Applying this file
 
-- Authoring a new persona/skill/rule: walk §1 (cheapest layer) -> §2 (spine) -> §3 (invariants) -> §4 (tier) -> §5 (drift).
-- Reviewing someone else's AI-entity change: walk in reverse — §5 first, then §3, §2, §1, §4.
-- Auditing the fleet (efficiency report): §1 ranks files by lifetime cost, §2/§3 find structural drift.
-- Auditing (continued): §4 recommends tier moves, §5 recommends deduplication.
+- Authoring a new persona/skill/rule: walk Token Economy (cheapest layer) -> Instruction Hierarchy and Attention Ordering (spine) -> Persona-Consistency Invariants -> Model-Tier Selection Decision Protocol -> Recursive Scope-Drift Detection (drift).
+- Reviewing someone else's AI-entity change: walk Recursive Scope-Drift Detection first, then Persona-Consistency Invariants, Instruction Hierarchy and Attention Ordering, Token Economy, Model-Tier Selection Decision Protocol.
+- Auditing the fleet (efficiency report): Token Economy ranks files by lifetime cost; Instruction Hierarchy and Persona-Consistency Invariants find structural drift.
+- Auditing (continued): Model-Tier Selection Decision Protocol recommends tier moves; Recursive Scope-Drift Detection recommends deduplication.

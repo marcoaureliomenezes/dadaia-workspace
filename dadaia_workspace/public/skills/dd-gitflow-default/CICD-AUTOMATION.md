@@ -1,21 +1,8 @@
-# CI/CD automation for the branch contract
+# Optional: plug your own CI into the repo's verify: lines
 
-Disclosed depth behind `dd-gitflow-default`'s "CI/CD automation" pointer.
-Addressed to a consumer operator wiring this contract into their own CI/CD, not to the agent running the skill.
+Optional depth behind `dd-gitflow-default`. Nothing here is required: the branch contract runs on local git and the repo's tracked `verify:` line alone.
+Addressed to an operator who also runs a pipeline of their own.
 
-Four checks turn the branch contract from a convention into a machine boundary. Each maps to one row of the skill's mechanical table.
-
-| Suggested check | Where it runs | What it refuses |
-|---|---|---|
-| Branch-name guard | pre-push hook | any ref not `main`, `develop`, or `feature/{M.m.p}` (`^feature/\d+\.\d+\.\d+$` — no `v`, no suffix) |
-| Direct-push refusal | pre-push hook | any push to `develop`/`main`; message names the PR path instead |
-| `pr-source-guard` (1 job, 2 rules) | required CI check | PR to `main` not from `develop` or the release-please release PR; PR to `develop` not from `feature/{M.m.p}` |
-| Post-merge branch deletion | CI job on the `develop`-merge following a deploy | a stale `feature/{M.m.p}` left behind |
-
-## Wiring notes
-
-- No CI job calls a model API; the security review is the `dd-code-reviewer` lens run before the PR.
-- A job newly added on a feature branch does not run on the PR that introduces it — mark it required only from the following PR onward.
-- `gh api PATCH .../required_status_checks` clobbers the existing list — always re-supply the full set, never a delta.
-- The denylist scan and the CI trigger on `feature/**` pushes belong to the same pipeline stage as the branch-name guard.
-- Keep all three in one preflight job so a single failure names the actual rule that fired.
+- Point the pipeline at the same lines the worktree gates run, so one command is the one judge, locally and in the pipeline.
+- The shipped pre-push hook already enforces `.dadaia/AGENTS.md` §3 (a pipeline feeds the pre-push ref lines to `.dadaia/.venv/bin/dadaia ci push-gate-check` on stdin).
+- A check that rejects a change from a source branch outside the skill's §2a table, and the deletion of a stale work branch after a deploy, are the same table read by your own host.

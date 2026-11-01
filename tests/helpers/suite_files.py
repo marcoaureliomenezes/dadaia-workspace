@@ -1,31 +1,12 @@
-"""The one enumeration of the test suite every ratchet pins (bug
-``v26-ratchet-scans-tests-tmp-scratch-dir-xdist-race``).
+"""The one suite enumerator: git-tracked paths, so a scratch file another process leaves
+in the checkout is never read."""
 
-A ratchet measures the TRACKED suite — what git holds — never whatever transient file a
-concurrent xdist worker is writing and deleting under ``tests/tmp/`` at that instant.
-``git ls-files`` is that definition in one call: scratch probes, ``__pycache__`` and every
-ignored path are outside it by construction, so no walker needs its own exclusion rule.
-"""
-
-from __future__ import annotations
-
-import fnmatch
-import subprocess
 from pathlib import Path
 
+from tests.helpers.oslib import run
 
-def tracked_test_files(
-    repo_root: Path, pattern: str = "*.py", *, tree: str = "tests"
-) -> list[Path]:
-    """Every git-tracked file under *tree* whose basename matches *pattern*, sorted."""
-    result = subprocess.run(
-        ["git", "ls-files", "-z", "--", tree],
-        cwd=repo_root,
-        capture_output=True,
-        check=True,
-    )
-    return sorted(
-        repo_root / entry
-        for entry in result.stdout.decode("utf-8").split("\0")
-        if entry and fnmatch.fnmatch(Path(entry).name, pattern)
-    )
+
+def tracked(root: Path, *spec: str) -> list[Path]:
+    """Sorted absolute paths of the files git tracks under *spec* in the repo at *root*."""
+    out = run(["git", "-C", str(root), "ls-files", "-z", "--", *spec], check=True).stdout
+    return sorted(root / p for p in out.split("\0") if p)

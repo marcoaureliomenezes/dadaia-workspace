@@ -1,24 +1,33 @@
 > **AI agent rules.** This file is generated from
-> `dadaia_workspace/public/data/AGENTS.md` by `dadaia public install`.
+> `dadaia_workspace/public/data/AGENTS.md` by `public install`.
 > Do not put project-specific instructions here. Put them in a scoped
 > `AGENTS.md` / `CLAUDE.md` inside the repo or directory they govern.
 
 # dadaia-workspace — the map
 
-- One workspace folder; the agent session launches at its root, always.
+- Simplicity and lightness are the first law, never above an operator order, the test rule, or security and privacy. The lightest solution that works wins: every gate, step, file and line must earn its place, and a heavier option is chosen only when a lighter one was tried and failed.
+- One workspace folder; the agent session launches at its root, always. A session launched elsewhere loads no persona and no hook, so it stands in for no role; on a harness that names its subagent, every write verb of `verdict.py`, `backlog.py`, `release.py` and `worktree.py` refuses it (What is enforced).
 - Projects live in `repos/<slug>/`; governance (`AGENTS.md`, `.agents/`, `.dadaia/`) lives outside every repo.
 - A project is a **context**: one **main repo** (where `specs/` lives) plus **associated repos**; never a monorepo.
-- Two rule-file kinds exist: this map and the scoped `AGENTS.md` per governed area (§5); nothing else is law.
+- Two rule-file kinds exist: this map and the scoped `AGENTS.md` per governed area (Scoped law); nothing else is law.
 - A scoped file is the system of record for its area and takes precedence there — open it before acting in that area.
 
 ## 1. The flow
 
 - Classify every demand: Arm A (feature) or Arm B (bug); state the arm before acting.
-- Arm A: `demand -> backlog -> release candidate (SPEC/PLAN/TASKS) -> implementation + review -> memory -> closure -> promote by merging the release PR`.
-- Arm B: `propose -> operator confirms -> register -> RED test -> root-cause fix -> GREEN -> resolved`.
-- Test: does the tool break its own contract? Yes -> Arm B, fixed now. No -> Arm A, via a candidate.
-- A feature enters only through the backlog or an operator demand recorded in the SPEC `Origin`; a confirmed bug is fixed immediately.
-- No workflow engine: the SDD documents (`specs/releases/AGENTS.md`) are the record of progress.
+- Arm A: `demand -> backlog -> as-is review -> release candidate (SPEC/PLAN/job files) -> implementation + review -> memory -> closure -> promote` (`dd-gitflow-default`, step 10).
+- Arm B: `propose -> operator confirms -> register -> lowest-level RED test -> root-cause fix -> GREEN -> resolved`.
+- Test: does the tool break its own contract? Yes -> Arm B. No -> Arm A.
+- A feature enters only through the backlog or an operator demand recorded in the SPEC `Origin`; a confirmed bug is fixed per `specs/bugs/AGENTS.md` (Resolution).
+- A test, or an existing assert, is removed or skipped only on the operator's order.
+- Every change minimizes code: DELETE → REBUILD → UPDATE → KEEP → ADD last; verbosity is a defect; documented behavior still works; tests assert behavior not text, mock only boundaries, expect literals; a docstring states only its unit's contract (inputs, output, raises, side effects); no bug id, ADR, FR, AC, task id, candidate, review round or audit id appears in a docstring or comment.
+- A fix hardens the contract test in that contract's one home: it tightens an assert or adds the missing partition and never loosens one, a new case is written only when no contract test covers the partition, and the reviewer reverts the fix and confirms the hardened test goes red.
+- A failing old test is a question: outside a fix, an assert is moved or narrowed, or a guard's reach narrowed, only with the main thread's ruling named in a `test(...)` commit, and a product-contract change also needs the operator.
+- Inventory existing gates and tools first; a new gate, lock, repo, layer or review round states what it buys and names the heavier one it deletes.
+- A requirement applied to every task, job or deletion is a gate, states its measured cost per run, and that cost never exceeds one run of the job's `verify:` gate as it stood before the change, without the operator's ruling.
+- The `verify:` line and the merge checks are gates: a change to one states its measured cost against the line it replaces, never against itself, and needs the operator's ruling; no step after the implementer's hand-back reruns a check the merge runs; a heavier gate is never the recommended option.
+- Non-blocking findings go to the main thread's intake report (`dd-backlog-definition`).
+- The SDD documents (`specs/releases/AGENTS.md`) are the record of progress; numbers, durations and dates are measured or read from a named source, and law text holds no dated snapshot value.
 
 ## 2. Who does what
 
@@ -26,44 +35,51 @@
 |---|---|
 | Intake, grill, dispatch, the review checkpoint, gates | the main thread (the operator's session) |
 | Backlog, SPEC, the product-memory pass at closure | `dd-product-engineer` |
-| PLAN, TASKS, production code and tests in any language | `dd-software-engineer` |
+| The as-is review, PLAN, job files, production code and tests for new behaviour | `dd-sw-engineer-sr` |
+| Tasks fully stated by their AC and `W:` | `dd-sw-engineer-jr` |
+| Read-only findings, each a `path:line` or URL | `dd-researcher` |
 | Three-axis review + six lenses (architecture, security, QA, product, audit, AI surface) | `dd-code-reviewer` |
 
-- Three roles, no fourth; every retired role is a lens the reviewer applies and the engineer anticipates.
-- Every agent invokes `dd-ai-eng-knowhow` for harness literacy; an AI-entity change follows its AUTHORING contract.
+- Only the operator accepts an ADR (`specs/ADRs/AGENTS.md`, Acceptance law).
+- Every agent but `dd-researcher` invokes `dd-ai-eng-knowhow` for harness literacy; an AI-entity change follows its AUTHORING contract.
 
 ## 3. What is enforced
 
-- One PreToolUse gate blocks exactly three things: a new workspace-root entry (§4), a `dadaia`/`pip` run outside `.dadaia/.venv/bin/`, a PROTECTED or out-of-scope write.
-- Path classes: ADDITIVE (the append-only governance areas of `specs/AGENTS.md` and the runtime scratch zones of `.dadaia/AGENTS.md`) always writable; PROTECTED (session state, the projected law files) blocked; everything else MUTATING, scope-judged under `repos/<slug>/`.
-- Every BLOCK carries exactly one `fix: <command>` line; a BLOCK whose fix is itself blocked is a Stall, CRITICAL.
-- Git chokepoints: pre-push allows `feature/{M.m.p}` and refuses `develop`/`main`, a non-canon `specs/` path or a denylisted secret; both PRs need CI green and a `dd-code-reviewer` APPROVED verdict; no CI job calls a model API. Mechanics: `dd-gitflow-default`, `.dadaia/AGENTS.md`.
-- Races surface, never block; context binding: `dadaia context show --json`, `dadaia context bind <ctx>`.
-- The gate reads no SDD artifact; procedure is skill-taught and audit-measured, never gated.
+- One PreToolUse gate blocks: a file-tool write (`WRITE_TOOLS`) creating a new entry at the root, `.dadaia/`, a closed-canon zone or the first level of `repos/`, `worktrees/`, `NotebookEdit` excepted (root_whitelist); a file-tool write (`WRITE_TOOLS`) to a path of the PROTECTED class below (PROTECTED); a file-tool write (`WRITE_TOOLS`) out of the bound scope (out-of-scope); a file-tool write under `repos/<slug>/` outside `specs/audits/`, since `repos/` is merge-only: `specs/audits/` is written directly, the rest by worktree merge, and only `context create` and a repo's first `specs init` write `specs/` directly (_MERGE_ONLY_MESSAGE); and a Bash call whose text holds `verdict.py` or `-m verdict` together with `--verdict`, once quotes and backslashes are removed, outside the dispatched `dd-code-reviewer`, on a harness whose pre-gate matcher carries the shell tool (`HOOK_DIALECTS`) and whose registry row names a subagent key, the only Bash act it judges (verdict_act).
+- The verdict-act test reads text only: a read-only mention of the writer with `--verdict` is refused too. Where the pre-gate matcher lacks the shell tool, a shell call inside a governed session, the main thread's included, can still write a verdict.
+- `context bind` and every write verb of `verdict.py`, `backlog.py`, `release.py` and `worktree.py` also refuse a call whose env carries the session id of a harness whose registry row names a subagent when that session has no live record, with the fix `doctor --fix` when that session's record does not read, else `Operator action: relaunch the session at the workspace root`; a caller controls its own environment and files, so a call without such an id is not judged, and a record its caller wrote itself, or a hook module it ran itself, passes.
+- The gate fails open on: a pre-gate past 10 s (TOOL_TIMEOUT_S); an id-less unbound session under `worktrees/<r>/` (gate_policy); a policy that raises (`pre_gate`); an unreadable payload (`read_stdin_json`); an unreadable registry, judging nothing below `repos/`, `worktrees/`, so only the merge-only block holds there (registered_slugs).
+- The Bash hook wrapper accepts the workspace venv's POSIX or Windows Python; when neither is executable, it warns and exits 0, and each context-injection lane prints the reinstall `fix: Agent action:` line.
+- Path classes: ADDITIVE (`.dadaia/AGENTS.md`'s output and ephemeral zones) writable; PROTECTED (every projected path the install ledger records, the hook wiring, `CORE_FLOOR`, and the `.dadaiaignore` `[protected]` globs, as `gate_policy._protection` decides) blocked; the rest MUTATING; no agent writes an out-of-scope path by any tool, Bash included, nor a PROTECTED path but through the owner its refusal names; Bash is outside `WRITE_TOOLS` and unjudged but for the act of the first bullet.
+- Every BLOCK carries exactly one fix line: `fix: <command>`, `fix: Agent action: <one act>` for an act an agent performs (one act may chain up to three steps with `, then`), or `fix: Operator action: <one act>` only for an ADR acceptance, a secret, a `.dadaiaignore` or PROTECTED edit, a ruling the law names, or an act outside the agents' reach (relaunching the session); a BLOCK whose fix is itself blocked is a Stall, CRITICAL.
+- Git chokepoints (branch contract and scope: `dd-gitflow-default`, The branch contract): pre-push: `.dadaia/AGENTS.md`, Git chokepoints; `.dadaia/.venv/bin/dadaia worktree merge` refuses a `wt-main`, `wt-rc`, hotfix or backlog tree without a valid APPROVED verdict bound to its diff, and a `wt-main`, `wt-rc` or hotfix tree whose `verify:` does not exit 0 (`worktrees/AGENTS.md`, Merges, gates, review); the merge gate is discipline (`dd-gitflow-default` §3b).
+- The binding: `.dadaia/.venv/bin/dadaia context show --json`. The gate reads no SDD artifact.
+- Common behaviour lives in skills and `AGENTS.md`; a persona or hook carries only the surface its harness cannot do without; a harness fact lives in one registry row.
 
 ## 4. Where things are written
 
-- Root holds only: `<!-- root -->`; what the operator created by hand stays; a tool's extra entry needs a glob in `.dadaia/states/instance_exceptions.txt`.
-- Temp: `.dadaia/tmp/<agent>/<YYYYMMDD>/`; handoffs: `.dadaia/handoff/<context>/`; HTML reports: `repos/<slug>/reports/<agent>/`; caches: `.dadaia/.cache/`, `.dadaia/mcps/<server>/`.
-- A repo tree carries source and its own artifacts only — never `.dadaia/`; caches redirect by configuration (`repos/<slug>/AGENTS.md`).
-- Credentials live only in the operator's root `.env`: never create, copy, persist, commit, print or report a secret, anywhere.
-- Invoke `.dadaia/.venv/bin/dadaia` by absolute path; register every dev server through `dd-cli-library`.
+- Root holds only: `<!-- root -->`; any other entry, the operator's included, needs a pattern in `.dadaiaignore`, which only the operator edits.
+- Temp: `.dadaia/tmp/<agent>/<YYYYMMDD>/`; handoffs: `.dadaia/handoff/<context>/`; HTML reports: `.dadaia/reports/<context>/`; worktrees: `worktrees/<repo>/<v>/…`; caches: `.dadaia/tmp/<tool>-cache/` (absolute, harness env); anything an MCP server needs: `.dadaia/mcps/<server>/`.
+- A repo tree carries source and its own artifacts only — never `.dadaia/`; caches redirect by configuration (`repos/<slug>/AGENTS.md`); unexplained files are presumed yours, uncommitted work not yours is never discarded or restored, and no infrastructure is probed on a guess.
+- Credentials live outside the workspace, in the operator's own file: never create, copy, persist, commit, print or report a secret, anywhere; the operator sets a secret from a real terminal, a job that uses it verifies it (never its name), and text is scrubbed before commit, not only at push, with generic names in review and QA text.
+- Register every dev server through `dd-cli-library`.
 
 ## 5. Scoped law — open before acting there
 
 | Area | File | Governs |
 |---|---|---|
-| specs tree | `specs/AGENTS.md` | canon, status tokens, doctor codes |
-| releases | `specs/releases/AGENTS.md` | candidates, phases, task markers, promote, commit shapes |
+| specs tree | `specs/AGENTS.md` | canon, status tokens, load order, artifact authority |
+| releases | `specs/releases/AGENTS.md` | candidates, phases, tasks, promote |
 | backlog | `specs/backlog/AGENTS.md` | demand queue, `exit`, dispositions |
 | bugs | `specs/bugs/AGENTS.md` | what a bug is, propose/confirm, records, resolution |
-| memory | `specs/memory/AGENTS.md` | product truth, atoms, Part 1/Part 2, ownership |
+| memory | `specs/memory/AGENTS.md` | product truth, atoms, ownership |
 | ADRs | `specs/ADRs/AGENTS.md` | decisions.jsonl, acceptance |
 | audits | `specs/audits/AGENTS.md` | three pillars, remediation release |
-| runtime | `.dadaia/AGENTS.md` | zones, doctor, reprojection, chokepoints, context freeze |
+| runtime | `.dadaia/AGENTS.md` | zones, doctor, reprojection, chokepoints |
 | handoff | `.dadaia/handoff/AGENTS.md` | emission, schema, ack |
 | tmp / states | `.dadaia/tmp/AGENTS.md`, `.dadaia/states/AGENTS.md` | TTL, state files |
 | a repo | `repos/<slug>/AGENTS.md` | clean tree, caches, tests |
+| worktrees | `worktrees/AGENTS.md` | the rc hierarchy and lanes, two gates, one review, one venv |
 
 ## 6. Skills — `.agents/skills/dd-*`
 
@@ -71,19 +87,23 @@
 |---|---|
 | `dd-grill-me` | the mandatory questioning session before any SPEC |
 | `dd-backlog-definition` | curating the backlog from operator demand |
-| `dd-release-definition` | SPEC -> PLAN -> TASKS for a candidate |
+| `dd-release-definition` | SPEC -> PLAN -> job files for a candidate |
 | `dd-release-implementation` | tasks, push green, closure order |
 | `dd-code-review` | three axes, six lenses, slop detection |
 | `dd-bug-registration`, `dd-bug-resolution` | Arm B end to end |
-| `dd-test-stewardship` | test intent, size, demotion, pruning |
-| `dd-gitflow-default` | branches, PRs, commit shapes |
+| `dd-gitflow-default` | branches, merges and PRs, commit shapes |
 | `dd-handoff-emitter` | machine-readable completion records |
 | `dd-audit-project` | the periodic three-pillar audit |
-| `dd-spec-navigator` | finding truth in `specs/`; the glossary |
+| `dd-spec-navigator` | finding truth in `specs/` |
 | `dd-cli-library` | the `dadaia` verbs, skill scripts, dev servers |
 | `dd-ai-eng-knowhow` | harness literacy and AI-entity authoring |
-| `dd-architecture-survey`, `dd-codebase-design`, `dd-domain-modeling` | design vocabulary for PLAN and SPEC |
-| `dd-manager-orchestration` | dispatching the three roles |
+| `dd-manager-orchestration` | dispatching the five roles |
 
 - Language: operator preference, default English. Tone: direct, concise, operational.
-- Instance state: `dadaia context show --json`, `dadaia doctor`, `dadaia public doctor`, `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py status`.
+
+## 7. Onboarding — three levels
+
+- Level 1 workspace: `uvx dadaia-workspace init [DIR]`; re-running it on an existing workspace is the upgrade.
+- Level 2 context: `.dadaia/.venv/bin/dadaia context create <name> --main-repo <url> [--associated-repo <url>]...` clones, hooks and marks ALIVE.
+- Level 3 specs: 3a `.dadaia/.venv/bin/dadaia specs init --context <ctx>`, then `.dadaia/.venv/bin/dadaia context bind <ctx>` binds a session; 3b the `dd-audit-project` first pass, done when memory holds real content (never a stamp); 3c `.dadaia/.venv/bin/dadaia context baseline <ctx>` publishes.
+- Read the next step from `.dadaia/.venv/bin/dadaia doctor` (`ONBOARDING`) and SessionStart print it with its `fix:` line.

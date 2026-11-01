@@ -1,0 +1,382 @@
+"""The guard matrix over the one traversal primitive of ``doctor.py``.
+
+Every per-call-site guard (``_entries``, ``_mtime``, ``_remove``, ``_guarded``,
+``_remove_dead_repo``) answers "may I touch this?" through that primitive; each row
+pins one refusal or deletion outcome.
+"""
+
+from __future__ import annotations
+
+import datetime as dt
+import os
+from collections.abc import Callable
+from pathlib import Path
+from types import SimpleNamespace
+
+import pytest
+
+from dadaia_workspace.core.skill_owner import load_owner
+from dadaia_workspace.features.spec_context import sweep
+from tests.helpers.oslib import (
+    PERMISSIONS_ENFORCED,
+    link,
+    make_readonly,
+    make_writable,
+    read_text,
+    write_text,
+)
+
+
+def _tree(root: Path, *, read_only: bool = False) -> Path:
+    tree = root / "cache" / "mod"
+    (tree / "pkg").mkdir(parents=True)
+    write_text(tree / "pkg" / "go.mod", "module x\n")
+    for path in (tree / "pkg" / "go.mod", tree / "pkg", tree) if read_only else ():
+        make_readonly(path)
+    return tree
+
+
+def _file(path: Path, *, read_only: bool = False) -> Path:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    write_text(path, "x")
+    if read_only:
+        make_readonly(path)
+    return path
+
+
+def _outside_link(tmp: Path) -> Path:
+    """`ws/link` -> `outside/` holding `treasure.txt`; returns ws."""
+    (tmp / "outside").mkdir()
+    write_text(tmp / "outside" / "treasure.txt", "x")
+    (tmp / "ws").mkdir()
+    assert link(str(tmp / "outside"), tmp / "ws" / "link", is_dir=True)
+    return tmp / "ws"
+
+
+def _walk_symlinked(tmp: Path) -> Path:
+    _outside_link(tmp)
+    return tmp / "ws" / "link"
+
+
+def _walk_plain(tmp: Path) -> Path:
+    write_text(tmp / "b", "b")
+    (tmp / "a").mkdir()
+    return tmp
+
+
+# fmt: off
+@pytest.mark.parametrize(("setup", "names"), [
+    pytest.param(_walk_plain, ["a", "b"], id="sorted-entries"),
+    pytest.param(_walk_symlinked, [], id="never-follows-a-symlinked-root"),
+    pytest.param(lambda tmp: tmp / "nope", [], id="missing-dir-is-empty"),
+])
+# fmt: on
+def test_walk_lists_only_a_real_directorys_sorted_entries(tmp_path: Path, setup: Callable[[Path], Path], names: list[str]) -> None:
+    """A symlinked root would yield entries whose parent is inside the workspace, so the destination would be reaped."""
+    assert [p.name for p in sweep.walk(setup(tmp_path))] == names
+
+
+def test_guarded_turns_an_oserror_into_exactly_one_skipped_action() -> None:
+    def boom() -> str | None:
+        raise OSError(13, "Permission denied")
+
+    [action] = sweep.guarded("WS-tmp-slop", "tmp/x", boom)
+    assert action.startswith("WS-tmp-slop: skipped 'tmp/x' (errno 13")
+    assert sweep.guarded("CODE", "path", lambda: None) == []
+
+
+_SKIP = "skipped '{rel}' (outside the workspace)"
+
+
+# fmt: off
+@pytest.mark.parametrize(("setup", "rel", "message", "survivor"), [
+    pytest.param(lambda t: (t, _file(t / "slop.txt")), "slop.txt", "deleted '{rel}'", None, id="file"),
+    pytest.param(lambda t: (t, _tree(t)), "cache/mod", "deleted '{rel}'", None, id="tree"),
+    pytest.param(lambda t: (t, _tree(t, read_only=True)), "cache/mod", "deleted '{rel}'", None, id="doctor-reaper-cannot-delete-read-only-trees"),
+    pytest.param(lambda t: (t, _file(t / "go.sum", read_only=True)), "go.sum", "deleted '{rel}'", None, id="read-only-file"),
+    pytest.param(lambda t: (_outside_link(t), t / "ws" / "link"), "link", "deleted '{rel}'", "outside/treasure.txt", id="symlink-unlinked-destination-kept"),
+    pytest.param(lambda t: ((t / "ws").mkdir() or t / "ws", _file(t / "elsewhere.txt")), "elsewhere.txt", _SKIP, "elsewhere.txt", id="outside-the-workspace-skipped"),
+    pytest.param(lambda t: (t, t / "ghost"), "ghost", None, None, id="already-gone-reports-nothing"),
+])
+# fmt: on
+def test_remove_deletes_a_read_only_tree(
+    tmp_path: Path, setup: Callable[[Path], tuple[Path, Path]], rel: str, message: str | None, survivor: str | None
+) -> None:
+    """The reaper removes what it reaps: a read-only tree or file is made writable on the way
+    down, then removed; a symlink goes, its destination never; a path outside is never touched."""
+    workspace, target = setup(tmp_path)
+    done = sweep.remove(workspace, target, rel)
+    expected = message and message.format(rel=rel)
+    assert done == (sweep.Skipped(_SKIP.format(rel=rel)) if message == _SKIP else expected)
+    assert bool(done) is (message not in (None, _SKIP))
+    assert not target.is_symlink() and (target.exists() == (survivor == rel))
+    assert survivor is None or (tmp_path / survivor).exists()
+
+
+def _not_the_owner(*_: object) -> None:
+    raise PermissionError(1, "Operation not permitted")
+
+
+def _exdev(a: object, b: object) -> None:
+    raise OSError(18, "Invalid cross-device link")
+
+
+# fmt: off
+@pytest.mark.parametrize(("src", "dest", "message", "exdev"), [
+    pytest.param("ws/repos/x/.pytest_cache/v", "ws/.dadaia/reaped/20260913/repos/x/.pytest_cache/v",
+                 "moved 'rel' -> '.dadaia/reaped/20260913/repos/x/.pytest_cache/v'", False, id="B4-relocates-and-creates-parents"),
+    pytest.param("ws/slop.txt", "ws/reaped/slop.txt", "moved 'rel' -> 'reaped/slop.txt'", True, id="B4-cross-device-copy-plus-remove-in-one-place"),
+    pytest.param("elsewhere.txt", "ws/reaped/e", "skipped 'rel' (outside the workspace)", False, id="B8-source-outside-skipped"),
+    pytest.param("ws/slop.txt", "escape.txt", "skipped 'rel' (outside the workspace)", False, id="B8-destination-outside-skipped"),
+])
+# fmt: on
+def test_move_holds_the_content_inside_the_workspace_only(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, src: str, dest: str, message: str, exdev: bool
+) -> None:
+    """The moved content is held inside the workspace; a cross-device move copies then removes
+    in one place, and a failed move is never a partial delete; a path outside is never touched."""
+    workspace = (tmp_path / "ws")
+    workspace.mkdir(exist_ok=True)
+    source = _file(tmp_path / src)
+    if exdev:
+        monkeypatch.setattr(sweep.os, "replace", _exdev)
+    done = sweep.move(workspace, source, tmp_path / dest, "rel")
+    moved = message.startswith("moved")
+    assert done == (message if moved else sweep.Skipped(message)) and bool(done) is moved
+    assert (source.exists(), (tmp_path / dest).exists()) == (not moved, moved)
+    assert not moved or read_text(tmp_path / dest) == "x"
+
+
+def test_move_resets_the_ttl_clock_and_never_follows_a_symlinked_source(tmp_path: Path) -> None:
+    """The reaped clock starts at the move, never at the origin's mtime; a symlink is moved,
+    its destination never."""
+    workspace = _outside_link(tmp_path)
+    old = _file(workspace / "old")
+    os.utime(old, (0, 0))
+    sweep.move(workspace, old, workspace / "reaped" / "old", "old")
+    sweep.move(workspace, workspace / "link", workspace / "reaped" / "link", "link")
+    assert (workspace / "reaped" / "old").lstat().st_mtime > 1_000_000_000
+    assert (workspace / "reaped" / "link").is_symlink()
+    assert (tmp_path / "outside" / "treasure.txt").exists()
+
+
+# ═════════════════════════════════════════════════════════════════════════════════
+# A live bind record over the primitive.
+# ═════════════════════════════════════════════════════════════════════════════════
+
+
+def test_a_live_bind_record_survives_a_full_doctor_fix_pass(tmp_path: Path) -> None:
+    """A live bind record survives a full doctor fix pass. Size: SMALL.
+
+    Bind, run ``fix()``, resolve the session again: the bind is intact. ``sessions/`` carries
+    no TTL, so no verdict ever names it, and every filesystem act goes through one guard.
+    """
+    from datetime import UTC, datetime
+
+    from dadaia_workspace.core import session_store, workspace_layout
+    from dadaia_workspace.core.workspace_layout import provisioned_zones
+    from dadaia_workspace.features.spec_context.doctor import DoctorService
+
+    dadaia = tmp_path / ".dadaia"
+    for zone in provisioned_zones():
+        (dadaia / zone.name).mkdir(parents=True, exist_ok=True)
+    write_text(tmp_path / workspace_layout.DADAIAIGNORE, "")
+
+    now = datetime.now(tz=UTC).isoformat().replace("+00:00", "Z")
+    record = session_store.new_binding_record(
+        session_id="sess-1", context="ctx-a", runtime="claude-code", pid=os.getpid(), now=now
+    )
+    session_store.write_session(tmp_path, "sess-1", record)
+
+    class _Store:
+        def list_all(self) -> list[object]:
+            return []
+
+        def get(self, name: str) -> None:
+            return None
+
+    DoctorService(_Store(), None, tmp_path).fix()  # type: ignore[arg-type]
+
+    assert session_store.live_session(tmp_path, "sess-1") is not None
+    assert session_store.read_session(tmp_path, "sess-1") == record
+
+
+# ═════════════════════════════════════════════════════════════════════════════════
+# The delete act is judged by its outcome; a refusal is falsy.
+# ═════════════════════════════════════════════════════════════════════════════════
+
+
+def _rmtree_leaving(error: OSError | None) -> Callable[..., None]:
+    """``shutil.rmtree`` that deletes nothing: silent, as 3.14's swallowed retry, or
+    reporting *error* to its ``onexc`` as a failed scan: recorded as injected, never
+    replaced by a real retry's platform errno."""
+
+    def rmtree(path: str, *, onexc: Callable[..., object]) -> None:
+        if error is not None:
+            onexc(os.scandir, path, error)
+
+    return rmtree
+
+
+# fmt: off
+@pytest.mark.parametrize(("error", "line"), [
+    pytest.param(None, "skipped 'tmp/x'", id="row6-silent-failure-judged-by-occupied"),
+    pytest.param(OSError(39, "Directory not empty"), "skipped 'tmp/x' (errno 39: Directory not empty)", id="row22-no-operator-act-off-a-permission"),
+])
+# fmt: on
+def test_a_surviving_target_is_refused_by_its_outcome(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, error: OSError | None, line: str
+) -> None:
+    target = _file(tmp_path / "tmp" / "x" / "f.txt").parent
+    monkeypatch.setattr(sweep.shutil, "rmtree", _rmtree_leaving(error))
+
+    done = sweep.remove(tmp_path, target, "tmp/x")
+
+    assert done == sweep.Skipped(line) and not done
+    assert target.is_dir()
+
+
+def test_a_refusal_is_falsy_and_no_str(tmp_path: Path) -> None:
+    """No caller can read a refusal as an act — not by truth value, not as a ``str``."""
+    workspace = _outside_link(tmp_path)
+
+    done = sweep.remove(workspace, tmp_path / "outside" / "treasure.txt", "treasure")
+
+    assert done == sweep.Skipped("skipped 'treasure' (outside the workspace)")
+    assert not done and not isinstance(done, str)
+
+
+def test_move_returns_its_failure_as_a_refusal(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A failed ``os.replace`` (not EXDEV) is the act's refusal, never raised."""
+    source = _file(tmp_path / "slop.txt")
+    monkeypatch.setattr(sweep.os, "replace", _not_the_owner)
+
+    done = sweep.move(tmp_path, source, tmp_path / "reaped" / "slop.txt", "slop.txt")
+
+    assert done == sweep.Skipped("skipped 'slop.txt' (errno 1: Operation not permitted)")
+    assert read_text(source) == "x"
+
+
+@pytest.mark.skipif(not PERMISSIONS_ENFORCED, reason="permissions do not bind this process")
+def test_a_permission_failure_names_the_recorded_entry(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Row 21: the refusal names the entry the retry could not lift, recorded by this call."""
+    entry = tmp_path / ".dadaia" / "tmp" / "a" / "20200101"
+    (held := entry / "x" / "dist").mkdir(parents=True)
+    write_text(held / "f.whl", "w")
+    make_readonly(held)
+    monkeypatch.setattr(sweep.os, "chmod", _not_the_owner)
+    try:
+        done = sweep.remove(tmp_path, entry, "tmp/a/20200101")
+    finally:
+        monkeypatch.undo()
+        make_writable(held)
+
+    assert str(done) == (
+        f"skipped 'tmp/a/20200101' (errno 13: Permission denied) — {held}/f.whl sits in a "
+        f"directory owned by {held.owner()}; Operator action: remove {entry}"
+    )
+    assert not done and (held / "f.whl").exists()
+
+
+@pytest.mark.skipif(os.utime not in os.supports_follow_symlinks, reason="a link's own mtime is POSIX-only")
+def test_a_root_level_held_symlink_keeps_its_hold_clock(tmp_path: Path) -> None:
+    """A root-level hold is its own clock, a symlink's included."""
+    assert link(str(tmp_path / "nowhere"), tmp_path / "link", is_dir=False)
+    os.utime(tmp_path / "link", (0, 0), follow_symlinks=False)
+
+    sweep.hold(tmp_path, tmp_path / "link", "link")
+
+    [held] = (tmp_path / ".dadaia" / "reaped").glob("*/link")
+    assert held.lstat().st_mtime > 1_000_000_000
+
+
+# fmt: off
+@pytest.mark.parametrize(("gitdir", "message"), [
+    pytest.param("/repo/.git/worktrees/wt", "skipped 'tree' (holds a linked git worktree)", id="linked-worktree-skipped"),
+    pytest.param("../.git/modules/sub", "deleted 'tree'", id="row24-submodule-is-no-worktree"),
+])
+# fmt: on
+def test_only_a_gitdir_under_worktrees_marks_a_linked_worktree(tmp_path: Path, gitdir: str, message: str) -> None:
+    """A submodule's ``.git`` file names a relative gitdir that moves with its repo; only
+    ``<common>/worktrees/<name>`` is a linked worktree."""
+    tree = tmp_path / "tree"
+    write_text(_file(tree / "sub" / ".git"), f"gitdir: {gitdir}\n")
+
+    done = sweep.remove(tmp_path, tree, "tree")
+
+    assert str(done) == message
+
+
+def test_n_moves_to_one_destination_make_n_holds(tmp_path: Path) -> None:
+    """An occupied destination yields the first free ``<name>-N`` beside it."""
+    for _ in range(3):
+        sweep.move(tmp_path, _file(tmp_path / "slop.txt"), tmp_path / "reaped" / "slop.txt", "slop")
+
+    assert sorted(p.name for p in (tmp_path / "reaped").iterdir()) == ["slop.txt", "slop.txt-1", "slop.txt-2"]
+
+
+@pytest.mark.skipif(not PERMISSIONS_ENFORCED, reason="permissions do not bind this process")
+def test_an_unopenable_subdirectory_is_refused_never_raised(tmp_path: Path) -> None:
+    """A 0o000 subdirectory fails ``os.open`` inside the walk; that failure is recorded and
+    judged by the outcome, never re-called without its flags."""
+    entry = tmp_path / "tmp" / "a" / "20200101"
+    (locked := entry / "x").mkdir(parents=True)
+    _file(locked / "f.txt")
+    make_readonly(locked, locked=True)
+    try:
+        done = sweep.remove(tmp_path, entry, "tmp/a/20200101")
+    finally:
+        make_writable(locked)  # the tmp tree stays removable
+
+    assert str(done) == (
+        f"skipped 'tmp/a/20200101' (errno 13: Permission denied) — {locked} sits in a "
+        f"directory owned by {entry.owner()}; Operator action: remove {entry}"
+    )
+    assert not done and (locked / "f.txt").exists()
+
+
+def test_a_nested_hold_stamps_its_top_entry(tmp_path: Path) -> None:
+    """A hold of ``a/b/c`` restarts the clock of ``reaped/<day>/a``, not of ``a/b``."""
+    _file(tmp_path / "a" / "b" / "c")
+    sweep.hold(tmp_path, tmp_path / "a" / "b" / "c", "a/b/c")
+    [top] = (tmp_path / ".dadaia" / "reaped").glob("*/a")
+    _file(tmp_path / "a" / "b" / "c")
+    os.utime(top, (0, 0))
+
+    sweep.hold(tmp_path, tmp_path / "a" / "b" / "c", "a/b/c")
+
+    assert top.stat().st_mtime > 1_000_000_000
+
+
+@pytest.mark.parametrize(
+    ("kernel_answer", "named"),
+    [((1000, "alice"), "alice"), ((1000, "1000"), "1000"), (None, "another account")],
+    ids=["resolvable", "unresolvable-uid", "no-account-database"],
+)
+def test_the_owner_named_is_the_kernels_answer(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, kernel_answer: tuple[int, str] | None, named: str
+) -> None:
+    """The owner text comes from the kernel's ``file_owner`` alone (posix answers and win32's None)."""
+    monkeypatch.setattr(sweep.platform, "file_owner", lambda _path: kernel_answer)
+    assert sweep._owner(tmp_path) == named
+
+class _KernelNow(dt.datetime):
+    """The kernel clock frozen at 2026-10-11T03:04:05Z."""
+
+    @classmethod
+    def now(cls, tz: dt.tzinfo | None = None) -> _KernelNow:
+        return cls(2026, 10, 11, 3, 4, 5, tzinfo=tz)
+
+
+def _freeze_kernel_clock(monkeypatch: pytest.MonkeyPatch) -> None:
+    kernel = load_owner("dd-bug-resolution", "_clock")
+    monkeypatch.setattr(kernel, "_dt", SimpleNamespace(datetime=_KernelNow, UTC=dt.UTC))
+
+
+def test_a_hold_is_stamped_with_the_kernel_clocks_day(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _freeze_kernel_clock(monkeypatch)
+    (tmp_path / "slop.txt").write_text("x", encoding="utf-8")
+    sweep.hold(tmp_path, tmp_path / "slop.txt", "slop.txt")
+    assert (tmp_path / ".dadaia" / "reaped" / "20261011" / "slop.txt").is_file()

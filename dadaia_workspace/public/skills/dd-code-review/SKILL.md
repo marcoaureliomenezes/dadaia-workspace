@@ -1,78 +1,87 @@
 ---
 name: dd-code-review
 description: >
-  The reviewer's method: three independent axes reported side by side, never
-  reranked — Standards (repo conventions + twelve Fowler smells), Spec (the diff does
-  what the approved SPEC/TASKS say, nothing more), Bug-surface (the diff reduced or
-  grew the touched feature's bug surface, evidenced from the ledger). Use when
-  reviewing a PR, branch or commit range, or when a verdict needs the Bug-surface
-  axis.
-compatibility: Standalone Agent Skill. Inside a dadaia-workspace (pip install dadaia-workspace) it also drives the SDD lifecycle — specs, backlog, bugs, releases.
+  Use when reviewing a worktree (`wt-main`, `wt-rc`, a lane), PR, branch or commit range, or when an audit
+  verdict needs the Bug-surface axis. Three axes reported side by side —
+  Standards (repo conventions, twelve Fowler smells, SLOP.md S1-S14), Spec (the diff does
+  what the approved SPEC and job files say, nothing more), Bug-surface (ledger evidence
+  that the touched feature's bug surface shrank, held or grew) — plus six lenses, ending
+  in an APPROVED/REJECTED verdict. Returns findings; the implementer writes the fix.
+compatibility: Standalone Agent Skill; the full lifecycle lives in a dadaia-workspace.
 ---
 
 # dd-code-review
 
-Three axes, run as three sequential passes (this workspace's sub-agents cannot
-nest-dispatch; main-thread-dispatched siblings are the alternative). Findings from different
-axes are reported side by side — an axis never outranks another.
+Three axes, run as three sequential passes. Findings from different
+axes are reported side by side with equal weight, so no axis hides another's finding.
 
 ## 1. When
 
 1. Inside a dadaia workspace, open `specs/memory/AGENTS.md` (the area's scoped law) and follow it — the diff is
    judged against current product truth.
-2. Reviewing a PR, branch or commit range before the candidate's PR.
-3. A curation, architecture or audit verdict needs the Bug-surface axis (§6).
+2. Reviewing a PR, branch or commit range before its merge.
+3. An architecture or audit verdict needs Axis 3 — Bug-surface.
 
 ## 2. Axis 1 — Standards
 
 - The repo's own documented conventions come FIRST and always override the baseline.
-- Skip anything tooling already enforces (ruff/mypy/import-linter findings are not review findings).
-- Baseline: the twelve Fowler smells, each reported as a labelled judgement call, never a rule:
+- Skip anything tooling already enforces (lint, typecheck and import-rule findings are not review findings).
+- Baseline: the twelve Fowler smells, each reported as a labelled judgement call:
   Mysterious Name · Duplicated Code · Feature Envy · Data Clumps · Primitive Obsession ·
   Repeated Switches · Shotgun Surgery · Divergent Change · Speculative Generality ·
   Message Chains · Middle Man · Refused Bequest.
-- Speak `dd-codebase-design`: a smell is usually a shallow module or a misplaced seam.
-- Slop signals S1-S10, each with its diff check: [`SLOP.md`](SLOP.md) — reported inside this axis, never a fourth.
+- Judge size by responsibility: a long method, a class with many methods or a file doing several jobs — one reason to change per class and per method.
+- Slop signals S1-S14, each with its diff check: [`SLOP.md`](SLOP.md) — reported inside this axis.
 
 ## 3. Axis 2 — Spec
 
-- Read the approved SPEC/TASKS the diff claims to implement (`**Status:** Approved`).
+- Read the candidate's SPEC (`**Status:** Approved`) and the unit's job file (`dd-release-definition` §The job file — tasks).
 - Does the diff do what they say — nothing more, nothing less?
 - Scope growth beyond the task's declared write set is a finding, even when the code is good.
+- A shape-11 `docs(law)` commit (`dd-gitflow-default` §Commit shapes — each write in its own shape) outside the job's `W:` is accepted only when its body cites the finding and names the file.
 - Acceptance criteria without corresponding evidence (test/assertion) is a finding.
+- Read the PLAN's As-is review beside the SPEC and job files: a DELETE or REBUILD unit the range leaves unchanged is HIGH.
+- A KEEP unit the range grew is a finding.
+- A SPEC, PLAN or job file breaking the root map §The flow gate-cost clause is REJECTED.
+- A worktree's (`worktrees/AGENTS.md`) commits follow the commit-shape rows of `dd-gitflow-default` §Commit shapes — each write in its own shape.
+- The reviewer of a `wt-rc` tree (its define commits) judges each job-file `who` column against the shape rule in `.agents/skills/dd-release-definition/SKILL.md` §The job file — tasks.
 
 ## 4. Axis 3 — Bug-surface
 
-- Pull the touched feature's ledger slice: `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py stats`, `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py status --all` filtered to its surface/component.
+- Read each touched file's bug history per `dd-bug-resolution/LINEAGE.md` §The filter.
 - Answer WITH EVIDENCE: did this diff reduce, keep, or increase the feature's bug surface?
 - The operator's rule applied as a review axis: a diff that GROWS the feature is a stop —
   a branch, flag, special case, second code path or cross-feature reach-in added by a fix
-  is a puxadinho; name it and recommend the replace-don't-layer shape instead.
-- An S4, S5 or S8 finding (`SLOP.md`) answers this axis "increased" until the finding is gone.
+  is a layer; name it and recommend the replace-don't-layer shape instead.
+- A fix whose `caused_by` is not `none` names a bug or task: inspect the fix of that bug or task (LINEAGE §Read persisted facts); a `fix(bugs)` label where `specs/bugs/AGENTS.md` §Resolution requires a REBUILD is REJECTED.
 
 ## 4a. The root-cause and approval bars
 
 - A fix qualifies only when it reproduces the failure on the executed path, tests for the real reason, fixes the cause and proves it green — a workaround or symptom patch is a finding.
-- Approved means the operator and the consumer-side validation agent agree after validating a real workspace.
+- The verdict is the enum `APPROVED`/`REJECTED`: on a worktree per `worktrees/AGENTS.md` §Merges, gates, review; on a PR per `dd-gitflow-default` §3b.
+- The first review of a fix sweeps the fixed pattern across the context's repos and states the grep with its hit count; a net-positive fix states its reason, else it is a finding; a verdict whose evidence lacks the implementer's run of the tests the change reaches (`dd-release-implementation` §Done when) is REJECTED.
 - A green internal gate that diverges from real consumer behavior is itself a bug.
+- A reviewer probe runs in scratch only: a copy of the context, with the live workspace root listed in `DADAIA_FENCED_ROOTS`; an explicit `--specs` path bypasses that fence, so every explicit path must point into the copy; never `doctor --fix`. A probe that reaches the live workspace is a finding.
 
-## 5. Reporting
+## 5. Done when — the report carries
 
 - Findings carry: axis, severity (CRITICAL/HIGH/MEDIUM/LOW/INFO), `file:line`, what the code does, fix direction (never code).
 - The three axes appear side by side in the report; the verdict (`APPROVED`/`REJECTED` — the handoff schema's enum) follows the caller persona's rules.
-- The Bug-surface answer is REQUIRED in every verdict — "tests green" is not a verdict.
+- Every verdict states the Bug-surface answer with ledger evidence, because a green suite says nothing about whether the feature grew.
 
 ## 6. The six lenses
 
-One reviewer, six checklists applied on every verdict (ADR 0016); the engineer anticipates them.
+One reviewer, six checklists applied on every verdict; the engineer anticipates them.
 
-- **Architecture** — root cause named; the diff shrinks or keeps the feature (`dd-codebase-design` deletion test); `dd-architecture-survey` at candidate close.
-- **Security** — OWASP top 10, secrets, dependency CVEs (`pip-audit`/`npm audit`), CWE id per finding; never Fable on this lens.
-- **QA** — every acceptance scenario has evidence; the pyramid holds; pruning only by a curation verdict (`dd-test-stewardship`).
-- **Product** — the diff matches SPEC scope; memory atoms still tell the truth (`dd-release-implementation` MEMORY-UPDATE).
-- **Audit** — `dd-audit-project` pillars over the window; findings, never fixes.
-- **AI surface** — every agent, skill, rule or hook change satisfies `dd-ai-eng-knowhow` AUTHORING's fifteen rules.
+- **Architecture** — root cause named; the diff shrinks or keeps the feature; per the PLAN's Authorities row, every `deleted` gone and every `consults` calls the authority (S4/S5/S10); a duplicated decider is flagged on the first pass; no component imports another's internals or forms a cycle, it reaches the other by running its entry point.
+- **Security** — OWASP top 10, secrets, dependency CVEs (the ecosystem's dependency audit), CWE id per finding.
+- **QA** — every acceptance scenario has evidence; the pyramid holds; tests keep the root map §The flow basics; a deleted or skipped test, or a removed or skipped assert, is HIGH, REJECTED, unless the operator ordered it (root map §The flow); a loosened assert in a fix is HIGH, REJECTED; a move or narrowing outside a fix is HIGH unless root map §The flow's ruling line admits it; each line of `git diff --output-indicator-old='<' -U0 <base>...HEAD -- <the repo's test globs> | grep -E '^<.*<assertion keywords>'` is a candidate, cleared as a tightening only by an added assert with the same call and arguments that tightens its expectation, else judged by the classes above; a fix without its revert-check evidence is HIGH, verdict REJECTED; the `SLOP.md` S3 signals are QA-lens items.
+- **QA, platform and claims** — the diff holds on Windows, platform facts read from one module; each negative claim in a verdict carries its grep and hit count; a new assert holds no platform literal and a child process copies the parent's env; the verdict names its platform proof.
+- **QA, visual and format** — a visual change is judged by the implementer's screenshot, framed on the reported symptom and taken after a server restart and a cache clear, which the reviewer checks against each layer that renders there; a changed grammar, format, stamp, fix line or public name is grepped across every repo of the context, and each consumer it breaks is HIGH.
+- **Product** — the diff matches SPEC scope; memory atoms still tell the truth (`.agents/skills/dd-release-implementation/MEMORY-UPDATE.md`).
+- **Audit** — `dd-audit-project` pillars over the window, its Slop readout (`PILLAR-SPECS.md`); findings, never fixes.
+- **AI surface** — every agent, skill, rule or hook change satisfies the fifteen rules of `.agents/skills/dd-ai-eng-knowhow/AUTHORING.md`.
 
 ## 7. References
 
-- `dd-codebase-design` — the vocabulary the Standards and Bug-surface axes speak.
+- [`SLOP.md`](SLOP.md) — slop signals S1-S14 and their diff checks.

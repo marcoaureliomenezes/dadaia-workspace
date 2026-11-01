@@ -1,0 +1,235 @@
+"""The real CLI doctor runs on a tmp tree with one planted finding; the printed ``fix:``
+runs from ``worktrees/`` and the re-run doctor no longer emits it. The suite fence
+(``DADAIA_FENCED_ROOTS``, inherited) keeps every child off the live instance.
+
+size: MEDIUM — the CLI and the ledger scripts run as real subprocesses.
+"""
+
+from __future__ import annotations
+
+import contextlib
+import json
+import os
+import sys
+from pathlib import Path
+
+import pytest
+from typer.testing import CliRunner
+
+from dadaia_workspace.cli.main import app
+from dadaia_workspace.core.cli_line import git_line
+from tests.fixtures.harness_env import run_bash, suite_env
+from tests.helpers.oslib import run as os_run
+from tests.helpers.oslib import stub_cli, venv_tool, write_text
+
+_REPO = Path(__file__).resolve().parents[3]
+_UNSET = ("DADAIA_CONTEXT", "DADAIA_SESSION_ID", "CLAUDE_CODE_SESSION_ID")
+
+
+def _env() -> dict[str, str]:
+    """The session env, read per call, without an ambient context or session."""
+    return suite_env(os.environ, Path.home(), unset=_UNSET)
+
+
+_GIT = ["git", "-c", "user.name=t", "-c", "user.email=t@t"]
+
+
+def _findings(root: Path, *scope: str) -> list[dict[str, str]]:
+    """The real CLI's ``doctor --json`` — the run judging a fix."""
+    argv = [sys.executable, "-m", "dadaia_workspace", "doctor", *scope, "--json"]
+    run = os_run(argv, cwd=root, env=_env(), check=False)  # noqa: S603
+    return _parse(run.stdout, scope)
+
+
+def _findings_before(root: Path, *scope: str) -> list[dict[str, str]]:
+    """The same ``doctor --json`` in-process — the planted finding and its printed fix,
+    before any child runs; the fix and the re-run doctor stay real processes."""
+    with contextlib.chdir(root):
+        run = CliRunner().invoke(app, ["doctor", *scope, "--json"], env=dict.fromkeys(_UNSET))
+    return _parse(run.stdout, scope)
+
+
+def _parse(stdout: str, scope: tuple[str, ...]) -> list[dict[str, str]]:
+    sections = json.loads(stdout)["sections"]
+    if scope:  # a bare specs tree: the fenced child judges no workspace at all
+        assert sections.get("workspace", {}).get("findings", []) == [], "unfenced"
+    return [f for s in sections.values() for f in s["findings"]]
+
+
+def _run_from_elsewhere(root: Path, fix: str) -> None:
+    elsewhere = root / "worktrees"  # inside the workspace, never the slop a fix moves: Windows
+    elsewhere.mkdir(exist_ok=True)  # refuses to move a directory a process holds as its cwd
+    ran = run_bash(fix, cwd=elsewhere, env=_env())
+    assert ran.returncode == 0, ran.stdout + ran.stderr
+
+
+_ENTRY = {"id": "a-entry", "title": "a", "opened": "2026-10-02", "status": "idea",
+          "description": "d", "provenance": "operator request"}  # fmt: skip
+_PRETTY = json.dumps(
+    {"schema": "backlog-v1", "active": [_ENTRY, {**_ENTRY, "id": "b-entry", "status": "resolved"}]},
+    indent=2,
+)
+#: (code, file, committed, bad, where): a JSONL ledger names its line; a JSON document
+#: names the entry or key, since none of its lines is one commit's.
+_LEDGER_ROWS = [
+    ("LEDGER-BUGS-SCHEMA", "specs/bugs/BUGS.jsonl", "", '{"id": "broken"}\n', 1),  # the bug's repro
+    ("LEDGER-BUGS-SCHEMA", "specs/bugs/BUGS.jsonl", "{not json\n", "{not json\n", 1),  # invalid at HEAD too
+    ("LEDGER-BACKLOG-SCHEMA", "specs/backlog/BACKLOG.json", '{"schema": "backlog-v1", "active": []}', "{not json\n", "its JSON syntax (line 1)"),
+    ("LEDGER-BACKLOG-SCHEMA", "specs/backlog/BACKLOG.json", "", _PRETTY, "entry 'b-entry'"),
+    ("LEDGER-FINDINGS-SCHEMA", "specs/audits/20260101-x/FINDINGS.jsonl", "", "{not json\n", 1),
+    ("LEDGER-RELEASE-SCHEMA", "specs/releases/1.0.0/_RELEASE.json", "{}\n", "{not json\n", "its JSON syntax (line 1)"),
+]  # fmt: skip
+
+
+@pytest.mark.parametrize(("code", "rel", "committed", "bad", "where"), _LEDGER_ROWS)
+def test_an_invalid_ledger_line_is_one_agent_action(
+    tmp_path: Path, code: str, rel: str, committed: str, bad: str, where: int | str
+) -> None:
+    """An invalid line is ONE finding whose fix is an `Agent action:` naming the
+    file, where in it, and the ledger's law; the commit that introduced it is reverted, an
+    uncommitted line deleted by its author — never a discard of the whole file."""
+    os_run(["git", "init", "-q", str(tmp_path)], check=True)  # noqa: S603, S607
+    ledger = tmp_path / rel
+    ledger.parent.mkdir(parents=True)
+    write_text(ledger.parent / "AUDIT.md", "# Audit\n") if "audits" in rel else None
+    write_text(ledger, committed)
+    os_run([*_GIT, "-C", str(tmp_path), "add", rel], check=True)  # noqa: S603
+    os_run([*_GIT, "-C", str(tmp_path), "commit", "-qm", "l"], check=True)  # noqa: S603
+    write_text(ledger, bad)
+    found = _findings_before(tmp_path, "--specs-dir", "specs")
+    (fix,) = [f["fix"] for f in found if f["code"] == code]
+    path = ledger.resolve()
+    assert fix.startswith("Agent action: ") and "AGENTS.md" in fix, fix
+    assert "<" not in fix and "by hand" not in fix, fix
+    if "audits" in rel:  # a bound session writes findings directly: the governed act
+        assert f"line 1 of {path} " in fix, fix
+        return
+    finder = (
+        git_line(path.parent, "log", "-L", f"1,1:{path.name}")
+        if where == 1
+        else git_line(path.parent, "log", "-p", "--", path.name)
+    )
+    assert "checkout" not in fix, fix
+    assert finder in fix, fix
+    assert (f"line 1 of {path} " if where == 1 else f"{path} fails at {where} ") in fix, fix
+
+
+_RECORD = {"id": "a-bug", "ts": "2026-09-20T10:00:00Z", "reported_by": "e", "title": "t",
+           "severity": "LOW", "surface": "cli", "component": "c", "context": "x", "symptom": "s",
+           "repro": "r", "expected": "e", "status": "open", "cause": None, "caused_by": None,
+           "closed_at": None}  # fmt: skip
+
+
+def _bugs(tmp_path: Path, *records: dict[str, object]) -> str:
+    """The doctor's one LEDGER-BUGS-SCHEMA fix over a ledger of *records*."""
+    os_run(["git", "init", "-q", str(tmp_path)], check=True)  # noqa: S603, S607
+    ledger = tmp_path / "specs/bugs/BUGS.jsonl"
+    ledger.parent.mkdir(parents=True)
+    write_text(ledger, "".join(json.dumps(r) + "\n" for r in records))
+    found = _findings_before(tmp_path, "--specs-dir", "specs")
+    return next(f["fix"] for f in found if f["code"] == "LEDGER-BUGS-SCHEMA")
+
+
+def test_a_dangling_caused_by_is_cleared_by_bugs_update(tmp_path: Path) -> None:
+    """A line a governance verb clears takes that verb with real
+    values; run from elsewhere, `bugs.py update <id> --set caused_by=none` clears it."""
+    fix = _bugs(tmp_path, {**_RECORD, "caused_by": "a-ghost"})
+    assert " update a-bug --set caused_by=none --specs " in fix, fix
+    _run_from_elsewhere(tmp_path, fix)
+    assert "LEDGER-BUGS-SCHEMA" not in {
+        f["code"] for f in _findings(tmp_path, "--specs-dir", "specs")
+    }
+
+
+def test_a_caused_by_cycle_is_an_agent_decision(tmp_path: Path) -> None:
+    """Which link of a cycle is wrong
+    is a judgement; the fix names the cycle's records and the law, and sets no value."""
+    fix = _bugs(
+        tmp_path,
+        {**_RECORD, "caused_by": "b-bug"},
+        {**_RECORD, "id": "b-bug", "caused_by": "a-bug"},
+    )
+    assert fix.startswith("Agent action: decide which of a-bug, b-bug ") and "update" in fix
+    assert "caused_by=none" not in fix and "<" not in fix and "AGENTS.md" in fix, fix
+
+
+def _workspace(tmp_path: Path) -> Path:
+    """A real ``init`` in tmp, its venv stubbed onto this interpreter (never a real venv)."""
+    from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES
+    from dadaia_workspace.features.workspace.service import WorkspaceService
+    from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager as A
+    from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager as E
+
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    WorkspaceService(public_assets=A(), python_env=E()).init(ws, harnesses=L1_ENTRY_HARNESSES[:1])
+    bin_dir = venv_tool(ws / ".dadaia" / ".venv", "dadaia").parent
+    bin_dir.mkdir(parents=True, exist_ok=True)
+    source = "#!python\nimport runpy\nrunpy.run_module('dadaia_workspace', run_name='__main__')\n"
+    stub_cli(bin_dir, "dadaia", source, python=Path(sys.executable))
+    return ws
+
+
+def _plant_root_slop(ws: Path) -> str:
+    write_text(ws / "junk.txt", "x\n")
+    return "WS-root-slop"
+
+
+def _plant_drifted_hook(ws: Path) -> str:
+    from dadaia_workspace.core import workspace_layout
+
+    repo = ws / "repos" / "beta"
+    os_run(["git", "init", "-q", str(repo)], check=True)  # noqa: S603, S607
+    for target, _ in workspace_layout.INSTALLED_GIT_HOOKS:
+        write_text(repo / ".git" / "hooks" / target, "#!/bin/sh\nexit 0\n")
+    ctx = {"name": "beta", "state": "alive", "repo_slug": "beta", "repo_url": "file:///x.git",
+           "created_at": "2026-01-01T00:00:00Z", "alive_since": "2026-01-01T00:00:00Z",
+           "dead_since": None, "current_branch": None}  # fmt: skip
+    states = ws / ".dadaia/states/spec_contexts.json"
+    write_text(states, json.dumps({"schema_version": "2", "contexts": [ctx]}))
+    return "HOOKS-DRIFT-1"
+
+
+def _plant_disarmed_gate(ws: Path) -> str:
+    (ws / ".claude" / "settings.json").unlink()
+    return "PROJECTION"
+
+
+#: Every code this module proves: cleared by its printed fix, or an agent action .
+WORKSPACE_PLANTS = {
+    **dict.fromkeys(code for code, *_ in _LEDGER_ROWS),
+    "WS-ENTRY": _plant_root_slop,  # the fixable sub-rule
+    "HOOKS-DRIFT-1": _plant_drifted_hook,
+    "PROJECTION": _plant_disarmed_gate,
+}
+
+
+@pytest.mark.parametrize("plant", [_plant_root_slop, _plant_drifted_hook, _plant_disarmed_gate])
+def test_a_workspace_finding_is_cleared_by_its_printed_fix(tmp_path: Path, plant: object) -> None:
+    """In an initialized tmp
+    workspace the printed fix, run from worktrees/, clears the workspace finding."""
+    ws = _workspace(tmp_path)
+    code = plant(ws)  # type: ignore[operator]
+    fix = next(f["fix"] for f in _findings_before(ws) if f["code"] == code)
+    _run_from_elsewhere(ws, fix)
+    assert code not in {f["code"] for f in _findings(ws)}
+
+
+def test_a_deleted_hook_is_reported_absent_and_its_fix_restores_it(tmp_path: Path) -> None:
+    """Delete a projected hook; the finding says absent, and its printed fix, run,
+    restores the hook byte for byte and clears the finding."""
+    from dadaia_workspace.core import workspace_layout
+
+    ws = _workspace(tmp_path)
+    _plant_drifted_hook(ws)
+    hooks = ws / "repos" / "beta" / ".git" / "hooks"
+    for target, _ in workspace_layout.INSTALLED_GIT_HOOKS:
+        (hooks / target).unlink()
+    found = next(f for f in _findings_before(ws) if f["code"] == "HOOKS-DRIFT-1")
+    assert "absent" in found["message"], found["message"]
+    _run_from_elsewhere(ws, found["fix"])
+    for target, source in workspace_layout.INSTALLED_GIT_HOOKS:
+        assert (hooks / target).read_bytes() == (
+            workspace_layout.public_scripts_dir() / source
+        ).read_bytes()
+    assert "HOOKS-DRIFT-1" not in {f["code"] for f in _findings(ws)}

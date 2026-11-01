@@ -1,0 +1,217 @@
+"""Unit tests for DoctorService — spec context invariant checker."""
+
+from __future__ import annotations
+
+from dataclasses import replace  # noqa: E402
+from pathlib import Path  # noqa: E402
+
+import pytest
+
+from dadaia_workspace.core.cli_line import cli_words  # noqa: E402
+from dadaia_workspace.core.doctor_rules import SectionFinding  # noqa: E402
+from dadaia_workspace.core.models.spec_context import (  # noqa: E402
+    AssociatedRepo,
+    ContextState,
+    SpecContextProject,
+)
+from dadaia_workspace.features.spec_context.doctor import (  # noqa: E402
+    DoctorService,
+    workspace_rules,
+)
+from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
+from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
+from tests.fixtures.stores import context_store
+from tests.helpers.oslib import cli_path, command, link, make_executable, read_text, write_text
+
+
+def _make_healthy_venv(root: Path) -> None:
+    """Create a SYNTHETIC healthy venv tree so the VENV-1 invariant is satisfied.
+
+    Synthetic only (mkdir/touch/chmod) — never a real venv build (QA memory law).
+    """
+    entry = cli_path(root)
+    entry.parent.mkdir(parents=True, exist_ok=True)
+    write_text(entry, "#!/bin/sh\n")
+    make_executable(entry)
+
+
+def _ctx(
+    name: str,
+    state: ContextState = ContextState.DEAD,
+    repo_slug: str | None = None,
+) -> SpecContextProject:
+    slug = repo_slug or name
+    return SpecContextProject(
+        name=name,
+        state=state,
+        repo_slug=slug,
+        repo_url=f"https://github.com/org/{slug}",
+        created_at="2026-01-01T00:00:00",
+        alive_since="2026-06-01T00:00:00Z" if state == ContextState.ALIVE else None,
+        dead_since=None,
+    )
+
+
+def _make_doctor(
+    workspace_root: Path,
+    contexts: list[SpecContextProject] | None = None,
+) -> tuple[DoctorService, JsonContextStore]:
+    ctx_store = context_store(workspace_root / ".dadaia" / "states")
+    for c in contexts or []:
+        ctx_store.save(c)
+    git_client = GitSubprocessClient()
+    svc = DoctorService(ctx_store, git_client, workspace_root)
+    return svc, ctx_store
+
+
+def test_check_clean_state_no_issues(tmp_path: Path) -> None:
+    ctx = _ctx("alpha", state=ContextState.ALIVE)
+    (tmp_path / "repos" / "alpha").mkdir(parents=True)
+    _make_healthy_venv(tmp_path)  # A clean workspace has a healthy venv.
+    svc, _ = _make_doctor(tmp_path, [ctx])
+    issues = svc.check()
+    assert issues == []
+
+
+# ---------------------------------------------------------------------------
+# INV-4: ALIVE context must have repo on disk — reported, not fixable
+# ---------------------------------------------------------------------------
+
+
+def _with_lib(ctx: SpecContextProject) -> SpecContextProject:
+    return replace(ctx, associated_repos=(AssociatedRepo(slug="lib", url="https://x.test/lib"),))
+
+
+@pytest.mark.parametrize("missing", ["missing", "lib"])
+def test_inv4_names_a_missing_main_or_associated_repo_with_the_alive_fix(
+    tmp_path: Path, missing: str
+) -> None:
+    """INV-4 iterates all_repos(); its fix is `context alive`."""
+    ctx = _with_lib(_ctx("missing", state=ContextState.ALIVE))
+    present = {"missing", "lib"} - {missing}
+    for slug in present:
+        (tmp_path / "repos" / slug).mkdir(parents=True)
+    svc, _ = _make_doctor(tmp_path, [ctx])
+
+    inv4 = [i for i in svc.check() if i.code == "INV-4"]
+
+    assert [(i.message, i.fixable) for i in inv4] == [
+        (f"Context 'missing' is alive but repo '{missing}' not on disk", False)
+    ]
+    assert inv4[0].fix == command(*cli_words(tmp_path, "context", "alive", "missing"))
+
+
+@pytest.mark.parametrize(
+    ("context", "expected"),
+    [("alpha", ["repos/alpha/.dadaia"]), (None, ["repos/alpha/.dadaia", "repos/beta/.dadaia"])],
+)
+def test_the_repo_tree_walk_judges_only_the_run_context(
+    tmp_path: Path, context: str | None, expected: list[str]
+) -> None:
+    """Slop only in another context's repo is neither reported nor reaped."""
+    for name in ("alpha", "beta"):
+        (tmp_path / "repos" / name / ".dadaia").mkdir(parents=True)
+    svc, _ = _make_doctor(tmp_path, [_ctx(n, state=ContextState.ALIVE) for n in ("alpha", "beta")])
+    found = [f.message.split()[0] for r in workspace_rules(context=context) for f in r.run(svc)]
+    assert sorted(path for path in found if path.endswith("/.dadaia")) == expected
+    svc.fix(context)
+    left = sorted(p.parent.name for p in (tmp_path / "repos").glob("*/.dadaia"))
+    assert left == ([] if context is None else ["beta"])
+
+
+# ---------------------------------------------------------------------------
+# INV-5: DEAD context must not have repo on disk — detected, fixable, fix() removes
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("slug", ["stale", "lib"])
+def test_inv5_holds_a_main_or_associated_repo_of_a_dead_context(tmp_path: Path, slug: str) -> None:
+    """INV-5 iterates all_repos(); --fix HOLDS, never deletes. The invariant is a SectionFinding, emitted directly."""
+    ctx = _with_lib(_ctx("stale", state=ContextState.DEAD))
+    repo_dir = tmp_path / "repos" / slug
+    repo_dir.mkdir(parents=True)
+    write_text(repo_dir / "work.txt", "keep\n")
+    svc, _ = _make_doctor(tmp_path, [ctx])
+
+    msg = f"Context 'stale' is dead but repo '{slug}' is on disk"
+    assert [i for i in svc.check() if i.code == "INV-5"] == [
+        SectionFinding("INV-5", "error", msg, False, True, "", True)
+    ]
+
+    svc.fix()
+
+    held = list(tmp_path.glob(f".dadaia/reaped/*/repos/{slug}/work.txt"))
+    assert [read_text(p) for p in held] == ["keep\n"]
+    assert not repo_dir.exists()
+    assert svc.fix() == []
+
+
+# ---------------------------------------------------------------------------
+# INV-6: registry-wide slug-ownership uniqueness — report-only.
+# ---------------------------------------------------------------------------
+
+
+def test_inv6_main_repo_slug_collision_reported_not_fixable(tmp_path: Path) -> None:
+    """Main/main slug collision."""
+    a = _ctx("a", repo_slug="x")
+    b = _ctx("b", repo_slug="x")
+    svc, _ = _make_doctor(tmp_path, [a, b])
+    inv6 = [i for i in svc.check() if i.code == "INV-6"]
+    assert [i.fixable for i in inv6] == [False]
+    assert "a" in inv6[0].message and "b" in inv6[0].message
+
+
+def test_inv6_main_vs_associated_slug_collision_reported(tmp_path: Path) -> None:
+    """Main-vs-associated slug collision."""
+    a = _ctx("a", repo_slug="x")
+    b = SpecContextProject(
+        name="b",
+        state=ContextState.DEAD,
+        repo_slug="b",
+        repo_url="https://github.com/org/b",
+        created_at="2026-01-01T00:00:00",
+        associated_repos=(AssociatedRepo(slug="x", url="https://github.com/org/x"),),
+    )
+    svc, _ = _make_doctor(tmp_path, [a, b])
+    inv6 = [i for i in svc.check() if i.code == "INV-6"]
+    assert [i.fixable for i in inv6] == [False]
+    assert "a" in inv6[0].message and "b" in inv6[0].message
+
+
+def test_inv5_fix_refuses_a_dead_slug_that_resolves_outside_repos(tmp_path: Path) -> None:
+    """A DEAD record whose slug resolves outside ``<workspace>/repos/`` (``..`` is the workspace
+    root itself) is never rmtree'd: the step reports a skipped action and every entry of
+    the workspace survives."""
+    (tmp_path / "repos" / "victim").mkdir(parents=True)
+    write_text(tmp_path / "repos" / "victim" / "keep.txt", "keep")
+    (tmp_path / ".dadaia" / "states").mkdir(parents=True)
+    victim = _ctx("victim", state=ContextState.ALIVE)  # registered: the layout keeps repos/victim
+    svc, _ = _make_doctor(
+        tmp_path, [_ctx("escape", repo_slug=".."), _ctx("dot", repo_slug="."), victim]
+    )
+
+    actions = svc.fix()
+
+    assert read_text(tmp_path / "repos" / "victim" / "keep.txt") == "keep"
+    assert (tmp_path / ".dadaia" / "states").is_dir()
+    inv5 = [a for a in actions if a.startswith("INV-5:")]
+    assert len(inv5) == 2 and all("skipped" in a and "outside" in a for a in inv5), actions
+
+
+def test_inv5_fix_never_follows_a_symlinked_repo_dir(tmp_path: Path) -> None:
+    """The CWE-59 shape: ``repos/<slug>`` is a symlink out of
+    ``repos/``; the target is neither removed nor emptied."""
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    write_text(outside / "keep.txt", "keep")
+    ws = tmp_path / "ws"
+    (ws / "repos").mkdir(parents=True)
+    assert link(str(outside), ws / "repos" / "stale", is_dir=True)
+    svc, _ = _make_doctor(ws, [_ctx("stale")])
+
+    actions = svc.fix()
+
+    assert read_text(outside / "keep.txt") == "keep"
+    assert [a for a in actions if a.startswith("INV-5:")] == [
+        "INV-5: skipped 'repos/stale' (outside repos/)"
+    ]

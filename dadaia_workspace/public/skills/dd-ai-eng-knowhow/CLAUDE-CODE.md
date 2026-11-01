@@ -1,7 +1,8 @@
 # CLAUDE-CODE.md — Claude Code Harness Mastery
+Sections: 1. Agentic loop model and the compaction boundary · 2. Context hierarchy decision protocol (ADR-style) · 3. Rules enforcement model — always-on vs path-scoped · 4. Skills mechanics — and the listing-budget tax · 5. Hooks lifecycle — the determinism primitive · 6. Subagents and dispatch authority · 7. Tools and permission model · 8. MCP and tool-search · Composition decision tree · 9. Official reference index (on-demand links — no content copied)
 
 Sibling of [`SKILL.md`](SKILL.md) (`dd-ai-eng-knowhow`, authoring depth).
-A decision surface, not a doc mirror — official docs are an on-demand index at §9; consult, never transcribe.
+A decision surface, not a doc mirror — official docs are an on-demand index at "Official reference index"; consult, never transcribe.
 
 - Governing law: the model decides, the harness enforces.
 - CLAUDE.md, memory, rules, skill bodies shape behavior — context, not guarantee.
@@ -23,9 +24,8 @@ A decision surface, not a doc mirror — official docs are an on-demand index at
 | Path-scoped rules (re-loaded on matching file access) | Conversation detail (summarized lossily) |
 | Most-recent skill invocation (partially re-attached, capped) | Earlier skill invocations beyond the re-attach budget |
 
-- A behavior that must hold across a long session belongs in CLAUDE.md/a rule (survives) or a hook (deterministic).
-- Never a one-time chat instruction or a resident skill body for a must-hold behavior.
-- A skill whose guidance is lost at compaction is placed at the wrong layer — promote it to a rule, or re-invoke it.
+- A behavior that must hold across a long session belongs in an `AGENTS.md` line (law) or a hook (deterministic).
+- A skill whose guidance is lost at compaction is placed at the wrong layer — promote it to an `AGENTS.md` line, or re-invoke it.
 - Subagents isolate a big exploration in its own context window and return only a summary.
 
 ---
@@ -37,16 +37,14 @@ A decision surface, not a doc mirror — official docs are an on-demand index at
 
 | Need | Layer | Loads | Pick when |
 |---|---|---|---|
-| Core convention every session needs | Project `CLAUDE.md` | Full every session; survives compaction | "Always do X" law, build commands |
+| Core convention every session needs | Project `CLAUDE.md` | Full every session; survives compaction | Build commands, the harness bootstrap; law lives in `AGENTS.md` |
 | Personal cross-project preference | User memory (`~/.claude/CLAUDE.md`) | Full every session, all projects, local only | Machine-local prefs |
-| Topic law, maybe directory-specific | Rule (`.claude/rules/*.md`) | Every session (unscoped) or on match (`paths:`) | Modular standing law |
+| Topic instructions, maybe directory-specific | Rule (`.claude/rules/*.md`) | Every session (unscoped) or on match (`paths:`) | Harness-only modular instructions; law lives in `AGENTS.md` |
 | Sometimes-needed reference | Skill (`SKILL.md`) | Description every session; body on invoke | Multi-step protocol, deep reference |
 
-- CLAUDE.md past ~200 lines: move reference material to skills, split topics into rules.
-- A long CLAUDE.md lowers adherence.
+- CLAUDE.md past ~200 lines lowers adherence: move reference material to skills, split law into scoped `AGENTS.md` files.
 - A "see X" prose pointer loads nothing in Claude Code — only an `@import` or a symlink pulls a file in.
 - Personal machine-local content goes to `~/.claude/` and `CLAUDE.local.md` (gitignored).
-- Never put machine-local content in team-shared `public/` source, which ships open-source.
 
 ---
 
@@ -56,22 +54,18 @@ A decision surface, not a doc mirror — official docs are an on-demand index at
 
 | Frontmatter | Activation | Use for |
 |---|---|---|
-| No `paths:` | Always-on; loads every session for every task | Truly global law |
-| `paths: [glob, ...]` | Loads only on a matching-file access | Directory- or language-specific law |
+| No `paths:` | Always-on; loads every session for every task | Instructions for every task |
+| `paths: [glob, ...]` | Loads only on a matching-file access | Directory- or language-specific instructions |
 
 - A rule fires by presence in context — advisory, the model is expected to comply.
 - A skill is invoked — its body enters context on demand and the model acts on it.
-- Rule of separation: standing law coloring all reasoning -> rule.
-- A procedure run on a specific task -> skill.
-- A guarantee that must hold regardless of model choice -> hook.
-- Gotcha: an unscoped rule loads every session even when irrelevant.
-- Add `paths:` for subtree-only law; reserve always-on for genuinely global law.
+- Add `paths:` for subtree-only instructions; reserve always-on for genuinely global instructions.
 
 ---
 
 ## 4. Skills mechanics — and the listing-budget tax
 
-- A skill's body loads only on invoke — long reference material is nearly free until used.
+- A skill's body loads only on invoke — long reference material is nearly free until used; a subagent's `skills:` grants preload the full body at every dispatch.
 - The description is not free: it loads every session.
 
 | Field | Effect | Authoring lever |
@@ -85,10 +79,7 @@ A decision surface, not a doc mirror — official docs are an on-demand index at
 - Gotcha: listing-budget tax = N skills x description tokens, capped near 1% of context window.
 - Overflow drops least-used descriptions first, causing mis-triggering.
 - Split-vs-merge: split a skill only on genuinely distinct triggers; otherwise merge to one description.
-- This folder is the worked example — four skills merged to one description.
 - Prefer `user-invocable: false` for agent-internal protocols nobody types as a command.
-- Gotcha: `applyTo` is silently ignored by Claude Code — the native path-scoping field is `paths:`.
-- dadaia's `applyTo:` is a listing convention for the projection toolchain, not a Claude Code activation lever.
 
 ---
 
@@ -115,11 +106,8 @@ A decision surface, not a doc mirror — official docs are an on-demand index at
 | `Edit\|Write` (letters/`_`/`\|`) | Exact tool name or `\|`-list |
 | anything else | JavaScript regex (e.g. `^Notebook`, `mcp__.*`) |
 
-- Gotcha: an empty matcher fires on every tool (`Read`, `Grep`, `Glob`, `WebFetch`, `TaskCreate` too).
-- Scope write-gates to `Edit|Write|MultiEdit|NotebookEdit`.
-- Add `Bash` to that matcher only when the gate inspects shell-side writes.
-- Inject full static context once per logical session (session-keyed sentinel), never every prompt.
-- `UserPromptSubmit` may fire every prompt but must stay a silent no-op after the first injection.
+- A gate's matcher is its harness's entry in `hook_wrappers.HOOK_DIALECTS`: scope it to the tools the gate judges.
+- Context injection: the rule is `decide_injection` in `injection_policy.py`, not restated here.
 - PreToolUse is a guardrail, not a hard boundary — a script that writes files itself can slip past it.
 - Keep a server-side backstop (a `doctor` check) for true enforcement.
 - Hooks run unsandboxed on the operator's machine, only after project-trust is accepted.
@@ -128,7 +116,7 @@ A decision surface, not a doc mirror — official docs are an on-demand index at
 | If the constraint must... | Use |
 |---|---|
 | hold every time, regardless of model choice | a **hook** (deterministic) |
-| color all reasoning but tolerate interpretation | a **rule** (advisory) |
+| color all reasoning but tolerate interpretation | standing law: the root map or a scoped `AGENTS.md`; harness-only advisory instructions: a **rule** |
 | apply only while a specific procedure runs | a **guard in the skill body** (interpreted) |
 
 ---
@@ -146,7 +134,6 @@ A decision surface, not a doc mirror — official docs are an on-demand index at
 | Tier 2 | Synthesis / review with delegated sub-work | Allowed only when the brief justifies it |
 | Tier 3 | Implementers / workers | Never — would let a worker spawn workers |
 
-- Never add the `Agent` tool to a Tier-3 persona.
 - Dispatch authority is reserved to dispatchers and justified by an operator-approved brief.
 
 ---
@@ -162,12 +149,7 @@ A decision surface, not a doc mirror — official docs are an on-demand index at
 - Narrow a subagent's surface with `tools:`/`disallowedTools:` rather than broad global allows.
 - Background subagents auto-deny anything that would prompt.
 - A blanket-allow layer is acceptable only when real enforcement lives in correctly-scoped hooks.
-- Prune dead/stale permission entries.
-- Gotcha: nothing enforces the per-persona write-allowlist.
 - Native frontmatter (`name`, `description`, `model`, `tools`, `skills`, `maxTurns`) is honored.
-- dadaia extras (`dispatch_band`, `input_contract`, `paths.write_allowlist`) are ignored by the runtime.
-- dadaia's PreToolUse gate is persona-blind: path-class x scope only.
-- `write_allowlist` is a convention checked by tooling/tests/reviewers — no runtime or hook polices it.
 
 ---
 
@@ -192,24 +174,21 @@ Must it hold EVERY time, regardless of what the model decides?
    |- yes -> MCP server (capability) + a skill (know-how). Lean on tool-search.
    `- no -> Is it standing law that should color reasoning?
       |- yes -> Does it govern only one subtree?
-      |         |- yes -> RULE with paths: (never always-on for subtree law).
-      |         `- no  -> always-on RULE, or a line in CLAUDE.md if core+global.
-      |                   (A "see X" prose pointer loads nothing — @import it).
+      |         |- yes -> a scoped `AGENTS.md` (never always-on for subtree law).
+      |         `- no  -> the root `AGENTS.md` map.
       `- no -> Is it a procedure / reference needed only sometimes?
-         |- yes -> SKILL. Path-scope with paths:, not applyTo:.
+         |- yes -> SKILL. Path-scope with paths:.
          |         Mind the listing tax: tight description, split only on distinct
          |         triggers, user-invocable:false for internal protocols.
          `- no -> Does a side task flood the main window with output?
             |- yes -> SUBAGENT (isolated window, returns a summary).
             |         Never grant the Agent tool to a Tier-3 worker.
             `- no -> It is probably a one-off; just say it in the turn (but know it
-                    will not survive compaction — promote to CLAUDE.md/rule if it
+                    will not survive compaction — promote to an `AGENTS.md` line if it
                     must).
 ```
 
 - Prune stale/dead permission entries and machine-specific paths from settings before they mislead.
-- Never project a `.claude/workflows/` reference directory — no workflow engine exists.
-- The ordered SDD flow is agent-dispatched, never a declarative workflow file Claude Code executes.
 
 ---
 

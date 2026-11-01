@@ -1,0 +1,81 @@
+"""Projection reconciliation diffs against the install ledger: prune only a pristine orphan."""
+
+from __future__ import annotations
+
+import shutil
+from pathlib import Path
+
+from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
+from tests.helpers.harness_profile import register_all
+from tests.helpers.oslib import read_text, write_text
+
+
+def _install_all(ws: Path) -> FileSystemPublicAssetManager:
+    mgr = FileSystemPublicAssetManager()
+    register_all(ws)
+    mgr.install(ws)
+    return mgr
+
+
+def test_retired_family_is_pruned_on_next_install(tmp_path: Path) -> None:
+    """A retired family's pristine projection is pruned; an operator-modified one is retained."""
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    mgr = FileSystemPublicAssetManager()
+    mgr._public_dir = shutil.copytree(mgr._public_dir, tmp_path / "public")
+    register_all(ws)
+    mgr.install(ws)
+    skills_src = mgr._public_dir / "skills"
+    pristine, edited = sorted(p.name for p in skills_src.iterdir() if p.is_dir())[:2]
+    gone = ws / ".agents" / "skills" / pristine / "SKILL.md"
+    kept = ws / ".agents" / "skills" / edited / "SKILL.md"
+    assert gone.is_file()
+    write_text(kept, read_text(kept) + "\nOPERATOR EDIT\n")
+
+    shutil.rmtree(skills_src)
+    installed = mgr.install(ws)
+
+    assert not gone.exists()
+    assert any("[prune]" in line and pristine in line for line in installed)
+    assert kept.exists()
+    assert any("operator-modified orphan retained" in ln and edited in ln for ln in installed)
+
+
+def test_no_ledger_bootstrap_prunes_nothing(tmp_path: Path) -> None:
+    """No ledger: prune nothing."""
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    mgr = _install_all(ws)
+
+    ledger = ws / ".dadaia" / "states" / "install_ledger.json"
+    assert ledger.is_file()
+    ledger.unlink()
+    stray = ws / ".agents" / "skills" / "operator-own-skill" / "SKILL.md"
+    stray.parent.mkdir(parents=True)
+    write_text(stray, "mine\n")
+
+    installed = mgr.install(ws)
+
+    assert stray.exists()
+    assert not any("[prune]" in line and "operator-own-skill" in line for line in installed)
+
+
+def test_every_install_keeps_every_ledgered_path_the_library_still_ships(tmp_path: Path) -> None:
+    """A whole, forced or
+    claude-scoped install keeps every previously ledgered path on disk."""
+    from dadaia_workspace.infrastructure.json_install_ledger_store import JsonInstallLedgerStore
+
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    mgr = _install_all(ws)
+    states = ws / ".dadaia" / "states"
+    before = JsonInstallLedgerStore().read(states)
+    assert before is not None
+    for variant in ({}, {"force": True}, {"harness": "claude"}):
+        mgr.install(ws, **variant)  # type: ignore[arg-type]
+        missing = [
+            rel
+            for rel in before.by_relpath()
+            if not (ws / rel).is_symlink() and not (ws / rel).exists()
+        ]
+        assert missing == [], variant

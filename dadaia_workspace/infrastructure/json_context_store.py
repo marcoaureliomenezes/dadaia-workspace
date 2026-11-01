@@ -1,68 +1,66 @@
 """JsonContextStore — atomic CRUD over spec_contexts.json (schema v3).
 
-Every write goes through ``atomic_write``; there is no lock. ``_load`` tolerates a v2
-file exactly like a v3 one — v3 only adds ``associated_repos``, which ``_from_dict``
-defaults to an empty tuple — so a v2 workspace needs no migration step.
+Every write goes through ``atomic_write``; there is no lock. A v2 file reads like a v3
+one — v3 only adds ``associated_repos``, which ``_from_dict`` defaults to empty.
 """
 
 import json
 from pathlib import Path
+from typing import cast
 
+from dadaia_workspace.core import context_registry
 from dadaia_workspace.core.atomic_write import atomic_write
+from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.exceptions import SchemaVersionError
 from dadaia_workspace.core.models.spec_context import (
     AssociatedRepo,
     ContextState,
     SpecContextProject,
 )
+from dadaia_workspace.core.platform import act
+from dadaia_workspace.core.workspace_layout import occupied
 
-_VERSION = "3"
+SCHEMA_VERSION = 3
 
-# Prior registry schema versions still readable without a forced migration — see the
-# module docstring for why v2 is tolerated rather than hard-refused.
-_READABLE_VERSIONS: frozenset[str] = frozenset({"2", _VERSION})
+# The keys every row carries: :func:`_from_dict` builds the model from them.
+ROW_KEYS = ("name", "state", "repo_slug", "repo_url", "created_at")
 
-# Legacy state values that indicate a v1 file (used only by the migration path — T-10c)
-_LEGACY_STATES: frozenset[str] = frozenset({"ativo", "inativo"})
+# Legacy state values that mark a v1 row — the rows ``migrate`` rewrites.
+LEGACY_STATES: frozenset[str] = frozenset({"ativo", "inativo"})
+
+
+def parse_schema_version(data: dict, path: Path) -> int:  # type: ignore[type-arg]
+    """THE registry version: 1 while any row is v1 or the stamp is below 2, else the stamp.
+
+    A non-numeric or newer stamp raises."""
+    raw = data.get("schema_version", data.get("version"))
+    text = str(SCHEMA_VERSION if raw is None else raw)
+    if isinstance(raw, bool) or not text.isdigit():
+        problem = f"spec_contexts.json schema_version {raw!r} is not a number."
+        raise SchemaVersionError(problem, act("operator", f"set it to {SCHEMA_VERSION} in {path}"))
+    if int(text) > SCHEMA_VERSION:
+        problem = f"spec_contexts.json schema_version {text} is newer than this dadaia."
+        raise SchemaVersionError(problem, act("agent", f"upgrade dadaia-workspace to read {path}"))
+    legacy = any(c.get("state") in LEGACY_STATES for c in data.get("contexts", []))
+    return 1 if legacy or int(text) < 2 else int(text)
 
 
 def _load(path: Path) -> dict:  # type: ignore[type-arg]
-    """Load spec_contexts.json.  Raises SchemaVersionError on v1 files.
-
-    Must NOT be called outside SpecContextService methods — see module docstring.
-    """
-    if not path.exists():
-        return {"schema_version": _VERSION, "contexts": []}
-    with path.open(encoding="utf-8") as f:
-        data = json.load(f)
-
-    # Detect v1 by explicit schema_version field
-    schema_ver = data.get("schema_version") or data.get("version")
-    if schema_ver == "1":
-        raise SchemaVersionError(
-            "[MIGRATION REQUIRED] This workspace uses spec_contexts.json v1.\n"
-            "Run: dadaia migrate\n"
-            "After migration, all v2 commands will work normally."
-        )
-
-    # Detect v1 by legacy state values in context rows
-    for ctx in data.get("contexts", []):
-        if ctx.get("state") in _LEGACY_STATES:
+    """Load spec_contexts.json through the one parse; a v1 registry refuses with the one
+    ``migrate --yes`` fix, a row missing a :data:`ROW_KEYS` key with an ``Operator action``."""
+    data = context_registry.read(path)
+    if parse_schema_version(data, path) < 2:
+        problem = "spec_contexts.json holds v1 rows (ativo/inativo or schema_version < 2)."
+        raise SchemaVersionError(problem, fix_line(path.parents[2], "migrate", "--yes"))
+    for row in cast(
+        "list[dict[str, object]]", data["contexts"]
+    ):  # THE row check: every method reads through here
+        if missing := [k for k in ROW_KEYS if k not in row]:
             raise SchemaVersionError(
-                "[MIGRATION REQUIRED] This workspace uses spec_contexts.json v1.\n"
-                "Run: dadaia migrate\n"
-                "After migration, all v2 commands will work normally."
+                f"{path}: context row {row.get('name')!r} has no {', '.join(missing)}.",
+                act("operator", f"add {', '.join(missing)} to that row of {path}"),
             )
-
-    # Unknown schema version — fail loudly
-    if schema_ver not in (None, *_READABLE_VERSIONS):
-        raise SchemaVersionError(
-            f"[MIGRATION REQUIRED] Unknown schema_version '{schema_ver}' in spec_contexts.json.\n"
-            "Run: dadaia migrate\n"
-            "After migration, all v2 commands will work normally."
-        )
-
-    return data  # type: ignore[no-any-return]
+    return data
 
 
 def _to_dict(ctx: SpecContextProject) -> dict:  # type: ignore[type-arg]
@@ -74,7 +72,6 @@ def _to_dict(ctx: SpecContextProject) -> dict:  # type: ignore[type-arg]
         "created_at": ctx.created_at,
         "alive_since": ctx.alive_since,
         "dead_since": ctx.dead_since,
-        "current_branch": ctx.current_branch,
         "associated_repos": [{"slug": r.slug, "url": r.url} for r in ctx.associated_repos],
     }
 
@@ -82,13 +79,12 @@ def _to_dict(ctx: SpecContextProject) -> dict:  # type: ignore[type-arg]
 def _from_dict(d: dict) -> SpecContextProject:  # type: ignore[type-arg]
     return SpecContextProject(
         name=d["name"],
-        state=ContextState(d["state"]),
+        state=ContextState(context_registry.state(d)),
         repo_slug=d["repo_slug"],
         repo_url=d["repo_url"],
         created_at=d["created_at"],
         alive_since=d.get("alive_since"),
         dead_since=d.get("dead_since"),
-        current_branch=d.get("current_branch"),
         associated_repos=tuple(
             AssociatedRepo(slug=r["slug"], url=r["url"]) for r in d.get("associated_repos") or []
         ),
@@ -97,30 +93,48 @@ def _from_dict(d: dict) -> SpecContextProject:  # type: ignore[type-arg]
 
 class JsonContextStore:
     def __init__(self, states_dir: Path) -> None:
+        self.states_dir = states_dir
         self._path = states_dir / "spec_contexts.json"
+
+    def exists(self) -> bool:
+        return self._path.exists()
+
+    def replace_raw(self, data: dict) -> None:  # type: ignore[type-arg]
+        body = {"schema_version": str(SCHEMA_VERSION)} | {
+            k: v for k, v in data.items() if k != "schema_version"
+        }
+        atomic_write(self._path, json.dumps(body, indent=2))
+
+    def seed_if_absent(self) -> None:
+        if not occupied(self._path):
+            self.replace_raw({"contexts": []})
+
+    def snapshot(self) -> bytes | None:
+        return self._path.read_bytes() if self._path.is_file() else None
+
+    def restore(self, content: bytes | None) -> None:
+        atomic_write(self._path, content)
 
     def save(self, ctx: SpecContextProject) -> None:
         data = _load(self._path)
         data["contexts"].append(_to_dict(ctx))
-        atomic_write(self._path, json.dumps(data, indent=2))
+        self.replace_raw(data)
 
     def update(self, ctx: SpecContextProject) -> None:
         data = _load(self._path)
         data["contexts"] = [_to_dict(ctx) if c["name"] == ctx.name else c for c in data["contexts"]]
-        atomic_write(self._path, json.dumps(data, indent=2))
+        self.replace_raw(data)
 
     def get(self, name: str) -> SpecContextProject | None:
-        data = _load(self._path)
-        for c in data["contexts"]:
-            if c["name"] == name:
-                return _from_dict(c)
-        return None
+        return next(
+            (_from_dict(c) for c in _load(self._path)["contexts"] if c["name"] == name),
+            None,
+        )
 
     def list_all(self) -> list[SpecContextProject]:
-        data = _load(self._path)
-        return [_from_dict(c) for c in data["contexts"]]
+        return [_from_dict(c) for c in _load(self._path)["contexts"]]
 
     def delete(self, name: str) -> None:
         data = _load(self._path)
         data["contexts"] = [c for c in data["contexts"] if c["name"] != name]
-        atomic_write(self._path, json.dumps(data, indent=2))
+        self.replace_raw(data)

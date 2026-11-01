@@ -1,0 +1,180 @@
+"""The merged PreToolUse entrypoint ``pre_gate``: first-block-wins over its policies, and
+the one envelope every harness parses.
+
+Parity with sdd_gate and root_whitelist through one spawn; the kimi shim's two raw anchors.
+"""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+from typing import Any
+
+import pytest
+
+from dadaia_workspace.core.cli_line import fix_line
+from dadaia_workspace.hooks import pre_gate
+from tests.fixtures.harness_env import claude_hook_env, run_hook_subprocess
+from tests.helpers.oslib import write_text
+
+_PATCH = "*** Begin Patch\n*** Update File: worktrees/a/0.5.0-rc1/j1/README.md\n+ok\n*** Update File: {}\n+x\n*** End Patch"
+
+
+def _spawn(ws: Path, payload: dict[str, Any]) -> Any:
+    env = claude_hook_env(ws, session_id="s")
+    env.pop("DADAIA_CONTEXT", None)
+    result = run_hook_subprocess("pre_gate", {**payload, "session_id": "s"}, env)
+    assert result.returncode == 0, result.stderr
+    return result
+
+
+# fmt: off
+@pytest.mark.medium
+@pytest.mark.parametrize(
+    ("tool", "tool_input", "want"),
+    [
+        ("Write", {"file_path": "repos/a/src/thing.py"}, "@wt"),
+        ("NotebookEdit", {"notebook_path": "junk.ipynb"}, None),
+        ("Read", {"file_path": "x"}, None),
+        ("Write", {"file_path": ".dadaia/sessions/a.json"}, "CWE-284"),
+        ("Write", {"file_path": "junk.txt"}, "ROOT WHITELIST GATE"),
+        ("apply_patch", {"command": _PATCH.format(".dadaia/sessions/a.json")}, "CWE-284"),
+        *[("Write", {"file_path": p}, "[GATE]") for p in ("AGENTS.md", ".dadaiaignore", ".claude/settings.json", ".dadaia/hooks/w.sh", ".dadaia/states/spec_contexts.json")],
+        ("Edit", {"file_path": "repos/a/secrets/k"}, "protected glob 'secrets'"),
+        ("apply_patch", {"command": _PATCH.format("worktrees/a/0.5.0-rc1/j1/secrets/k")}, "protected glob 'secrets'"),
+        ("Write", {"file_path": "worktrees/a/0.5.0-rc1/j1/src/ok.py"}, None),
+        ("Write", {"file_path": "worktrees/a/scratch/any/secrets/k"}, "protected glob 'secrets'"),  # any tree name
+        ("Write", {"file_path": "worktrees/a/scratch/secrets"}, "protected glob 'secrets'"),
+        ("Write", {"file_path": "worktrees/a/scratch/secrets/k"}, "protected glob 'secrets'"),
+        ("Write", {"file_path": "worktrees/a/x/y/z/secrets/k"}, "protected glob 'secrets'"),
+        ("Write", {"file_path": "worktrees/a/0.5.0-rc1/j1/src/secrets/k"}, None),  # anchored at the tree root
+        ("Write", {"file_path": "worktrees/a/x/y/src/ok.py"}, None),
+    ],
+    ids=[
+        "in-repo-write-is-merge-only",
+        "notebook-edit-is-root-whitelist-exempt",
+        "non-write-tool-allows",
+        "protected-sessions-fails-closed",
+        "root-whitelist-forbidden-entry-blocks",
+        "apply-patch-most-restrictive-header-blocks-the-whole-patch",
+        *[f"AC2.3-no-ledger-floor-{n}" for n in ("agents-md", "dadaiaignore", "hook-wiring", "hook-wrapper", "states")],
+        "AC2.5-protected-glob-in-repo",
+        "AC2.5-protected-glob-in-worktree-codex-dialect",
+        "AC2.5-unprotected-sibling-allowed",
+        "AC1.3-protected-glob-in-any-tree-name",
+        "protected-glob-plain-tree-depth-1",
+        "protected-glob-plain-tree-depth-2",
+        "protected-glob-non-canonical-depth",
+        "protected-glob-below-the-tree-root-allowed",
+        "unprotected-non-canonical-depth-allowed",
+    ],
+)
+# fmt: on
+def test_non_write_and_protected_matrix(
+    tmp_path: Path, tool: str, tool_input: dict[str, str], want: str | None
+) -> None:
+    """Through one spawn, pre_gate reproduces the standalone sdd_gate and root_whitelist
+    verdicts (paths are workspace-relative; ``want`` names the block reason)."""
+    want = want and want.replace("@wt", fix_line(tmp_path, "worktree", "list"))
+    (tmp_path / ".dadaia" / "states").mkdir(parents=True)
+    write_text(tmp_path / ".dadaia" / "states" / "spec_contexts.json", json.dumps({"contexts": [{"repo_slug": "a", "state": "alive"}]}))
+    (tmp_path / "repos" / "a" / "specs").mkdir(parents=True)
+    write_text(tmp_path / ".dadaiaignore", "[protected]\nsecrets\n")
+    for tree in ("0.5.0-rc1/j1", "scratch", "scratch/any", "x/y/z"):  # a linked worktree's root holds a .git file
+        (tmp_path / "worktrees" / "a" / tree).mkdir(parents=True)
+        admin = tmp_path / "repos/a/.git/worktrees" / tree.replace("/", "-")
+        admin.mkdir(parents=True)
+        write_text(admin / "gitdir", f"{(tmp_path / 'worktrees' / 'a' / tree / '.git').as_posix()}\n")
+        write_text(tmp_path / "worktrees" / "a" / tree / ".git", f"gitdir: {admin.as_posix()}\n")
+    rooted = {k: v if k == "command" else str(tmp_path / v) for k, v in tool_input.items()}
+    block = _spawn(tmp_path, {"tool_name": tool, "tool_input": rooted}).block_envelope()
+    if want is None:
+        assert block is None, block
+    else:
+        assert block is not None and want in block["reason"], block
+
+
+@pytest.mark.medium
+@pytest.mark.parametrize("envelope", [{}, [1, 2, 3], "text", None], ids=["empty", "list", "string", "null"])
+def test_non_object_envelope_fails_open(tmp_path: Path, envelope: Any) -> None:
+    """The hook lane reads stdin through ``read_stdin_json``: an envelope that is not a JSON
+    object is read as ``{}`` and allowed, never a crash."""
+    env = claude_hook_env(tmp_path, session_id="s")
+    result = run_hook_subprocess("pre_gate", envelope, env)
+    assert result.returncode == 0, result.stderr
+    assert result.block_envelope() is None
+
+
+@pytest.mark.medium
+@pytest.mark.parametrize("raw", ["", "   ", "{not json"], ids=["empty", "blank", "malformed"])
+def test_unreadable_stdin_fails_open(tmp_path: Path, raw: str) -> None:
+    """Blank or malformed stdin text is read as ``{}`` and allowed, never a crash."""
+    result = run_hook_subprocess("pre_gate", {}, claude_hook_env(tmp_path, session_id="s"), raw=raw)
+    assert result.returncode == 0, result.stderr
+    assert result.block_envelope() is None
+
+
+def test_evaluate_payload_first_block_wins_and_faulty_policy_fails_open(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[str] = []
+
+    def rw(_p: dict[str, object]) -> str | None:
+        calls.append("rw")
+        return "ROOT BLOCK"
+
+    def sdd(_p: dict[str, object]) -> str | None:
+        calls.append("sdd")
+        return "SDD BLOCK"
+
+    monkeypatch.setattr(pre_gate, "_POLICIES", (rw, sdd))
+    assert pre_gate.evaluate_payload({"tool_name": "Write"}) == "ROOT BLOCK"
+    assert calls == ["rw"]
+
+    def explode(_p: dict[str, object]) -> str | None:
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(pre_gate, "_POLICIES", (explode, lambda _p: None))
+    assert pre_gate.evaluate_payload({"tool_name": "Write"}) is None
+
+
+@pytest.mark.medium
+@pytest.mark.parametrize(
+    ("payload", "blocked"),
+    [
+        pytest.param(
+            {"tool_name": "Read", "tool_input": {"file_path": "x"}}, False, id="allow"
+        ),
+        pytest.param(
+            {"tool_name": "Bash", "tool_input": {"command": "pip install requests"}},
+            False,
+            id="allow-bash-pip",
+        ),
+        pytest.param(
+            {"tool_name": "Bash", "tool_input": {"command": "dadaia doctor"}},
+            False,
+            id="allow-workspace-cli",
+        ),
+    ],
+)
+def test_envelope_contract(tmp_path: Path, payload: dict[str, Any], blocked: bool) -> None:
+    """Whole stdout is ONE JSON object. Allow carries no verdict at all (Claude's schema
+    rejects ``decision: allow`` and interactive sessions ignore ``defer``). Block carries the
+    legacy ``"decision": "block"`` (codex + the kimi shim's grep) AND
+    ``permissionDecision: deny`` with the same reason, top-level ``reason`` LAST (the shim's
+    sed capture)."""
+    raw = _spawn(tmp_path, payload).stdout.strip()
+    envelope = json.loads(raw)
+    if not blocked:
+        assert envelope == {"continue": True, "hookSpecificOutput": {"hookEventName": "PreToolUse"}}
+        assert '"decision": "block"' not in raw
+        return
+    reason = envelope["reason"]
+    assert envelope["decision"] == "block"
+    assert envelope["hookSpecificOutput"] == {
+        "hookEventName": "PreToolUse",
+        "permissionDecision": "deny",
+        "permissionDecisionReason": reason,
+    }
+    assert '"decision": "block"' in raw
+    assert raw.index('"hookSpecificOutput"') < raw.index('"reason": "')

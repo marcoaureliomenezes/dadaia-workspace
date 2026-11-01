@@ -1,22 +1,14 @@
-"""Shared leaf helpers for the SpecsDoctor decomposition (v0.1.55 FR1).
+"""Shared leaf helpers for the SpecsDoctor decomposition.
 
 Cross-validator free functions used by THREE validator families (release, closure_audit,
 governance) plus ``doctor_structural`` (a fourth). Holds no sibling-VALIDATOR
 import (no ``ReleaseValidator``/``StructuralValidator`` class ever imported here or from
 here) — the release-dir discovery helpers were instance methods on ``SpecsDoctor``; they
 are re-homed here as free functions taking ``specs_dir`` explicitly so no family owns
-them (they were cross-validator all along — SPEC-DOC-006/026/027/031).
+them.
 
-``resolve_live_release_id`` + ``resolve_active_release`` (v0.5.x, successor to the
-RELEASE.jsonl fold; v0.5.0 FR4/T-050-21A, A4.1) replace the former
-``read_active_md``/``ACTIVE.md`` pair — that file is retired, no replacement scaffolded
-in its place. Both ``doctor_release`` and ``doctor_structural`` need the resolved
-(release, segment, phase) triple, so it lives here rather than in either — the same
-shared-leaf shape ``read_active_md`` had. The one tri-state disk read + parse of a
-release's ``RELEASE.json`` (S1 FR23 amendment A6, "ONE reader") lives in
-``_read_and_parse_release_json``, below; ``features.specs.doctor_release
-.read_release_phase`` is a thin wrapper over it for a caller that already knows the
-release_id, never a second read implementation.
+``resolve_active_release`` reads which release is live and its phase; whether its state
+document is valid is `release.py check`'s answer (the doctor's LEDGER-RELEASE-SCHEMA).
 """
 
 from __future__ import annotations
@@ -24,148 +16,41 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from dadaia_workspace.core.release_state import (
-    ReleaseState,
-    parse_release_state,
-    release_state_file,
-)
+from dadaia_workspace.core.release_state import CANDIDATE_RE
+from dadaia_workspace.core.skill_owner import load_owner
 
 # A dir counts as a "release dir" iff it carries at least one SDD release artifact.
-# Public name (v0.1.81 FR2): reused by ``release_tree`` so both surfaces share one
-# canonical artifact-filename set.
-#
-# v0.5.0 T-050-25A (A4.4): ``CLOSURE.md`` dropped — FR4/T-050-21A retired it as a
-# going-forward artifact, so a lone CLOSURE.md with no SPEC/PLAN/TASKS is now an
-# anomaly, never legitimate. Every archived release in this repo's own history already
-# carries a surviving artifact alongside its CLOSURE.md, so this changes zero
-# classification here.
 RELEASE_ARTIFACTS: tuple[str, ...] = ("SPEC.md", "PLAN.md", "TASKS.md")
-_RELEASE_ARTIFACTS = RELEASE_ARTIFACTS
-# Segment dirs (ADR-1/ADR-5) live *inside* a release dir and are not themselves releases:
-# alpha-N, rc-N, plus the historical `integration` segment container.
-_SEGMENT_NAME_RE = re.compile(r"^(?:alpha|rc)-\d+$|^integration$")
+# Candidate dirs (rc-N) and the historical alpha-N and `integration` segments live inside
+# a release dir and are not releases themselves.
+_SEGMENT_NAME_RE = re.compile(rf"{CANDIDATE_RE.pattern}|^alpha-\d+$|^integration$")
 
 
-def resolve_live_release_id(specs_dir: Path) -> tuple[str | None, str | None]:
-    """Resolve which release under ``releases/`` is live (v0.5.x, successor to the
-    RELEASE.jsonl fold; v0.5.0 FR4/T-050-21A, A4.1).
-
-    The live release is the ONE directory directly under ``specs_dir/releases/`` —
-    excluding ``_archive`` — that carries a ``RELEASE.json`` file
-    (T-050-11 back-fills it the moment a release reaches DEFINITION). This directory
-    scan is the sole replacement for ``ACTIVE.md``'s ``release:`` field; no file
-    stands in its place.
-
-    Returns ``(release_id, error)``. Zero matches is ``(None, None)`` — not an
-    error, the honest "no active release" state and the successor of the old
-    scaffold default ``release: none`` (there is no longer a placeholder file to
-    write that value into). More than one match is a genuine structural anomaly
-    (two live releases at once) and is reported as ``error`` rather than guessed at
-    — the caller decides severity, this leaf only detects the shape.
-    """
-    releases_root = specs_dir / "releases"
-    if not releases_root.is_dir():
-        return None, None
-    candidates = sorted(
-        d.name
-        for d in releases_root.iterdir()
-        if d.is_dir() and d.name != "_archive" and release_state_file(d) is not None
-    )
-    if not candidates:
-        return None, None
-    if len(candidates) > 1:
-        return None, (
-            "multiple live release directories carry RELEASE.json: " + ", ".join(candidates)
-        )
-    return candidates[0], None
-
-
-def _read_and_parse_release_json(
-    specs_dir: Path, release_id: str
-) -> tuple[ReleaseState | None, bool]:
-    """The ONE tri-state disk read + parse of a release's ``RELEASE.json`` (v0.5.x,
-    successor to the RELEASE.jsonl fold's ONE reader, S1 FR23 firing amendment A6,
-    ``specs/releases/0.5.0/reviews/S1-FR23-firing.md`` §3). ``core.release_state``
-    itself never does file I/O (core file-I/O purity ratchet, architect A9); every
-    reader of these bytes goes through this one function — :func:`resolve_active_release`
-    (below) and ``features.specs.doctor_release.read_release_phase`` are its only two
-    (thin) callers, so the tri-state disk read is never duplicated.
-
-    Returns ``(state, exists)``: ``exists=False`` means
-    ``specs_dir/releases/<release_id>/RELEASE.json`` does not exist at all
-    (``state=None``, the honest "nothing to read" case); ``exists=True`` with
-    ``state=None`` means the file IS present but failed to read (OSError) or parse
-    (a malformed ``release-state-v1`` document) — callers must treat that as UNKNOWN,
-    never as "no state". (This corrects a found/exists conflation the retired
-    ``_read_and_parse_release_jsonl`` carried: its two-state ``found`` flag collapsed
-    "absent" and "present but unreadable" into the same ``False``, silently
-    contradicting ``read_release_phase``'s own docstring contract.)
-    """
-    path = release_state_file(specs_dir / "releases" / release_id)
-    if path is None:
-        return None, False
+def resolve_active_release(specs_dir: Path) -> tuple[str | None, str | None]:
+    """``(release_id, phase)`` of the ONE live release (`_release_store.live_release`), or
+    ``(None, None)`` when there is none, several, or no readable phase: `release.py check`
+    reports those defects, so no rule here judges them twice."""
     try:
-        text = path.read_text(encoding="utf-8")
-    except OSError:
-        return None, True
-    try:
-        return parse_release_state(text), True
-    except ValueError:
-        return None, True
-
-
-def resolve_active_release(specs_dir: Path) -> tuple[str | None, str | None, str | None]:
-    """Resolve ``(release_id, phase, error)`` straight from the live state document
-    (v0.5.x reader; segment dropped at release 0.4.6 with the scaffolded segment
-    lane, ADR 0006). Downstream consumers (``doctor_release``, ``doctor_structural``)
-    keep their existing branching (``if err: ...``, ``if release is None: ...``).
-
-    :func:`resolve_live_release_id` (above) answers "which directory" (pure stdlib);
-    this function answers the content question — the phase, read straight off disk by
-    :func:`_read_and_parse_release_json`. There is no fold anymore: the document
-    already IS the current phase.
-
-    No live release directory: ``(None, None, None)`` — success, not an error. The
-    retired ``"none"`` sentinel this used to return was a release id and a phase name
-    wearing each other's clothes (0.4.7 FR4 deleted ``"none"`` from
-    :data:`~dadaia_workspace.core.release_state.PHASES`): absence is ``None``, and
-    every caller already branches on falsiness.
-    Ambiguous (two+ live release dirs) or an unreadable/malformed/phase-less
-    ``RELEASE.json``: ``error`` carries the reason and ``phase`` is ``None`` — the
-    same "treat as UNKNOWN" contract the narrow phase reader already has.
-    """
-    release_id, disc_err = resolve_live_release_id(specs_dir)
-    if disc_err:
-        return None, None, disc_err
-    if release_id is None:
-        return None, None, None
-    state, exists = _read_and_parse_release_json(specs_dir, release_id)
-    if not exists or state is None:
-        return release_id, None, f"state document for {release_id!r} could not be read"
-    if not state.phase:
-        return (
-            release_id,
-            None,
-            f"state document for {release_id!r} carries no 'phase' value",
-        )
-    return release_id, state.phase, None
+        live = load_owner("dd-release-implementation", "_release_store").live_release(specs_dir)
+    except load_owner("dd-bug-resolution", "_refusal").Refusal:
+        return None, None
+    phase = live.state.get("phase")
+    return (live.release_id, phase) if isinstance(phase, str) and phase else (None, None)
 
 
 def is_release_dir(d: Path) -> bool:
-    if not d.is_dir() or not any((d / a).exists() for a in _RELEASE_ARTIFACTS):
+    """A dir carrying a trio document itself, or one in an ``rc-<N>/`` candidate; a
+    candidate or segment dir is never a release — its id is the parent's."""
+    if not d.is_dir() or _SEGMENT_NAME_RE.match(d.name):
         return False
-    # Segment dirs (alpha-N/rc-N/integration) are an orthogonal lifecycle concept,
-    # not releases — they carry artifacts but their *release id* is the parent dir.
-    # Exclude them from release-id-uniqueness and naming-canon invariants.
-    return _SEGMENT_NAME_RE.match(d.name) is None
+    return any((d / a).exists() or any(d.glob(f"rc-*/{a}")) for a in RELEASE_ARTIFACTS)
 
 
 def iter_archive_release_dirs(arch: Path) -> list[Path]:
     """All release dirs under ``releases/_archive/`` (recursive).
 
-    A dir qualifies only when it carries an SDD release artifact; segment containers
-    (``rc-N``) are skipped by :func:`is_release_dir` while any artifact-bearing child
-    is still found by the recursion.
+    A dir qualifies only when it carries an SDD release artifact, its own or an
+    ``rc-N/`` candidate's (:func:`is_release_dir`).
     """
     out: list[Path] = []
     for d in sorted(p for p in arch.rglob("*") if p.is_dir()):

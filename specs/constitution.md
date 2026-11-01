@@ -1,11 +1,12 @@
 ---
-specs_pattern_version: 7
-constitution_version: 6.0.0
+specs_pattern_version: 13
+constitution_version: 7.1.0
+gitflow: {"principal": "main", "integration": "develop", "work": "feature/"}
 ---
 
 # Constitution — dadaia-workspace
 
-Permanent product law, stated **once**. Every rule already stated in `DADAIA.md` lives there
+Permanent product law, stated **once**. Every rule that has a home elsewhere lives there
 alone; this file carries only what no other file states.
 
 ## 1. Identity
@@ -21,12 +22,12 @@ Definitions are pointers, not rules — each term is defined once, in the atom n
 |---|---|
 | Vision · layout and module map | [[product-vision]] · [[architecture]] |
 | **Spec Context Project** — one canonical specs folder bound to one repository | [[spec-context-project]] |
-| **Entry harness** — the coding harness a human launches, and the roster of them | [[tech-stack]] Part 2 › Snapshot |
+| **Entry harness** — the coding harness a human launches, and the roster of them | `dadaia_workspace/core/harness_registry.py` |
 | **Harness isolation** — a workspace installed for any subset of the roster | the `specs/memory/product/harness/` atoms |
 | **Agentic entity** — Persona, Deterministic Behavior, Abstract Rule, universal surface | [[agentic-entities]], registry `dadaia_workspace/public/entities/registry.json` |
 
-The harness roster is enumerated in exactly one memory atom, set-equal to
-`dadaia_workspace/core/harness_registry.py`; this constitution never enumerates it.
+The harness roster is enumerated in exactly one place, `dadaia_workspace/core/harness_registry.py`;
+this constitution never enumerates it.
 
 ## 2. The Operational-Change Lane
 
@@ -57,12 +58,28 @@ article or substantive clarification, PATCH for wording. An amendment lands with
 decision that decided it, in the same commit; amendment history lives in git and in the
 amending release's `_RELEASE.json` `log`, never inline.
 
+## 5. O contrato de confiança
+
+Cada passo do processo existe pelo que garante; cada garantia é verdade por mecanismo e número, nunca por declaração; versão cuja medida falha não publica.
+
+1. **Teste não se burla.** Nenhum gate aceita uma vermelha que sumiu: assert antigo editado, skip/xfail/marker/seletor mudado, ou o julgado editando o próprio juiz. Medida: cada burla conhecida no ledger é um teste adversário plantado que os gates recusam; re-bug na mesma superfície ≤ 30%.
+2. **Evidência é produzida, nunca declarada.** Veredito, CI run, mutação, test-audit e data existem só como saída da ferramenta que os calculou, presos ao sha julgado; o julgado nunca escreve a própria evidência. Medida: zero campo de evidência digitado à mão; o merge recusa veredito com sha ou hash de diff divergente.
+3. **Código é escrito para humanos.** Script e módulo entregues leem como arquitetura limpa: um kernel por preocupação, zero cópia, zero ciclo de import, toda função com complexidade grau C ou melhor. Medida: critério "scripts" do scorecard ≥ 9.
+4. **Peso compra confiança ou sai.** Passo de cerimônia que não produz evidência checada por um gate é apagado.
+
+Medido pelo scorecard da versão: toda célula ≥ 9, pontuada por dois juízes independentes antes de evals, promote ou publicação; o scorecard é o último job de implementação do rc final, antes do promote, nunca depois do resumo de closure.
+
+## 6. Features × Futures
+
+A feature or fix delivers present behaviour and spends future options when it increases
+coupling. Because coupling is software cost, development alternates feature investment with
+option-restoring work that deletes, simplifies or decouples. Decision: ADR 0228.
+
 <!-- dadaia:fixed slop-law -->
 ## Slop — workspace law (fixed)
-- Slop is what passes the deletion test without loss: removed, no behavior changes and no decision loses its record.
-- A SPEC declares scope, observable criteria and decisions in domain names; it fits the byte ceiling of `specs/releases/AGENTS.md`.
+- A SPEC declares scope, observable criteria and decisions in domain names; past the size `specs/releases/AGENTS.md` recommends, open `rc-<N+1>/`.
 - A concept takes a glossary name; a numbered code exists only where a mechanical index reads it (FR, AC, T-).
 - Every file has a canonical home and a GC path; summaries, backups, notes and scratch live in `.dadaia/tmp/` or do not exist.
 - A branch dies at merge; a candidate exists only with scope that changes behavior.
-- Measured by `dadaia doctor` (FIXED-1/2) and the slop ratchets; detection signals: `dd-code-review` SLOP.md.
+- Slop is defined in `dd-code-review` SLOP.md; measured by `.dadaia/.venv/bin/dadaia doctor` (FIXED-1/2).
 <!-- /dadaia:fixed slop-law -->

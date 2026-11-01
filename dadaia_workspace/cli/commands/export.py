@@ -7,11 +7,11 @@ import typer
 from rich.console import Console
 
 from dadaia_workspace import container
+from dadaia_workspace.cli._fail import fail
 from dadaia_workspace.core.exceptions import DadaiaError
 from dadaia_workspace.core.workspace_resolver import resolve_cli_workspace_root
 
 console = Console()
-err_console = Console(stderr=True)
 
 
 def export(
@@ -19,15 +19,21 @@ def export(
         Path | None,
         typer.Option("--workspace", "-w", help="Workspace root (default: resolved from cwd)."),
     ] = None,
+    hard: Annotated[
+        bool,
+        typer.Option(
+            "--hard", help="Write `workspace-export.tar.gz`: the JSON plus the unpushed work."
+        ),
+    ] = False,
 ) -> None:
-    """Write `.dadaia/dist/spec-contexts.json` — one record per spec context.
+    """Write `.dadaia/dist/spec-contexts.json` — one record per spec context, read-only.
 
-    The file is overwritten on every run. On another workspace, `dadaia import <file>`
-    registers each unknown context DEAD and `dadaia context alive <name>` clones it.
+    The file is overwritten on every run. `--hard` writes `.dadaia/dist/workspace-export.tar.gz`
+    instead: the same JSON plus a bundle of each open lane and `wt-rc` tree and each pause
+    bundle, every bundle scanned for secrets.
     """
     try:
-        result = container.build_export_service(resolve_cli_workspace_root(workspace)).run()
+        result = container.build_export_service(resolve_cli_workspace_root(workspace)).run(hard)
     except DadaiaError as exc:
-        err_console.print(f"[red]Error:[/red] {exc}")
-        raise typer.Exit(1) from None
+        fail(exc)
     console.print(f"[green]✓[/green] {result.path}  ({result.contexts} contexts)", soft_wrap=True)

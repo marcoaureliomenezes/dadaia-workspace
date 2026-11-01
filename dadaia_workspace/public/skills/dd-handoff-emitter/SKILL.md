@@ -2,9 +2,10 @@
 name: dd-handoff-emitter
 description: >
   Emit the machine-readable handoff JSON at the end of any agent task (handoff-only by
-  default; HTML report added only when the operator asks or the next hop is human), and
-  delete a consumed coordination handoff (ack-on-consume). Use at task completion and
-  after acting on a handoff addressed to you.
+  default; HTML report added only when the operator asks or the next hop is human); the main
+  thread deletes a consumed coordination handoff (ack-on-consume). Use at task completion,
+  when writing a reviewer verdict (verdict.py), and, for the main thread, once a returned
+  handoff's next agent has acted on it.
 ---
 
 # dd-handoff-emitter
@@ -15,31 +16,30 @@ completed agent task; the HTML report is the exception, not the rule.
 ## Emitting
 
 1. Open `.dadaia/handoff/AGENTS.md` (the area's scoped law) and follow it.
-2. Resolve the workspace root: walk up from cwd to the nearest ancestor already
-   containing `.dadaia/` — never create a new one.
-3. Default to handoff-only; switch to report mode only when the operator asked or
-   `next_handoff.agent == "human"`.
-4. Report mode first writes the HTML to
-   `repos/<slug>/reports/<agent>/<UTC>-<slug>.html`, then captures
+2. Resolve the workspace root: walk up from cwd to the nearest ancestor holding
+   `.dadaia/states/spec_contexts.json` — write under that root only, since a second `.dadaia/` splits workspace state.
+3. Report mode first writes the HTML to
+   `.dadaia/reports/<context>/<UTC>-<agent>-<slug>.html`, then captures
    `sha256sum <report>` as `artifact.content_hash`.
-5. Assemble the handoff field-by-field against
+4. Assemble the handoff field-by-field against
    `.dadaia/agentic/schemas/handoff-v1.schema.json`; set `artifact.path` only for a
    file already on disk.
-6. Write `.dadaia/handoff/<context>/<YYYY-MM-DDTHHMMSSZ>-<agent>-<slug>.handoff.json`
-   (2-space indent) and run `dadaia reports validate <path>` — fix any non-zero exit
-   before moving on.
+5. The file name stamp and `produced_at` come from one clock read: `python3 -c "import datetime as d; print(d.datetime.now(d.UTC).strftime('%Y-%m-%dT%H%M%SZ'))"`; `produced_at` is that instant with colons (`YYYY-MM-DDTHH:MM:SSZ`, the schema's pattern). Any other date names its source: `git` or the clock.
+   Write `.dadaia/handoff/<context>/<YYYY-MM-DDTHHMMSSZ>-<agent>-<slug>.handoff.json` (2-space indent) and run `.dadaia/.venv/bin/dadaia reports validate <path>`;
+   fix any non-zero exit before moving on.
+6. A reviewer verdict is written only by `python3 .agents/skills/dd-handoff-emitter/scripts/verdict.py` (flags: its `--help`). A refusal leaves no file and prints one `fix:` line; the path it prints is the verdict.
 
-**Done when** the handoff file exists at that exact path shape, `dadaia reports
-validate` exits 0, and (report mode) `artifact.content_hash` matches the file on disk.
+**Done when** the handoff file exists at that exact path shape, `.dadaia/.venv/bin/dadaia reports
+validate` exits 0 on a non-verdict handoff, and (report mode) `artifact.content_hash` matches the file on disk; a verdict is done when `verdict.py` prints its path, having validated it against the reviewed tree.
 
 ## Consuming (ack-on-consume)
 
-After reading and acting on a coordination handoff addressed to you:
+The main thread, once the agent a coordination handoff names has acted on it:
 
-1. Resolve its real target path; act only on a path inside `.dadaia/`, and never
-   follow a symlinked directory.
-2. Delete only that one consumed handoff file; every other handoff expires one day
-   after its mtime and `dadaia doctor` reaps it, `artifact.path` or not.
+1. Resolve its real target path; act only when the resolved path stays inside `.dadaia/`, since a
+   symlinked directory can point the delete elsewhere.
+2. Delete only that one consumed handoff file; every other handoff is reaped on the
+   schedule in `.dadaia/AGENTS.md`'s zone table.
 
 **Done when** the consumed coordination handoff is gone and every other handoff still
 validates.
@@ -48,3 +48,5 @@ validates.
 
 - `.dadaia/agentic/schemas/handoff-v1.schema.json` — field list, types, enums,
   patterns, `schema_version` posture.
+- `python3 .agents/skills/dd-handoff-emitter/scripts/verdict.py --help` — the verdict writer's flags.
+- `python3 .agents/skills/dd-handoff-emitter/scripts/verdict.py stats <M.m.p>-rc<N> --specs <specs-dir>` — the candidate's readout table, each metric beside its target (metrics: `scripts/_stats.py`); it refuses any release state `release.py check` refuses, so run it after the memory pass.

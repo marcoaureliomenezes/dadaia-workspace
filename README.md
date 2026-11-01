@@ -1,19 +1,16 @@
 # dadaia-workspace
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/marcoaureliomenezes/dadaia-workspace/blob/main/LICENSE)
 [![PyPI](https://img.shields.io/pypi/v/dadaia-workspace)](https://pypi.org/project/dadaia-workspace/)
 
 A local-first, spec-driven workspace that gives AI agents current context, a document-governed lifecycle, visible concurrency and anti-slop boundaries.
 
-A workspace is one folder. You open an agent session at its root. Your projects live in
-repos inside it, and the governance — `AGENTS.md`, `.agents/`, `.dadaia/` — sits outside
-every repo. One workspace holds many projects and a project many repos; it is never a
-monorepo. Each project is a context: its **main repo** is the repo where `specs/` lives,
-its **associated repos** are the others it owns.
+A workspace is one folder, and your projects live in repos inside it. Governance sits
+outside every repo; a project is a context, with one main repo where `specs/` lives and
+its associated repos. It is never a monorepo. The folder rules are the root map,
+`dadaia_workspace/public/data/AGENTS.md`.
 
 ## What it is and principles
-
-<!-- derived-from: product-vision sha256:164c4a8b0eca -->
 
 dadaia-workspace is the operating environment around repositories developed with AI
 agents. Its unit is the context: one main repo, where `specs/` lives, plus its
@@ -21,132 +18,81 @@ associated repos; a single-repo context is the minimal case. Eight pillars:
 
 - **Current context** — agents bind explicitly and receive only the relevant project,
   memory, release and task state.
-- **Documents are the lifecycle** — backlog, SPEC, PLAN, TASKS, `_RELEASE.json` and
+- **Documents are the lifecycle** — backlog, SPEC, PLAN, the job files, `_RELEASE.json` and
   `BUGS.jsonl` carry ordered work; no runtime drives agents through steps.
-- **Deterministic boundaries** — path class, bind scope, root hygiene, venv-rooting and
-  the push gate are mechanical, each refusal carrying its own runnable fix; what cannot
+- **Deterministic boundaries** — path class, bind scope, root hygiene, the verdict
+  writer and the push gate are mechanical, each refusal carrying one fix line; what cannot
   be mechanical is written as law.
 - **Visible concurrency** — sessions may race, git exposes the overlap, and nothing
   waits on a lock.
-- **No mechanism without a demand** — a capability exists only while it earns its
-  maintenance cost, and deleted surface beats accreted surface.
+- **Features preserve futures** — features and fixes spend options when coupling grows;
+  delivery alternates with deletion, simplification or decoupling, and a capability
+  exists only while it earns its maintenance cost.
 - **No slop** — runtime state, reports, handoffs, caches, projections and temporary
   files have canonical homes and never leak into repositories.
 - **Six entry harnesses** — Claude Code, Codex, Kimi Code, Cursor, Devin and GitHub
-  Copilot, one registry record each; public assets originate once, stage once, and are
-  read natively or through per-entry symlinks.
-- **Evidence, never prose** — success is evidenced by reviews, task markers, commands
+  Copilot, one registry record each; public assets originate once, and installation
+  refreshes staging before native or projected consumption.
+- **Evidence, never prose** — success is evidenced by reviews, task commits, commands
   and artifacts.
-
-Two usage paths follow — a human drives it from a shell, an agent reads the root
-`AGENTS.md` map — and both read one truth: every section below derives from a named
-memory atom under its content hash.
 
 ## A human installs and uses it
 
-<!-- derived-from: pypi-distribution sha256:c4d89365ff10 -->
-<!-- derived-from: workspace-init sha256:ca5c835e94af -->
-<!-- derived-from: context-management sha256:0227a5e43894 -->
-<!-- derived-from: workspace-doctor sha256:ef9c81d0d181 -->
-
 ```bash
-pip install dadaia-workspace
-dadaia init demo --harness claude --repo <clone url>   # workspace + first project
-cd demo && eval $(dadaia context bind <ctx> --print-env)
-dadaia doctor --context <ctx>     # findings, each with a runnable fix
+uvx dadaia-workspace init demo --harness claude --repo <clone url>   # level 1 + 2
+cd demo
+.dadaia/.venv/bin/dadaia specs init --context <slug>                 # level 3
+.dadaia/.venv/bin/dadaia doctor --context <slug>   # findings, each with one fix line
 ```
 
-`pip install dadaia-workspace` installs the library and one CLI under two names,
-`dadaia` and `dadaia-workspace`, so `uvx dadaia-workspace init …` runs without an
-install; the wheel ships the full public asset tree, so `init` works offline.
+The three onboarding levels are: the workspace (`uvx dadaia-workspace init <dir> --harness <name>`,
+or `pip install dadaia-workspace`, which installs one CLI under two names, `dadaia` and
+`dadaia-workspace`); a project (`--repo <url>`, with repeatable `--associated-repo <url>`;
+a later one through `.dadaia/.venv/bin/dadaia context create --main-repo <url>`); and the
+specs (`.dadaia/.venv/bin/dadaia specs init --context <slug>`, the first memory pass, then
+`.dadaia/.venv/bin/dadaia context baseline <slug>`). Their order is the heading
+*Onboarding — three levels* of `dadaia_workspace/public/data/AGENTS.md`; `doctor` prints each
+next step with its `fix:` line. `.dadaia/.venv/bin/dadaia context bind <ctx>` binds a session;
+its scope is the heading *Context, scope and races* of `dadaia_workspace/public/data/dadaia-AGENTS.md`.
 
-`dadaia init <dir> --harness <name> [--repo <url>] [--skip-assets]` is the only verb
-that works on an empty directory, and a re-run is idempotent. It provisions
-`.dadaia/.venv`, the `.dadaia/` zones, `.agents/skills` and the named harness's
-projection, seeds the state documents without overwriting them, and (unless
-`--skip-assets`) stages and installs the public assets — the one writer of every hook
-wiring. With `--repo <url>` it clones the repo into `repos/<slug>/`, composes the
-context verbs — `create`, `alive`, the bind — and installs the pre-push hook. Without
-`--repo` it prints the `dadaia context create <name> --main-repo <slug>` that makes the
-first project. `dadaia harness add <name>` adds a harness later.
+**Upgrade:** re-run the `uvx dadaia-workspace init <dir> --harness <name>` line, then
+`.dadaia/.venv/bin/dadaia specs init --context <ctx>`. `.dadaia/.venv/bin/dadaia harness add <name>`
+adds a harness later.
 
-`dadaia context bind <ctx>` writes one session record (context, runtime, pid,
-`bound_at`) and acquires nothing; `--print-env` emits `DADAIA_CONTEXT` and
-`DADAIA_SESSION_ID` for `eval $(…)`. The bind's scope is the context's main repo plus
-its associated repos, and it drives the injection of the tech stack and the memory
-catalog digest into the session.
-
-`dadaia doctor` is the one instance validator. Three sections run in fixed order —
-`workspace`, `specs`, `ledgers` — each finding one `<CODE> <verdict> <message>` line,
-every error-class finding with one `fix: <command>` line and exit 1; there is no score.
-`--json` mirrors the run; `--fix` is the reaper: it moves slop to `.dadaia/reaped/`
-and deletes only what a TTL expired.
+**Move:** `.dadaia/.venv/bin/dadaia export` writes the contexts and harnesses to
+`.dadaia/dist/spec-contexts.json`; `uvx dadaia-workspace init <dir> --from <artifact>` replicates it.
 
 ## An agent reads AGENTS.md and uses it
 
-<!-- derived-from: agentic-entities sha256:98cb81d2e72c -->
-<!-- derived-from: sdd-gate-v3 sha256:ea8939698674 -->
-<!-- derived-from: release-lifecycle sha256:09607348cc88 -->
-<!-- derived-from: bug-ledger sha256:9534ded07707 -->
-<!-- derived-from: harness-claude-code sha256:ee2f8a3870b4 -->
-<!-- derived-from: harness-codex sha256:868c0a658eab -->
-<!-- derived-from: harness-kimi-code sha256:fcfeb26d658b -->
-<!-- derived-from: harness-cursor sha256:480b18aa9b61 -->
-<!-- derived-from: harness-devin sha256:ab4a32c4a53d -->
-<!-- derived-from: harness-copilot sha256:b93cef868a6f -->
-<!-- derived-from: agent-comms sha256:c485c616b2df -->
+Fast path for multi-agent, spec-driven development: `uvx dadaia-workspace init <dir> --harness <name>` installs the workspace for Claude Code,
+Codex, Kimi Code, Cursor, Devin or GitHub Copilot, with its agent skills under `.agents/skills`.
+Read the root `AGENTS.md` map, then run `.dadaia/.venv/bin/dadaia doctor`.
 
-The always-on law is the root `AGENTS.md` map; every governed area carries its own
-scoped `AGENTS.md`, and every `dd-` skill touching an area opens that file first. The
-map, the scoped files, `.agents/skills/dd-*` and `.agents/agents/dd-*.md` are authored
-once. Codex, Kimi Code, Cursor, Devin and GitHub Copilot read `.agents/skills`
-natively; Claude Code reaches skills and personas through per-entry symlinks. A harness
-differs only in serialization — event names, hook file, answer shape — and adds no
-behaviour.
+Model-readable indexes: `llms.txt` lists the pages, and `llms-full.txt` holds their full text.
 
-The gate is one PreToolUse pre-gate: root whitelist, venv guard, SDD gate, in that
-order, first block wins; a policy that raises is ALLOW. It blocks exactly three things:
-a new workspace-root entry, a `dadaia`/`pip`/`python -m dadaia_workspace` run outside
-`.dadaia/.venv/bin/`, and a PROTECTED write or a bound session's MUTATING write into a
-`repos/<slug>/` outside its scope. Path classes: ADDITIVE (always writable), MUTATING
-(everything else, scope-judged), PROTECTED (session records and the projected law).
-Every BLOCK carries exactly one `fix:` line, and a contract test feeds each fix back
-through the gate asserting ALLOW. No lease, lock or wait path exists; the gate reads no
-`_RELEASE.json`.
-
-Work runs as candidates inside one live release: a picked set, a grill, SPEC, PLAN and
-TASKS, one reserved task at a time, `[x]` only after the reviewer's `APPROVED`, then
-closure — memory reconciliation, disposition sweep, the `feature -> develop` merge. The
-ledger scripts under `.agents/skills/*/scripts/` (`bugs.py`, `backlog.py`,
-`release.py`, `audit.py`) are each record's one writer. A bug is proposed to the
-operator and registered only after confirmation, then fixed on the live feature branch
-with a RED test. Completed work leaves as a `handoff-v1` record, validated by
-`dadaia reports validate`.
+The gate is one PreToolUse pre-gate: root whitelist, then SDD gate. Its rules are the root
+map's heading *What is enforced*. The always-on law is the root map, `dadaia_workspace/public/data/AGENTS.md`; each governed
+area carries its own scoped `AGENTS.md`, listed under its heading *Scoped law — open before
+acting there*. A harness differs only in serialization; its deltas are in
+`dadaia_workspace/public/skills/dd-ai-eng-knowhow/CLAUDE-CODE.md` and `CODEX.md`. Completed
+work leaves as a `handoff-v1` record, validated by `.dadaia/.venv/bin/dadaia reports validate`.
 
 ## Documentation
 
-<!-- derived-from: pypi-distribution sha256:c4d89365ff10 -->
-<!-- derived-from: public-asset-distribution sha256:eb08a2e29f43 -->
+The documentation is the repository's [docs folder](https://github.com/marcoaureliomenezes/dadaia-workspace/tree/main/docs):
 
-The site is <https://marcoaureliomenezes.github.io/dadaia-workspace/>:
-
-- [Quickstart](docs/quickstart.md) — install to a bound project, a backlog entry and a
-  live release; [positioning](docs/positioning.md) — why product repos carry no agent
+- [Quickstart](https://github.com/marcoaureliomenezes/dadaia-workspace/blob/main/docs/quickstart.md) — install to a bound project, a backlog entry and a
+  live release; [positioning](https://github.com/marcoaureliomenezes/dadaia-workspace/blob/main/docs/positioning.md) — why product repos carry no agent
   config.
-- [The bug loop](docs/bug-loop.md) — register, RED, fix, resolve;
-  [what the bug ledger taught](docs/bug-ledger-lessons.md) — measuring the ledger and
+- [The bug loop](https://github.com/marcoaureliomenezes/dadaia-workspace/blob/main/docs/bug-loop.md) — register, RED, fix, resolve;
+  [what the bug ledger taught](https://github.com/marcoaureliomenezes/dadaia-workspace/blob/main/docs/bug-ledger-lessons.md) — measuring the ledger and
   the fix-chain lesson.
-- [CLI reference](docs/cli.md) · [concepts](docs/concepts.md) ·
-  [getting started](docs/getting-started.md) · [distribution](docs/distribution.md)
-
-The standalone skills install without a workspace from the `dadaia-skills` repository:
-`npx skills add marcoaureliomenezes/dadaia-skills`, or as a Claude Code marketplace.
+- [CLI reference](https://github.com/marcoaureliomenezes/dadaia-workspace/blob/main/docs/cli.md) · [concepts](https://github.com/marcoaureliomenezes/dadaia-workspace/blob/main/docs/concepts.md) ·
+  [getting started](https://github.com/marcoaureliomenezes/dadaia-workspace/blob/main/docs/getting-started.md) · [distribution](https://github.com/marcoaureliomenezes/dadaia-workspace/blob/main/docs/distribution.md)
 
 ## Links
 
-<!-- derived-from: pypi-distribution sha256:c4d89365ff10 -->
-
 - GitHub — <https://github.com/marcoaureliomenezes/dadaia-workspace>
 - PyPI — <https://pypi.org/project/dadaia-workspace/>
-- Agent index — [`llms.txt`](llms.txt)
-- Changelog — [`CHANGELOG.md`](CHANGELOG.md)
+- Agent index — [`llms.txt`](https://github.com/marcoaureliomenezes/dadaia-workspace/blob/main/llms.txt)
+- Changelog — [`CHANGELOG.md`](https://github.com/marcoaureliomenezes/dadaia-workspace/blob/main/CHANGELOG.md)

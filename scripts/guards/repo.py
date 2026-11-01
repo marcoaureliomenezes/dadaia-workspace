@@ -1,0 +1,1341 @@
+"""Repository checks: the workflows, the release canon, canonical memory, the ADR ledger and
+the specs canon's git visibility.
+
+Each check reads tracked files of the tree it is given; ``CONTROL`` copies the library's own
+tracked files, so a green control is the checkout's truth and every plant edits one line.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+import tomllib
+from pathlib import Path
+from typing import TYPE_CHECKING, Any
+
+import yaml
+
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT))
+
+from run import _CI, tracked  # noqa: E402
+
+from dadaia_workspace.core.fixed_sections import authored_text, extract_fixed_section  # noqa: E402
+from dadaia_workspace.core.gitflow import (  # noqa: E402
+    live_release_id,
+    read_gitflow,
+    resolve_live_candidate,
+)
+from dadaia_workspace.core.specs_version import state as specs_state  # noqa: E402
+from dadaia_workspace.features.specs.canon import CANON  # noqa: E402
+from dadaia_workspace.features.specs.memory_canon import is_forbidden_memory_heading  # noqa: E402
+from dadaia_workspace.infrastructure.ledger_scripts import load_owner  # noqa: E402
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from run import Check, Plant, Tree
+
+_WF = ".github/workflows"
+_RELEASE = f"{_WF}/release.yml"
+_ACTION = "googleapis/release-please-action"
+_GATE = "needs.release-please.outputs.release_created == 'true'"
+_MODEL_SECRET = re.compile(r"CLAUDE_API_KEY|ANTHROPIC_(?:API_)?KEY|api\.anthropic\.com", re.I)
+_OAUTH = re.compile(r"CLAUDE_CODE_OAUTH_TOKEN")
+_EVAL = f"{_WF}/eval.yml"
+_EVAL_TRIGGERS = {"workflow_dispatch", "schedule"}
+_HOSTED = {"ubuntu-latest", "ubuntu-24.04", "ubuntu-22.04", "windows-latest", "windows-2025",
+           "windows-2022", "macos-latest", "macos-15", "macos-14"}  # fmt: skip
+_SCAN = "python3 evals/scripts/scan.py evals/jobs evals/summary.md"
+_PRUNE_TAIL = "-type d -path '*/agent/sessions' -prune -exec rm -rf {} +"  # the harness config dir
+_SUMMARY = 'cat evals/summary.md >> "$GITHUB_STEP_SUMMARY"'
+_UPLOADED = {"evals/jobs/", "evals/summary.md"}  # what the scan covers
+_ACTIONS = ("actions/checkout@", "actions/upload-artifact@", "actions/download-artifact@")
+_WHEEL = "dist/*.whl"  # the candidate build, handed to the eval job; not a publish
+_EXPR = re.compile(r"\$\{\{(.*?)\}\}", re.S)
+_SECRETS = re.compile(r"\bsecrets\b(?!\.GITHUB_TOKEN\b)", re.I)
+_WORD = re.compile(r"\bsecrets\b", re.I)
+_SKILLS_REPO = re.compile(
+    r"dadaia-skills|SKILLS_REPO_TOKEN|build-skills-repo|npx skills add|skills-repository"
+)
+# Both dated release headings: hand-written `## [x.y.z] — date`, release-please's `(date)`.
+# the one poetry floor: GHSA-2599-h6xx-hpxp (wheel path traversal), GHSA-73h3-mf4w-8647
+_POETRY_FLOOR = (2, 3, 4)
+# the name under PEP 503 normalisation, pinned (`==`, `@`, a range) or named after
+# install/download/add/--from/--with (flags between allowed); `uvx dadaia-workspace init`,
+# `--from <path>` and the import name stay legal
+_NAME_TOKEN = re.compile(r"[A-Za-z0-9][\w.-]*")
+_SPECIFIER = re.compile(r"==[0-9${]|@|[<>~!]=?")
+_AFTER_VERB = re.compile(r"(?:install|download|add|--from|--with)(?:[ ='\",]+-\S+)*[ ='\",]+$")
+_POETRY_PIN = re.compile(r"poetry==(\d+(?:\.\d+)*)")
+_CHANGELOG_TOP = re.compile(
+    r"^## \[(\d+\.\d+\.\d+)\](?:\([^)]*\))? (?:[-—] \d{4}-\d{2}-\d{2}|\(\d{4}-\d{2}-\d{2}\))\s*$",
+    re.M,
+)
+
+
+def _yaml(tree: Tree, rel: str) -> dict[Any, Any]:
+    return yaml.safe_load(tree.read(rel)) or {}
+
+
+def _on(doc: dict[Any, Any]) -> Any:
+    """PyYAML (YAML 1.1) reads the bare ``on:`` key as the boolean True."""
+    return doc.get("on", doc.get(True)) or {}
+
+
+def _workflows(tree: Tree) -> dict[str, dict[Any, Any]]:
+    return {p: _yaml(tree, p) for p in tree.tracked(_WF) if p.endswith((".yml", ".yaml"))}
+
+
+def _jobs(doc: dict[Any, Any]) -> dict[str, dict[str, Any]]:
+    return {k: j for k, j in (doc.get("jobs") or {}).items() if isinstance(j, dict)}
+
+
+def _needs(job: dict[str, Any]) -> list[str]:
+    needs = job.get("needs") or []
+    return [needs] if isinstance(needs, str) else list(needs)
+
+
+def _steps(tree: Tree) -> list[tuple[str, str, dict[str, Any]]]:
+    return [
+        (p, jid, s)
+        for p, doc in _workflows(tree).items()
+        for jid, job in _jobs(doc).items()
+        for s in job.get("steps") or []
+    ]
+
+
+def _records(tree: Tree) -> list[dict[str, Any]]:
+    path = tree.root / "specs" / "ADRs" / "decisions.jsonl"
+    return list(load_owner("dd-bug-resolution", "_ledger").records(path))
+
+
+def _anthropic(uses: str) -> bool:
+    return uses.lower().startswith("anthropics/")
+
+
+def _strings(node: Any) -> Iterator[str]:
+    if isinstance(node, dict):
+        for v in node.values():
+            yield from _strings(v)
+    elif isinstance(node, list):
+        for v in node:
+            yield from _strings(v)
+    elif isinstance(node, str):
+        yield node
+
+
+def _secret_use(node: Any) -> bool:
+    """The word ``secrets`` as a key, or inside a ``${{ }}`` expression (``GITHUB_TOKEN`` aside)."""
+    if isinstance(node, dict):
+        return any(str(k).lower() == "secrets" or _secret_use(v) for k, v in node.items())
+    if isinstance(node, list):
+        return any(_secret_use(v) for v in node)
+    return isinstance(node, str) and any(_SECRETS.search(e) for e in _EXPR.findall(node))
+
+
+def _triggers(doc: dict[Any, Any]) -> set[str]:
+    on = _on(doc)
+    return {on} if isinstance(on, str) else set(on)
+
+
+def _hits(rules: dict[str, bool], where: str) -> list[str]:
+    return [f"{rule}: {where}" for rule, hit in rules.items() if hit]
+
+
+def _model_markers(tree: Tree, p: str, doc: dict[Any, Any]) -> list[str]:
+    """Outside ``eval.yml``, no ``anthropics/*`` action, model secret or endpoint."""
+    jobs = _jobs(doc).values()
+    steps = [str(s.get("uses", "")) for j in jobs for s in j.get("steps") or []]
+    calls = [str(j.get("uses", "")) for j in jobs]
+    out = [f"anthropic-workflow: {p} uses {u}" for u in calls if _anthropic(u)]
+    out += [f"anthropic-action: {p} uses {u}" for u in steps if _anthropic(u)]
+    lines = list(enumerate(tree.read(p).splitlines(), 1))
+    out += [f"model-secret: {p}:{n}" for n, line in lines if _MODEL_SECRET.search(line)]
+    return out + [f"oauth-token: {p}:{n}" for n, line in lines if _OAUTH.search(line)]
+
+
+def _outside_eval(p: str, doc: dict[Any, Any]) -> list[str]:
+    """Clauses (a) and (b) for a workflow that is not ``eval.yml``: a job in environment
+    ``evals`` runs on dispatch or schedule only, and no secret is read at all."""
+    on = _triggers(doc)
+    jobs, push = _jobs(doc), not (on and on <= _EVAL_TRIGGERS)
+    env = {j: job.get("environment") for j, job in jobs.items()}
+    exprs = [e for s in _strings(doc) for e in _EXPR.findall(s)]
+    shapes = {
+        "evals-environment-push": push and "evals" in env.values(),
+        "env-dict-prt": push
+        and any(isinstance(e, dict) and e.get("name") == "evals" for e in env.values()),
+        "bracket-secret-push": any(re.search(r"secrets\s*\[", e, re.I) for e in exprs),
+        "tojson-secrets-push": any(re.search(r"tojson\(\s*secrets\b", e, re.I) for e in exprs),
+        "lowercase-secret-push": any(w != "secrets" for e in exprs for w in _WORD.findall(e)),
+        "renamed-secret-push": any(_SECRETS.search(e) for e in exprs),
+        "reusable-call-has-no-runs-on": any("uses" in j and "secrets" in j for j in jobs.values()),
+    }
+    return _hits(shapes, p)
+
+
+def _eval_header(doc: dict[Any, Any]) -> list[str]:
+    """``eval.yml``: dispatch or schedule only, no workflow-level secret or ``defaults``."""
+    on = _triggers(doc)
+    shapes = {
+        "no-on": not on,
+        "pull-request": "pull_request" in on,
+        "pull-request-target-no-secret": "pull_request_target" in on,
+        "quoted-on-push": "push" in on,
+        "trigger-other": bool(
+            on - _EVAL_TRIGGERS - {"pull_request", "pull_request_target", "push"}
+        ),
+        "secret-workflow-level": _secret_use({k: v for k, v in doc.items() if k != "jobs"}),
+        "defaults-workflow-level": "defaults" in doc,
+    }
+    return _hits(shapes, _EVAL)
+
+
+def _eval_job(job: dict[str, Any]) -> list[str]:
+    """One ``eval.yml`` job: an exact hosted label, no ``defaults``, a secret only in its ``env``,
+    actions from the allowlist alone."""
+    ro, steps = job.get("runs-on"), job.get("steps") or []
+    uses = [str(s["uses"]) for s in steps if "uses" in s]
+    shapes = {
+        "runs-on-self-hosted": "self-hosted" in str(ro),
+        "runs-on-list-hosted": isinstance(ro, list),
+        "runs-on-prefix-label": not isinstance(ro, list) and str(ro) not in _HOSTED,
+        "defaults-job-level": "defaults" in job,
+        "step-env-secret": any(_secret_use(s) for s in steps),
+        "job-container-secret": _secret_use(
+            {k: v for k, v in job.items() if k not in ("env", "steps")}
+        ),
+        "action-not-allowlisted": any(
+            not u.startswith(("actions/", "./", "docker:")) for u in uses
+        ),
+        "uses-summary": any(u.startswith(("./", "docker:")) for u in uses),
+        "action-prefix-lookalike": any(
+            u.startswith("actions/") and not u.startswith(_ACTIONS) for u in uses
+        ),
+    }
+    return _hits(shapes, _EVAL)
+
+
+def _paths(step: dict[str, Any]) -> set[str]:
+    return set(str((step.get("with") or {}).get("path", "")).split())
+
+
+def _publishes(step: dict[str, Any], secret_free: bool) -> bool:
+    """A step that writes the step summary or uploads anything; the wheel handed to the eval
+    job is no publish only in a secret-free job."""
+    return "GITHUB_STEP_SUMMARY" in str(step.get("run")) or (
+        str(step.get("uses")).startswith(_ACTIONS[1])
+        and not (secret_free and _paths(step) == {_WHEEL})
+    )
+
+
+def _publish_if(step: dict[str, Any]) -> str:
+    cond = str(step["if"])
+    named = {
+        "failure()": "upload-on-failure",
+        "cancelled()": "upload-not-cancelled",
+        "always()": "upload-always",
+    }
+    return next((r for w, r in named.items() if w in cond), "publish-conditional")
+
+
+def _publish_step(step: dict[str, Any]) -> str | None:
+    """The rule a publishing step breaks after the scan: conditional, its own summary source
+    or extra keys, an upload path the scan did not cover."""
+    if "if" in step:
+        return _publish_if(step)
+    if "run" in step and step != {"run": _SUMMARY}:
+        return "summary-step-extra-key" if step["run"] == _SUMMARY else "summary-other-source"
+    return None if "run" in step or _paths(step) <= _UPLOADED else "upload-other-path"
+
+
+def _write_rule(before_first_publish: bool) -> str:
+    return "write-after-scan" if before_first_publish else "write-between-publishes"
+
+
+def _scan_rules(steps: list[dict[str, Any]]) -> dict[str, bool]:
+    """The ways a step can look like the canonical scan and still not be it."""
+    runs = [(s, str(s.get("run"))) for s in steps]
+    return {
+        "scan-conditional": any(r == _SCAN and "if" in s for s, r in runs),
+        "scan-continue-on-error": any(r == _SCAN and "continue-on-error" in s for s, r in runs),
+        "scan-or-true": any(r.startswith(_SCAN) and r != _SCAN for _, r in runs),
+        "scan-wrong-path": any("scan.py" in r and not r.startswith(_SCAN) for _, r in runs),
+    }
+
+
+def _eval_publish(job: dict[str, Any]) -> list[str]:
+    """Clause (c): after the canonical scan, only publishing steps up to the last one, each
+    unconditional and uploading only what the scan covers."""
+    steps = job.get("steps") or []
+    free = not _secret_use(job) and "environment" not in job
+    pub = [i for i, s in enumerate(steps) if _publishes(s, free)]
+    scans = [i for i, s in enumerate(steps) if s.get("run") == _SCAN and len(s) == 1]
+    scan = scans[0] if scans else len(steps)
+    after = steps[scan + 1 : pub[-1] + 1] if pub else []
+    rules = [
+        _publish_step(s) if _publishes(s, free) else _write_rule(i < pub[0])
+        for i, s in enumerate(after, scan + 1)
+    ]
+    shapes = {
+        "summary-unscanned": any(_publishes(s, free) for s in steps) and not scans,
+        "upload-before-scan": bool(pub and scans) and pub[0] < scan,
+        "sessions-unpruned": any("harbor run" in str(s.get("run")) for s in steps)
+        and not any(
+            len(s) == 1 and str(s["run"]).endswith(_PRUNE_TAIL) for s in steps[:scan] if "run" in s
+        ),
+        **_scan_rules(steps),
+    }
+    return _hits(shapes, _EVAL) + [f"{r}: {_EVAL}" for r in rules if r]
+
+
+def _cli_pin(tree: Tree, doc: dict[Any, Any]) -> list[str]:
+    """``eval-cli-pin``: every task Dockerfile's ``ARG CLAUDE_CODE_VERSION`` equals ``eval.yml``'s."""
+    pin = re.escape(str((doc.get("env") or {}).get("CLAUDE_CODE_VERSION")))
+    arg = re.compile(rf"^ARG CLAUDE_CODE_VERSION={pin}\s*$", re.M)
+    return [
+        f"eval-cli-pin: {d}"
+        for d in tree.tracked("evals/tasks/*/environment/Dockerfile")
+        if not arg.search(tree.read(d))
+    ]
+
+
+def _row_pins(doc: dict[Any, Any]) -> list[str]:
+    """``eval-cli-pin`` on the matrix: every row names a model and a version; a claude-code row's
+    version is the ``CLAUDE_CODE_VERSION`` pin."""
+    pin = str((doc.get("env") or {}).get("CLAUDE_CODE_VERSION"))
+    strategies = [j.get("strategy") for j in _jobs(doc).values()]
+    matrices = [s.get("matrix") for s in strategies if isinstance(s, dict)]
+    rows = [r for m in matrices if isinstance(m, dict) for r in m.get("include") or []]
+    out: list[str] = []
+    for row in rows:
+        if not isinstance(row, dict) or "model" not in row or "version" not in row:
+            out.append(f"eval-cli-pin: {_EVAL} matrix row without a model or a version")
+        elif row.get("harness") == "claude-code" and str(row["version"]) != pin:
+            out.append(f"eval-cli-pin: {_EVAL} claude-code matrix row off the pin")
+    return out
+
+
+def no_model_calls_in_ci(tree: Tree) -> list[str]:
+    """A model is called only from ``eval.yml``, which is dispatch or schedule
+    only, on an exact hosted runner, reads its secret at job level alone, and publishes
+    only what the canonical scan covered."""
+    out: list[str] = []
+    for p, doc in _workflows(tree).items():
+        if p != _EVAL:
+            out += _model_markers(tree, p, doc) + _outside_eval(p, doc)
+            continue
+        jobs = _jobs(doc).values()
+        out += _eval_header(doc) + _cli_pin(tree, doc) + _row_pins(doc)
+        out += [v for job in jobs for v in _eval_job(job) + _eval_publish(job)]
+    return out
+
+
+def workflow_never_rules(tree: Tree) -> list[str]:
+    wfs, steps = _workflows(tree), _steps(tree)
+    text = {p: tree.read(p) for p in wfs}
+    release = _jobs(wfs.get(_RELEASE, {}))
+    surfaces = [*wfs, *tree.tracked("README.md", "llms.txt", "docs/*.md", "specs/memory/*.md")]
+    cov = [
+        f"{p}:{jid}"
+        for p, doc in wfs.items()
+        for jid, job in _jobs(doc).items()
+        for s in job.get("steps") or []
+        if "pytest" in (run := s.get("run") or "")
+        and "--cov" in run
+        and "runner.temp"
+        not in str(
+            (s.get("env") or {}).get("COVERAGE_FILE") or (job.get("env") or {}).get("COVERAGE_FILE")
+        )
+    ]
+    jobs, ci_yml = tree.ci_jobs(), _jobs(wfs.get(_G, {}))
+    release_runs = [
+        line.strip()
+        for p, _, s in steps
+        if p == _RELEASE
+        for line in (s.get("run") or "").splitlines()
+    ]
+    never = {
+        # No standalone skills repository was ordered.
+        "skills-repository-published": [
+            f"{p}:{n}"
+            for p in surfaces
+            for n, line in enumerate(authored_text(tree.read(p)).splitlines(), 1)
+            if _SKILLS_REPO.search(line)
+        ],
+        # the template-injection shape: every value reaches a run body through env:
+        "workflow-expression-in-a-run-body": [
+            f"{p}/{j}: {line.strip()}"
+            for p, j, s in steps
+            for line in (s.get("run") or "").splitlines()
+            if "${{" in line
+        ],
+        "coverage-file-in-the-checkout": cov,
+        "poetry-below-the-floor": [
+            f"{p}/{j}: poetry=={v}"
+            for p, j, s in steps
+            for v in _POETRY_PIN.findall(s.get("run") or "")
+            if tuple(map(int, v.split("."))) < _POETRY_FLOOR
+        ],
+        # every Linux job runs `scripts/ci.py <job>`, the one source of its steps
+        "job-bypasses-ci-script": [
+            j
+            for j in jobs
+            if f"scripts/ci.py {j}"
+            not in "".join(s.get("run") or "" for s in ci_yml.get(j, {}).get("steps") or [])
+        ],
+        "release-please-outside-release-yml": [
+            p for p in wfs if _ACTION in text[p] and p != _RELEASE
+        ],
+        "pypi-publisher-outside-release-yml": [
+            p for p in wfs if "pypa/gh-action-pypi-publish" in text[p] and p != _RELEASE
+        ],
+        # same-workflow chaining only: a second trigger would need a PAT
+        "release-event-trigger": [p for p, doc in wfs.items() if "release" in _on(doc)],
+        "tag-push-trigger": [
+            p
+            for p, doc in wfs.items()
+            if isinstance(t := _on(doc), dict)
+            and bool({"tags", "tags-ignore"} & set(t.get("push") or {}))
+        ],
+        "publishing-job-without-the-release-gate": [
+            j
+            for j, job in release.items()
+            if j != "release-please" and "release-please" not in _needs(job)
+        ],
+        "publishing-job-ungated": [
+            j
+            for j, job in release.items()
+            if j != "release-please" and str(job.get("if") or "").strip() != _GATE
+        ],
+        "needs-an-undefined-job": [
+            f"{j} -> {d}" for j, job in release.items() for d in _needs(job) if d not in release
+        ],
+        # the action mints the tag, never workflow arithmetic
+        "hand-computed-tag": [line for line in release_runs if "git tag " in line],
+        "hand-listed-tags": [line for line in release_runs if "git ls-remote --tags" in line],
+        # only the build under test is installed; third-party dependencies still resolve from PyPI
+        "published-dadaia-workspace-install": _published_installs(tree.root),
+    }
+    return [f"{rule}: {hits}" for rule, hits in never.items() if hits]
+
+
+def _published_installs(root: Path) -> list[str]:
+    """``file:line: text`` of every line that installs the published package or names a previous release."""
+    candidates = subprocess.run(
+        ["git", "grep", "-nIiE", r"dadaia[-_.]+workspace|previous_release", "--",
+         ".github", "tests", "evals", "scripts", ":!scripts/guards/repo.py"],
+        cwd=root, capture_output=True, text=True, encoding="utf-8", errors="replace", check=False,
+    ).stdout.splitlines()  # fmt: skip
+
+    def hit(line: str) -> bool:
+        if "previous_release" in line:
+            return True
+        for m in _NAME_TOKEN.finditer(line):
+            if re.sub(r"[-_.]+", "-", m.group()).lower() != "dadaia-workspace":
+                continue
+            if line[m.end() : m.end() + 1] == "/":
+                continue
+            if _SPECIFIER.match(line, m.end()) or _AFTER_VERB.search(line[: m.start()]):
+                return True
+        return False
+
+    return [c for c in candidates if hit(c.split(":", 2)[2])]
+
+
+def release_workflow_canon(tree: Tree) -> list[str]:
+    """The main-only pinned release-please, the one gated publish chain, the manifest
+    floor and patch rule, the CHANGELOG's top section equal to the manifest, and the pyproject
+    version either the live release's newest ``rc`` label or the number release-please wrote."""
+    doc = _yaml(tree, _RELEASE)
+    on, jobs = _on(doc), _jobs(doc)
+    rp, build = jobs.get("release-please", {}), jobs.get("build", {})
+    pins = [ln for ln in tree.read(_RELEASE).splitlines() if _ACTION in ln and "uses:" in ln]
+    ref, _, comment = (pins[0] if len(pins) == 1 else "@").partition("#")
+    step: dict[str, Any] = next(
+        (s for s in rp.get("steps") or [] if _ACTION in str(s.get("uses"))), {}
+    )
+    inputs = step.get("with") or {}
+    version: dict[str, Any] = next(
+        (s for s in build.get("steps") or [] if s.get("id") == "version"), {}
+    )
+    existing: dict[str, Any] = next(
+        (s for s in rp.get("steps") or [] if s.get("id") == "existing"), {}
+    )
+    manifest = json.loads(tree.read(".release-please-manifest.json"))
+    config = json.loads(tree.read("release-please-config.json"))
+    sections = {e["type"]: e for e in config.get("changelog-sections") or []}
+    minted = tomllib.loads(tree.read("pyproject.toml"))["tool"]["poetry"]["version"]
+    top = _CHANGELOG_TOP.search(tree.read("CHANGELOG.md"))
+    specs = tree.root / "specs"
+    live, cand = live_release_id(specs), resolve_live_candidate(specs)
+    shipped = live in (None, manifest["."])
+    expected = manifest["."] if shipped else f"{live}{cand.name.replace('-', '')}" if cand else None
+    tags = subprocess.run(
+        ["git", "tag", "-l", "v*", "--sort=version:refname"],
+        cwd=tree.root, capture_output=True, text=True, encoding="utf-8", errors="replace", check=False,
+    ).stdout.split()  # fmt: skip
+    clauses = {
+        "push-main": (on.get("push") or {}).get("branches") == ["main"],
+        "dispatch": "workflow_dispatch" in on,
+        "main-only": str(rp.get("if") or "").strip() == "github.ref == 'refs/heads/main'",
+        "write-scope": doc.get("permissions") == {"contents": "write", "pull-requests": "write"},
+        "sha-pinned": bool(re.fullmatch(r"[0-9a-f]{40}", ref.split("@", 1)[1].strip())),
+        "pin-comment": bool(re.fullmatch(r"\s*v\d+\.\d+\.\d+\s*", comment)),
+        "config-driven": step.get("id") == "release-please"
+        and "release-type" not in inputs
+        and inputs.get("config-file") == "release-please-config.json",
+        "manifest-input": inputs.get("manifest-file") == ".release-please-manifest.json",
+        "publish-chain": jobs.get("publish", {}).get("environment") == "pypi",
+        "id-token": (jobs.get("publish", {}).get("permissions") or {}).get("id-token") == "write",
+        "approve-gate": jobs.get("approve", {}).get("environment") == "release-gate",
+        "version-step": (build.get("outputs") or {}).get("version")
+        == "${{ steps.version.outputs.version }}"
+        and version.get("env") == {"TAG": "${{ needs.release-please.outputs.tag_name }}"}
+        and 'echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"' in str(version.get("run"))
+        and {j for j, job in jobs.items() if "needs.build.outputs.version" in yaml.safe_dump(job)}
+        == {"approve", "publish", "smoke-test"},
+        "republish-tag": "tag" in ((on.get("workflow_dispatch") or {}).get("inputs") or {})
+        and "inputs.tag" in str(existing.get("if"))
+        and ((build.get("steps") or [{}])[0].get("with") or {}).get("ref")
+        == "${{ needs.release-please.outputs.tag_name }}",
+        # the build waits for ci.yml itself
+        "ci-gated-build": jobs.get("ci", {}).get("uses") == "./.github/workflows/ci.yml"
+        and "ci" in _needs(build),
+        "no-pytest": not any("pytest" in yaml.safe_dump(job) for job in jobs.values()),
+        "manifest-floor": set(manifest) == {"."},
+        "version-label": shipped or minted == expected,
+        "version-shipped": not shipped or minted == expected,
+        # the floor is the last published tag (a shallow clone has none)
+        "published-floor": not tags or tags[-1] == f"v{manifest['.']}",
+        "minor-pre-major": config.get("bump-minor-pre-major") is True,
+        "patch-below-one": config.get("bump-patch-for-minor-pre-major") is True
+        and config.get("include-component-in-tag") is False
+        and config["packages"]["."].get("release-type") == "python"
+        and config["packages"]["."].get("changelog-path") == "CHANGELOG.md"
+        and all(e.get("section") and isinstance(e.get("hidden"), bool) for e in sections.values()),
+        "changelog-sections": {"feat", "fix", "refactor", "docs", "ci", "test", "chore"}
+        <= set(sections),
+        "changelog-dated": top is not None,
+        "version-equals-changelog": top is None or top.group(1) == manifest["."],
+        "smoke-before-publish": "smoke-test" in _needs(jobs.get("publish", {})),
+    }
+    pin = f"pyproject.toml reads {minted}; fix: set pyproject.toml version to {expected}"
+    hint = {"version-label": pin, "version-shipped": pin}
+    return [
+        f"{c}: {hint.get(c, 'release.yml / release-please / version clause broken')}"
+        for c, ok in clauses.items()
+        if not ok
+    ]
+
+
+_PKG_MAP = re.compile(
+    r'package map \(\d+ packages\)\s+```mermaid\n(?:(?!```).)*?pkgs\["([^"]*)"', re.S
+)
+
+
+def features_map_matches_architecture(tree: Tree) -> list[str]:
+    """Judge ARCHITECTURE.md's features package map against the tracked feature packages."""
+    node = _PKG_MAP.search(tree.read("specs/memory/ARCHITECTURE.md"))
+    mapped = {n.strip() for n in node[1].split("·")} if node else set()
+    live = {
+        p.split("/")[2]
+        for p in tree.tracked("dadaia_workspace/features")
+        if p.endswith("/__init__.py") and p.count("/") == 3
+    }
+    return [f"stale-node: {n} is no live package" for n in sorted(mapped - live)] + [
+        f"missing-node: {n} is absent from the map" for n in sorted(live - mapped)
+    ]
+
+
+_SECTIONS = {
+    "ARCHITECTURE.md": (["Principles", "Tech Stack", "Structure"], "slop-code"),
+    "QUALITY.md": (["Principles", "Test architecture", "Gates"], "slop-tests"),
+}
+_TOP = re.compile(r"^## (.+?)\s*$", re.M)
+_HEADING = re.compile(r"^#{1,6}\s*(.+?)\s*$", re.M)
+_PRINCIPLE = re.compile(r"^### P-(\d{2}) ·.*$", re.M)
+_BLOCK_END = re.compile(r"^(?:### P-\d{2} ·|## )", re.M)
+_MEASURED = re.compile(r"^Measured by: .+$", re.M)
+
+
+def memory_canonical_shape(tree: Tree) -> list[str]:
+    """Judge the canonical memory pair by its nine shape rules."""
+    sections = dict(_SECTIONS)
+    if specs_state(tree.root / "specs", tree.read("specs/constitution.md"))[0] != "canonical":
+        sections["QUALITY.md"] = ([*_SECTIONS["QUALITY.md"][0], "Bugs"], "slop-tests")
+    top = sorted(
+        Path(p).name
+        for p in tree.tracked("specs/memory")
+        if p.count("/") == 2 and p.endswith(".md")
+    )
+    out = []
+    if top != ["AGENTS.md", *sections]:
+        out.append(f"canonical-pair: specs/memory holds {top}")
+    seen: set[str] = set()
+    for name, (headings, fixed) in sections.items():
+        text = tree.read(f"specs/memory/{name}")
+        if (heads := _TOP.findall(text)) != headings:
+            out.append(f"section-order: {name} has {heads}")
+        if not extract_fixed_section(text, fixed):
+            out.append(f"fixed-block: {name} lost `{fixed}`")
+        if m := next(
+            (m for m in _HEADING.finditer(text) if is_forbidden_memory_heading(m[1])), None
+        ):
+            out.append(f"history-heading: {name} carries {m.group(0)!r}")
+        start = text.find("## Principles")
+        end = (
+            (m.start() if (m := _TOP.search(text, start + 1)) else len(text)) if start >= 0 else -1
+        )
+        if not _PRINCIPLE.search(text):
+            out.append(f"no-principles: {name} carries no `### P-NN` block")
+        links = set(re.findall(r"\[\[([^\]]+)\]\]", authored_text(text)))
+        foreign = links - {"ARCHITECTURE", "QUALITY"}
+        if foreign:
+            out.append(f"atom-link: {name} links {sorted(foreign)}")
+        for h in _PRINCIPLE.finditer(text):
+            pid, nxt = h.group(1), _BLOCK_END.search(text, h.end())
+            body = text[h.end() : nxt.start() if nxt else len(text)]
+            if not start < h.start() < end:
+                out.append(f"principle-placement: {name} P-{pid} sits outside ## Principles")
+            if pid in seen:
+                out.append(f"unique-ids: P-{pid} appears twice across the pair")
+            seen.add(pid)
+            if not _MEASURED.search(body):
+                out.append(f"measured-line: {name} P-{pid} lacks `Measured by:`")
+    return out
+
+
+def adr_superseded_successor(tree: Tree) -> list[str]:
+    records = _records(tree)
+    named = {i for r in records for i in (r.get("supersedes") or "").split(",") if i}
+    orphans = sorted(
+        r["id"] for r in records if r["status"] == "superseded" and r["id"] not in named
+    )
+    return [f"orphan-superseded: {orphans} named by no successor's supersedes"] if orphans else []
+
+
+def ci_triggers_gitflow(tree: Tree) -> list[str]:
+    """The literal triggers are the library constitution's gitflow."""
+    flow, warning = read_gitflow(tree.root / "specs")
+    ci, release = _on(_yaml(tree, f"{_WF}/ci.yml")), _on(_yaml(tree, _RELEASE))
+    scan = _yaml(tree, f"{_WF}/secret-scan.yml")
+    edges = [flow.principal, flow.integration]
+    work = len(edges) + 1  # the PR edges, then the work branch, then the jobs' `wt/**`
+    bot = _yaml(tree, ".github/dependabot.yml").get("updates") or []
+    clauses = {
+        "gitflow-unread": warning is None,
+        "ci-triggers": ci["push"]["branches"][:work] == [*edges, f"{flow.work_prefix}**"]
+        and ci["pull_request"]["branches"] == edges,
+        "job-trigger": ci["push"]["branches"][work:] == ["wt/**"],  # job branches run ci
+        "release-trigger": release["push"]["branches"] == [flow.principal],
+        # the required gitleaks context reports on both PR edges
+        "secret-scan-edges": _on(scan)["pull_request"]["branches"] == edges,
+        "secret-scan-push": _on(scan)["push"]["branches"] == [flow.principal],
+        "gitleaks-context": _jobs(scan).get("gitleaks", {}).get("name") == "gitleaks",
+        "no-hotfix": "hotfix" not in tree.read(f"{_WF}/secret-scan.yml"),
+        "dependabot-target": bool(bot)
+        and {u.get("target-branch") for u in bot} == {flow.integration},
+    }
+    return [
+        f"{c}: the triggers drift from the gitflow block" for c, ok in clauses.items() if not ok
+    ]
+
+
+_RENAMED = "---\nspecs_pattern_version: 6\ngitflow: {principal: trunk, integration: next, work: work/}\n---\n# C\n"
+# main takes develop and release-please's own branch; develop takes feature/ and
+# Dependabot; a renamed gitflow moves the rules; no constitution, the default.
+_SOURCES = [
+    ("repo", "develop", "main", True),
+    ("repo", "release-please--branches--main", "main", True),
+    ("repo", "feature/0.4.7", "main", False),
+    ("repo", "release-please--branches--develop", "main", False),
+    ("repo", "feature/0.4.7", "develop", True),
+    ("repo", "develop", "develop", False),
+    ("repo", "dependabot/pip/ruff-0.16.8", "develop", True),
+    ("repo", "dependabot/github_actions/actions/checkout-7.1.0", "develop", True),
+    ("repo", "dependabot/pip/ruff-0.16.8", "main", False),
+    ("renamed", "next", "trunk", True),
+    ("renamed", "develop", "trunk", False),
+    ("renamed", "work/1.2.3", "next", True),
+    ("renamed", "feature/1.2.3", "next", False),
+    ("absent", "develop", "main", True),
+    ("absent", "feature/0.5.0", "main", False),
+]
+
+
+def pr_source_guard_release_pr(tree: Tree) -> list[str]:
+    """pr-source-guard's step exactly as CI runs it, against each base gitflow."""
+    job = _jobs(_yaml(tree, f"{_WF}/ci.yml")).get("pr-source-guard", {})
+    run = next((s["run"] for s in job.get("steps") or [] if "HEAD_REF" in (s.get("env") or {})), "")
+    out = []
+    with tempfile.TemporaryDirectory(prefix="guard-gitflow-") as tmp:
+        specs = {"repo": tree.root / "specs", "renamed": Path(tmp, "r"), "absent": Path(tmp, "a")}
+        specs["renamed"].mkdir()
+        (specs["renamed"] / "constitution.md").write_text(_RENAMED, encoding="utf-8")
+        for gitflow, head, base, allowed in _SOURCES:
+            env = {**os.environ, "HEAD_REF": head, "BASE_REF": base,
+                   "PYTHONPATH": str(ROOT), "BASE_SPECS": str(specs[gitflow]),
+                   "PATH": os.pathsep.join([str(Path(sys.executable).parent), os.environ["PATH"]])}  # fmt: skip
+            ok = subprocess.run(["bash", "-c", run or "exit 1"], env=env, cwd=tree.root,
+                                capture_output=True).returncode == 0  # fmt: skip
+            if ok != allowed:
+                out.append(f"{'admits' if ok else 'refuses'}: {gitflow} {base} <- {head}")
+    return out
+
+
+def ci_checkout_history(tree: Tree) -> list[str]:
+    """Every ci.yml checkout fetches depth 0."""
+    depths = [
+        (jid, (s.get("with") or {}).get("fetch-depth"))
+        for jid, job in _jobs(_yaml(tree, f"{_WF}/ci.yml")).items()
+        for s in job.get("steps") or []
+        if str(s.get("uses", "")).startswith("actions/checkout@")
+    ]
+    shallow = [jid for jid, d in depths if d != 0]
+    return ([f"shallow-checkout: {shallow}"] if shallow else []) + (
+        [] if depths else ["no-checkout: ci.yml has no actions/checkout step"]
+    )
+
+
+def required_checks_listed(tree: Tree) -> list[str]:
+    """An unlisted PR check is red-but-mergeable;
+    a stale entry blocks every merge."""
+    contexts: set[str] = set()
+    for doc in _workflows(tree).values():
+        if "pull_request" in _on(doc):
+            for jid, job in _jobs(doc).items():
+                name = job.get("name", jid)
+                matrix = ((job.get("strategy") or {}).get("matrix") or {}).get("os")
+                contexts |= {f"{name} ({v})" for v in matrix} if matrix else {name}
+    required = set(json.loads(tree.read(".github/required-checks.json")))
+    out = [f"unlisted-check: {sorted(contexts - required)}"] if contexts - required else []
+    return out + ([f"stale-entry: {sorted(required - contexts)}"] if required - contexts else [])
+
+
+def onboarding_journey_uv(tree: Tree) -> list[str]:
+    """The e2e job installs uv, requires uvx and runs the journey; the
+    post-publish smoke walks init --repo, specs init and doctor."""
+
+    def texts(wf: str, job: str) -> str:
+        steps = _jobs(_yaml(tree, f"{_WF}/{wf}")).get(job, {}).get("steps") or []
+        return "\n".join(f"{s.get('run', '')}\n{s.get('env', '')}" for s in steps)
+
+    e2e, smoke = texts("ci.yml", "e2e-python"), texts("release.yml", "smoke-test")
+    steps = tree.ci_jobs().get("e2e-python", [])
+    needles = (
+        'uvx --from "$whl" dadaia-workspace init',
+        "--repo",
+        "specs init --context",
+        "doctor --context",
+    )
+    e2e_rules = {
+        "e2e-installs-uv": "install uv==" in e2e,
+        "e2e-uv": all(e.get("DADAIA_REQUIRE_UVX") == "1" for _, _, e in steps),
+        "e2e-runs-journey": any("tests/e2e" in cmd for _, cmd, _ in steps),
+    }
+    out = [f"{r}: the e2e job breaks the uvx journey" for r, ok in e2e_rules.items() if not ok]
+    return out + [f"smoke-greenfield: smoke-test lacks {n!r}" for n in needles if n not in smoke]
+
+
+def specs_canon_tracked(tree: Tree) -> list[str]:
+    """One probe per CANON row, judged by the tree's .gitignore. Every row is tracked
+    (a rendered row's drift is TREE-5's, in CI's doctor); only the two archived scratch
+    shapes are ignored."""
+    expect = {"specs/" + re.sub(r"<[^>]+>|\*\*", "1", row.shape): "canon-ignored" for row in CANON}
+    expect |= {
+        "specs/releases/_archive/1/local-notes.md": "ignore-lost",
+        "specs/releases/_archive/1/tmp/x": "scratch-tracked",
+    }
+    ignored = set(subprocess.run(
+        ["git", "check-ignore", "--no-index", "--stdin"], cwd=tree.root,
+        input="\n".join(expect), capture_output=True, text=True, encoding="utf-8", errors="replace", check=False,
+    ).stdout.split())  # fmt: skip
+    return [
+        f"{rule}: {p} is {'ignored' if p in ignored else 'tracked'}"
+        for p, rule in expect.items()
+        if (p in ignored) == (rule == "canon-ignored")
+    ]
+
+
+_MIRROR_FREE = ("tests/fixtures/", "tests/helpers/", "tests/tmp/", "tests/e2e/")
+_MIRROR_ALLOW = {"tests/contract/test_docs_derived_from_memory.py", "tests/contract/__init__.py"}
+_MIRROR_SUPPORT = {"tests/conftest.py", "tests/fakes.py", "tests/__init__.py"}
+_TEST_NAME = re.compile(r"^test_(?P<m>_?[a-z0-9]+(?:_[a-z0-9]+)*)(?:__(?P<topic>[a-z0-9_]+))?\.py$")
+
+
+def _source_keys(tree: Tree) -> set[str]:
+    """The mirrorable sources, hyphens read as underscores: package modules, the shell scripts
+    shipped under ``public/scripts``, and ``scripts/**``: always the library's own, whatever tree
+    is judged."""
+    found = tracked(ROOT, "dadaia_workspace", "scripts")
+    return {
+        re.sub(r"\.(py|sh)$", "", p).replace("-", "_") for p in found if p.endswith((".py", ".sh"))
+    }
+
+
+def _mirror_key(rel: str) -> str | None:
+    """The source key a ``tests/``-relative path mirrors, or None when its name is no test."""
+    base, _, name = rel.rpartition("/")
+    match = _TEST_NAME.match(name)
+    if not match:
+        return None
+    root = "" if rel.startswith("scripts/") else "dadaia_workspace/"
+    return f"{root}{base + '/' if base else ''}{match['m']}"
+
+
+def _mirror_exempt(p: str) -> bool:
+    return p in _MIRROR_ALLOW | _MIRROR_SUPPORT or p.startswith(_MIRROR_FREE[:3])
+
+
+def tests_mirror_the_package(tree: Tree) -> list[str]:
+    """Every test file is ``tests/<p>/test_<m>.py`` (or ``test_<m>__<topic>.py``) for a
+    source ``dadaia_workspace/<p>/<m>`` (``scripts/<p>/<m>`` under ``tests/scripts``); a journey
+    under ``tests/e2e`` names its ``Owner:``; no test directory is empty."""
+    sources, out = _source_keys(tree), []
+    paths = tree.tracked("tests")
+    for p in (p for p in paths if p.endswith(".py") and not _mirror_exempt(p)):
+        name = p.rsplit("/", 1)[-1]
+        if p.startswith("tests/e2e/"):
+            if name.startswith("test_") and "Owner:" not in tree.read(p):
+                out.append(
+                    f"no-owner: {p} names no `Owner:`. "
+                    f"Agent action: add an `Owner: dd-sw-engineer-sr` docstring line to {p}"
+                )
+        elif name != "__init__.py" and _mirror_key(p[len("tests/") :]) not in sources:
+            out.append(
+                f"loose-test: {p} mirrors no module. "
+                f"Agent action: git mv {p} under the tests/ folder that mirrors the module it tests, "
+                "or under tests/fixtures/ when it tests the suite itself"
+            )
+    live = [p for p in paths if p.rsplit("/", 1)[-1].startswith("test_")]
+    dirs = {p.rsplit("/", 1)[0] for p in paths if p.endswith("/__init__.py") and p.count("/") > 1}
+    out += [
+        f"empty-dir: {d} holds no test; fix: git rm {d}/__init__.py"
+        for d in sorted(dirs)
+        if not f"{d}/".startswith(_MIRROR_FREE) and not any(t.startswith(d + "/") for t in live)
+    ]
+    return out
+
+
+# --- plants: CONTROL is the library's own files; each plant edits one line of it ---------
+
+_COPIED = (".github", ".gitignore", "specs/constitution.md", "specs/memory", "specs/ADRs",
+           "pyproject.toml", "CHANGELOG.md", ".release-please-manifest.json",
+           "release-please-config.json", "README.md", "llms.txt", "docs", "evals", "scripts/ci.py",
+           "specs/releases/*/_RELEASE.json", "specs/releases/*/rc-*/SPEC.md",
+           "dadaia_workspace/features/*/__init__.py")  # fmt: skip
+_ROGUE = (
+    "on: push\njobs:\n  x:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: anthropics/a@v1\n"
+)
+
+
+def CONTROL(root: Path) -> None:
+    """Every check green on a copy of the tracked library files; an untracked, excluded
+    workflow breaking the CI rules stays out (untracked is never read)."""
+    for rel in tracked(ROOT, *_COPIED):
+        (root / rel).parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(ROOT / rel, root / rel)
+    for rel in tracked(ROOT, "tests"):
+        if rel.endswith(".py") and not (root / rel).exists():
+            (root / rel).parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(ROOT / rel, root / rel) if rel.startswith("tests/e2e/") else (
+                root / rel
+            ).touch()
+    pin = yaml.safe_load((root / _EVAL).read_text("utf-8"))["env"]["CLAUDE_CODE_VERSION"]
+    (root / "evals/tasks/ok/environment").mkdir(parents=True)
+    (root / "evals/tasks/ok/environment/Dockerfile").write_text(f"ARG CLAUDE_CODE_VERSION={pin}\n")
+    (root / ".git/info/exclude").write_text(f"{_WF}/zz.yml\n", encoding="utf-8")
+    (root / _WF / "zz.yml").write_text(
+        _ROGUE + "        run: echo ${{ secrets.ANTHROPIC_KEY }}\n", "utf-8"
+    )
+    with (root / _A).open("a", encoding="utf-8") as arch:
+        arch.write(_GENERATED)
+
+
+def _edit(rel: str, old: str, new: str) -> Plant:
+    """CONTROL with *old*'s first occurrence in *rel* replaced (appended when *old* is empty)."""
+
+    def plant(root: Path) -> None:
+        CONTROL(root)
+        path = root / rel
+        text = path.read_text("utf-8") if path.exists() else ""
+        if old and old not in text:
+            raise AssertionError(f"plant anchor lost in {rel}: {old!r}")
+        path.write_text(text.replace(old, new, 1) if old else text + new, encoding="utf-8")
+
+    return plant
+
+
+def _file(rel: str, text: str) -> Plant:
+    """CONTROL plus a new file *rel* holding *text*."""
+
+    def plant(root: Path) -> None:
+        CONTROL(root)
+        (root / rel).parent.mkdir(parents=True, exist_ok=True)
+        (root / rel).write_text(text, encoding="utf-8")
+
+    return plant
+
+
+def _workflow(steps: str, on: str = "push") -> Plant:
+    head = f"on: {on}\njobs:\n  x:\n    runs-on: ubuntu-latest\n    steps:\n"
+    return _edit(f"{_WF}/planted.yml", "", head + steps)
+
+
+def _re(rel: str, pattern: str, repl: str) -> Plant:
+    """CONTROL with every *pattern* match in *rel* substituted (at least one)."""
+
+    def plant(root: Path) -> None:
+        CONTROL(root)
+        text, n = re.subn(pattern, repl, (root / rel).read_text("utf-8"))
+        if not n:
+            raise AssertionError(f"plant pattern lost in {rel}: {pattern!r}")
+        (root / rel).write_text(text, encoding="utf-8")
+
+    return plant
+
+
+def _tag(root: Path) -> None:
+    """The manifest's own tag, then a newer one: the floor is behind the last published."""
+    CONTROL(root)
+    git = ["git", "-c", "user.name=g", "-c", "user.email=g@example.invalid"]
+    subprocess.run([*git, "commit", "-q", "--allow-empty", "-m", "g"], cwd=root, check=True)
+    floor = json.loads((root / ".release-please-manifest.json").read_text("utf-8"))["."]
+    for tag in (f"v{floor}", "v99.0.0"):
+        subprocess.run(["git", "tag", tag], cwd=root, check=True)
+
+
+def _unlink(rel: str) -> Plant:
+    def plant(root: Path) -> None:
+        CONTROL(root)
+        (root / rel).unlink()
+
+    return plant
+
+
+_A, _Q, _G = "specs/memory/ARCHITECTURE.md", "specs/memory/QUALITY.md", f"{_WF}/ci.yml"
+# a generated section names what the operator's rules ban: the control stays green around it
+_GENERATED = (
+    "\n<!-- dadaia:fixed adr-list -->\n"
+    "- 0904 — No dadaia-skills repository is published: see [[spec-tree]]\n"
+    "<!-- /dadaia:fixed adr-list -->\n"
+)
+# a clean job first, so a plant is judged among clean expressions and jobs
+_CLEAN = (
+    "on: push\njobs:\n  a:\n    runs-on: ubuntu-latest\n    steps:\n"
+    "      - run: echo\n        env: {L: '${{ github.sha }}'}\n  x:\n"
+)
+_NON_EVAL = _CLEAN + "    runs-on: ubuntu-latest\n"
+_ON = r"(?ms)^on:.*?(?=^permissions:)"
+_STEPS = "    steps:\n      - run: echo\n"
+_GATED_JOB = f"  rogue:\n    needs: [release-please, ghost]\n    if: {_GATE}\n    runs-on: x\n"
+_ROW = "        include:\n          - harness: claude-code\n"
+_SUPERSEDED = json.dumps({"id": "9999", "status": "superseded", "supersedes": None}) + "\n"
+
+CHECKS: dict[str, Check] = {
+    "no-model-api-in-ci": (
+        no_model_calls_in_ci,
+        {
+            "anthropic-workflow": _edit(
+                f"{_WF}/planted.yml", "", "on: push\njobs:\n  x:\n    uses: anthropics/w/r.yml@v1\n"
+            ),
+            "anthropic-action": _workflow("      - uses: anthropics/claude-code-action@v1\n"),
+            "model-secret": _workflow(
+                "      - env: {K: x}\n        run: echo $anthropic_api_key\n"
+            ),
+            "oauth-token": _workflow(
+                "      - env: {K: x}\n        run: echo $CLAUDE_CODE_OAUTH_TOKEN\n"
+            ),
+            "evals-environment-push": _edit(
+                f"{_WF}/planted.yml", "", _NON_EVAL + "    environment: evals\n" + _STEPS
+            ),
+            "env-dict-prt": _edit(
+                f"{_WF}/planted.yml",
+                "",
+                _NON_EVAL.replace("push", "pull_request_target")
+                + "    environment: {name: evals}\n"
+                + _STEPS,
+            ),
+            "tojson-secrets-push": _edit(
+                f"{_WF}/planted.yml",
+                "",
+                _NON_EVAL + _STEPS + "        env: {K: '${{ toJSON(secrets) }}'}\n",
+            ),
+            "bracket-secret-push": _edit(
+                f"{_WF}/planted.yml",
+                "",
+                _NON_EVAL + _STEPS + "        env: {K: \"${{ SECRETS['X'] }}\"}\n",
+            ),
+            "lowercase-secret-push": _edit(
+                f"{_WF}/planted.yml",
+                "",
+                _NON_EVAL + _STEPS + "        env: {K: '${{ SECRETS.X }}'}\n",
+            ),
+            "renamed-secret-push": _edit(
+                f"{_WF}/planted.yml",
+                "",
+                _NON_EVAL + _STEPS + "        env: {K: '${{ secrets.OTHER }}'}\n",
+            ),
+            "reusable-call-has-no-runs-on": _edit(
+                f"{_WF}/planted.yml",
+                "",
+                _CLEAN + "    uses: ./.github/workflows/eval.yml\n    secrets: inherit\n",
+            ),
+            "no-on": _re(_EVAL, _ON, ""),
+            "pull-request": _re(_EVAL, _ON, "on: pull_request\n"),
+            "pull-request-target-no-secret": _re(_EVAL, _ON, "on: pull_request_target\n"),
+            "quoted-on-push": _re(_EVAL, _ON, '"on": push\n'),
+            "trigger-other": _re(_EVAL, _ON, "on: workflow_run\n"),
+            "secret-workflow-level": _edit(
+                _EVAL, "permissions:\n", "x: [y, '${{ secrets.K }}']\npermissions:\n"
+            ),
+            "defaults-workflow-level": _edit(
+                _EVAL, "permissions:\n", "defaults: {run: {shell: bash}}\npermissions:\n"
+            ),
+            "defaults-job-level": _edit(
+                _EVAL,
+                "    environment: evals\n",
+                "    environment: evals\n    defaults: {run: {shell: bash}}\n",
+            ),
+            "runs-on-self-hosted": _edit(_EVAL, "runs-on: ubuntu-24.04", "runs-on: self-hosted"),
+            "runs-on-list-hosted": _edit(_EVAL, "runs-on: ubuntu-24.04", "runs-on: [ubuntu-24.04]"),
+            "runs-on-prefix-label": _edit(
+                _EVAL, "runs-on: ubuntu-24.04", "runs-on: ubuntu-24.04-arm"
+            ),
+            "step-env-secret": _edit(
+                _EVAL,
+                "      - run: pipx install poetry",
+                "      - env: {K: '${{ secrets.K }}'}\n        run: pipx install poetry",
+            ),
+            "job-container-secret": _edit(
+                _EVAL,
+                "    environment: evals\n",
+                "    environment: evals\n    container: {image: x, credentials: {password: '${{ secrets.K }}'}}\n",
+            ),
+            "action-not-allowlisted": _edit(
+                _EVAL,
+                "      - run: pipx install poetry",
+                "      - uses: softprops/x@v1\n      - run: pipx install poetry",
+            ),
+            "uses-summary": _edit(
+                _EVAL,
+                "      - run: pipx install poetry",
+                "      - uses: ./.github/actions/summary\n      - run: pipx install poetry",
+            ),
+            "action-prefix-lookalike": _edit(
+                _EVAL, "actions/upload-artifact@043", "actions/upload-artifact-lookalike@043"
+            ),
+            "summary-unscanned": _edit(
+                _EVAL,
+                "      - run: python3 evals/scripts/scan.py evals/jobs evals/summary.md\n",
+                "",
+            ),
+            "upload-before-scan": _edit(
+                _EVAL,
+                "      - run: python3 evals/scripts/scan.py evals/jobs",
+                "      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a\n        with: {path: evals/jobs/}\n      - run: python3 evals/scripts/scan.py evals/jobs",
+            ),
+            "scan-or-true": _edit(
+                _EVAL, "evals/jobs evals/summary.md\n", "evals/jobs evals/summary.md || true\n"
+            ),
+            "scan-conditional": _edit(
+                _EVAL,
+                "      - run: python3 evals/scripts/scan.py",
+                "      - if: always()\n        run: python3 evals/scripts/scan.py",
+            ),
+            "scan-continue-on-error": _edit(
+                _EVAL,
+                "      - run: python3 evals/scripts/scan.py evals/jobs evals/summary.md\n",
+                "      - run: python3 evals/scripts/scan.py evals/jobs evals/summary.md\n        continue-on-error: true\n",
+            ),
+            "scan-wrong-path": _edit(
+                _EVAL, "scan.py evals/jobs evals/summary.md", "scan.py evals/jobs"
+            ),
+            "write-after-scan": _edit(
+                _EVAL,
+                "      - run: cat evals/summary.md",
+                "      - run: env >> evals/summary.md\n      - run: cat evals/summary.md",
+            ),
+            "write-between-publishes": _edit(
+                _EVAL,
+                "      - uses: actions/upload-artifact",
+                "      - run: env >> evals/summary.md\n      - uses: actions/upload-artifact",
+            ),
+            "summary-other-source": _edit(
+                _EVAL, "cat evals/summary.md >>", "cat evals/other.md >>"
+            ),
+            "summary-step-extra-key": _edit(
+                _EVAL,
+                '      - run: cat evals/summary.md >> "$GITHUB_STEP_SUMMARY"\n',
+                '      - run: cat evals/summary.md >> "$GITHUB_STEP_SUMMARY"\n        shell: bash\n',
+            ),
+            "upload-on-failure": _edit(
+                _EVAL,
+                "      - uses: actions/upload-artifact",
+                "      - if: failure()\n        uses: actions/upload-artifact",
+            ),
+            "upload-not-cancelled": _edit(
+                _EVAL,
+                "      - uses: actions/upload-artifact",
+                "      - if: ${{ !cancelled() }}\n        uses: actions/upload-artifact",
+            ),
+            "upload-always": _edit(
+                _EVAL,
+                "      - uses: actions/upload-artifact",
+                "      - if: always()\n        uses: actions/upload-artifact",
+            ),
+            "publish-conditional": _edit(
+                _EVAL,
+                "      - uses: actions/upload-artifact",
+                "      - if: github.ref == 'refs/heads/main'\n        uses: actions/upload-artifact",
+            ),
+            "upload-other-path": _edit(
+                _EVAL,
+                "            evals/summary.md\n",
+                "            evals/summary.md\n            ../.claude/\n",
+            ),
+            "eval-cli-pin": _file(
+                "evals/tasks/x/environment/Dockerfile", "ARG CLAUDE_CODE_VERSION=0.0.1\n"
+            ),
+            "eval-cli-pin#row-without-model": _edit(
+                _EVAL, "        include:\n", _ROW + "            version: 2.1.284\n"
+            ),
+            "eval-cli-pin#row-without-version": _edit(
+                _EVAL,
+                "        include:\n",
+                _ROW + "            model: anthropic/claude-sonnet-5\n",
+            ),
+            "eval-cli-pin#row-version-off-pin": _edit(
+                _EVAL,
+                "        include:\n",
+                _ROW + "            model: anthropic/claude-sonnet-5\n            version: 9.9.9\n",
+            ),
+        },
+    ),
+    "workflow-never-rules": (
+        workflow_never_rules,
+        {
+            "skills-repository-published": _edit("README.md", "", "\nnpx skills add dadaia\n"),
+            "workflow-expression-in-a-run-body": _workflow(
+                "      - run: echo ${{ github.head_ref }}\n"
+            ),
+            "coverage-file-in-the-checkout": _workflow("      - run: pytest --cov x\n"),
+            "poetry-below-the-floor": _workflow("      - run: pipx install poetry==2.3.3\n"),
+            "job-bypasses-ci-script": _edit(_G, "scripts/ci.py e2e-python", "pytest tests/e2e"),
+            "release-please-outside-release-yml": _workflow(f"      - uses: {_ACTION}@v5\n"),
+            "pypi-publisher-outside-release-yml": _workflow(
+                "      - uses: pypa/gh-action-pypi-publish@v1\n"
+            ),
+            "release-event-trigger": _workflow(
+                "      - run: echo\n", "{release: {types: [published]}}"
+            ),
+            "tag-push-trigger": _workflow("      - run: echo\n", "{push: {tags: [v*]}}"),
+            "publishing-job-without-the-release-gate": _edit(
+                _RELEASE,
+                "    needs: [release-please, build, approve, smoke-test]\n",
+                "    needs: [build, approve, smoke-test]\n",
+            ),
+            "publishing-job-ungated": _edit(_RELEASE, f"    if: {_GATE}\n", "    if: always()\n"),
+            "hand-listed-tags": _edit(
+                _RELEASE,
+                "      - run: pipx install",
+                "      - run: git ls-remote --tags o\n      - run: pipx install",
+            ),
+            "needs-an-undefined-job": _edit(_RELEASE, "", _GATED_JOB),
+            "published-dadaia-workspace-install": _file(
+                "tests/helpers/pin.py", 'REQ = "dadaia-workspace==1.2.3"\n'
+            ),
+            "published-dadaia-workspace-install#unpinned": _file(
+                "tests/helpers/pin.py", 'CMD = "pip install dadaia-workspace"\n'
+            ),
+            "published-dadaia-workspace-install#tag": _file(
+                "tests/helpers/pin.py", 'CMD = "uvx dadaia-workspace@latest init x"\n'
+            ),
+            "published-dadaia-workspace-install#range": _file(
+                "tests/helpers/pin.py", "CMD = \"pip install 'dadaia-workspace>=0.4'\"\n"
+            ),
+            "published-dadaia-workspace-install#from": _file(
+                "tests/helpers/pin.py", 'CMD = "uvx --from dadaia-workspace dadaia init"\n'
+            ),
+            "published-dadaia-workspace-install#fstring": _file(
+                "tests/helpers/pin.py", 'REQ = f"dadaia-workspace=={version}"\n'
+            ),
+            "published-dadaia-workspace-install#argv": _file(
+                "tests/helpers/pin.py", 'CMD = ["pip", "install", "dadaia-workspace"]\n'
+            ),
+            "hand-computed-tag": _edit(
+                _RELEASE,
+                "      - run: pipx install",
+                "      - run: git tag v9\n      - run: pipx install",
+            ),
+        },
+    ),
+    "release-workflow-canon": (
+        release_workflow_canon,
+        {
+            "push-main": _edit(
+                _RELEASE,
+                "  push:\n    branches: [main]\n",
+                "  push:\n    branches: [main, develop]\n",
+            ),
+            "dispatch": _edit(_RELEASE, "  workflow_dispatch:\n", "  workflow_call:\n"),
+            "pin-comment": _re(
+                _RELEASE, r"(release-please-action@[0-9a-f]{40})\s+#\s*v[\d.]+", r"\1  # main"
+            ),
+            "manifest-input": _edit(_RELEASE, "manifest-file:", "manifest-path:"),
+            "id-token": _edit(_RELEASE, "      id-token: write", "      id-token: read"),
+            "approve-gate": _edit(
+                _RELEASE, "    environment: release-gate\n", "    environment: gate\n"
+            ),
+            "version-step": _edit(_RELEASE, 'echo "version=${TAG#v}"', 'echo "version=${TAG}"'),
+            "no-pytest": _edit(
+                _RELEASE,
+                "      - run: pipx install",
+                "      - run: pytest -q\n      - run: pipx install",
+            ),
+            "minor-pre-major": _edit(
+                "release-please-config.json",
+                '"bump-minor-pre-major": true',
+                '"bump-minor-pre-major": false',
+            ),
+            "changelog-sections": _edit(
+                "release-please-config.json", '"type": "chore"', '"type": "chores"'
+            ),
+            "changelog-dated": _re("CHANGELOG.md", r"(?m)^## \[", "## v["),
+            "main-only": _edit(_RELEASE, "    if: github.ref == 'refs/heads/main'\n", ""),
+            "write-scope": _edit(
+                _RELEASE, "  contents: write\n", "  contents: write\n  packages: write\n"
+            ),
+            "sha-pinned": _edit(_RELEASE, f"{_ACTION}@", f"{_ACTION}@v5.0.0 "),
+            "config-driven": _edit(
+                _RELEASE,
+                "          config-file:",
+                "          release-type: python\n          config-file:",
+            ),
+            "publish-chain": _edit(
+                _RELEASE, "    environment: pypi\n", "    environment: release-gate\n"
+            ),
+            "republish-tag": _edit(_RELEASE, "inputs.tag != ''", "true"),
+            "ci-gated-build": _edit(
+                _RELEASE, "    needs: [release-please, ci]\n", "    needs: [release-please]\n"
+            ),
+            "manifest-floor": _edit(".release-please-manifest.json", '"."', '"x": "1", "."'),
+            "version-label": _re("pyproject.toml", r'(?m)^version = ".*"', 'version = "0.4.7"'),
+            # the release PR moved the manifest to the live id and left pyproject at the rc label
+            "version-shipped": _edit(".release-please-manifest.json", "0.4.7", "0.5.0"),
+            "published-floor": _tag,
+            "smoke-before-publish": _edit(
+                _RELEASE,
+                "    needs: [release-please, build, approve, smoke-test]\n",
+                "    needs: [release-please, build, approve]\n",
+            ),
+            "patch-below-one": _edit(
+                "release-please-config.json",
+                '"bump-patch-for-minor-pre-major": true',
+                '"bump-patch-for-minor-pre-major": false',
+            ),
+            "version-equals-changelog": _edit(
+                "CHANGELOG.md", "\n## [", "\n## [9.9.9] — 2026-01-01\n\n## ["
+            ),
+        },
+    ),
+    "memory-canonical-shape": (
+        memory_canonical_shape,
+        {
+            "canonical-pair": _edit("specs/memory/TECHSTACK.md", "", "# retired\n"),
+            "section-order": _edit(_A, "\n## Structure", "\n## Notes\n\n## Structure"),
+            "fixed-block": _edit(_Q, "slop-tests", "slop-gone"),
+            "history-heading": _edit(_A, "\n## Tech Stack", "\n### Changelog\n\n## Tech Stack"),
+            "measured-line": _edit(_A, "\nMeasured by: ", "\nMeasured: "),
+            "no-principles": _re(_Q, r"(?m)^### P-", "### Q-"),
+            "unique-ids": _edit(_Q, "### P-2", "### P-0"),
+            "principle-placement": _edit(
+                _A, "\n## Structure", "\n### P-99 · x\nMeasured by: x\n\n## Structure"
+            ),
+            "atom-link": _edit(_Q, "\n## Gates", "\nSee [[sdd-gate-v3]].\n\n## Gates"),
+        },
+    ),
+    "features-map-matches-architecture": (
+        features_map_matches_architecture,
+        {"stale-node": _edit(_A, 'pkgs["backlog', 'pkgs["ghost · backlog')},
+    ),
+    "adr-superseded-successor": (
+        adr_superseded_successor,
+        {"orphan-superseded": _edit("specs/ADRs/decisions.jsonl", "", _SUPERSEDED)},
+    ),
+    "ci-triggers-gitflow": (
+        ci_triggers_gitflow,
+        {
+            "gitflow-unread": _unlink("specs/constitution.md"),
+            "ci-triggers": _edit(_G, "branches: [main, develop]", "branches: [main]"),
+            "job-trigger": _edit(_G, "      - 'wt/**'\n", ""),
+            "release-trigger": _edit(_RELEASE, "branches: [main]", "branches: [main, develop]"),
+            "secret-scan-edges": _edit(f"{_WF}/secret-scan.yml", "[main, develop]", "[main]"),
+            "secret-scan-push": _edit(
+                f"{_WF}/secret-scan.yml", "      - main\n", "      - main\n      - develop\n"
+            ),
+            "no-hotfix": _edit(f"{_WF}/secret-scan.yml", "permissions:", "# hotfix\npermissions:"),
+            "gitleaks-context": _edit(
+                f"{_WF}/secret-scan.yml", "    name: gitleaks\n", "    name: leaks\n"
+            ),
+            "dependabot-target": _edit(
+                ".github/dependabot.yml", "target-branch: develop", "target-branch: main"
+            ),
+        },
+    ),
+    "pr-source-guard-release-pr": (
+        pr_source_guard_release_pr,
+        {
+            "refuses": _edit(_G, ', f"release-please--branches--{flow.principal}"', ""),
+            "admits": _edit(_G, 'ok = flow.role_of(head) == "work" or', "ok = True or"),
+        },
+    ),
+    "ci-checkout-history": (
+        ci_checkout_history,
+        {
+            "shallow-checkout": _edit(_G, "fetch-depth: 0", "fetch-depth: 1"),
+            "no-checkout": _re(_G, "actions/checkout@", "actions/checkoot@"),
+        },
+    ),
+    "required-checks-listed": (
+        required_checks_listed,
+        {
+            "unlisted-check": _edit(
+                _G, "    name: Guards (scripts/guards)", "    name: Guards renamed"
+            ),
+            "stale-entry": _edit(".github/required-checks.json", "[", '["Retired job",'),
+        },
+    ),
+    "onboarding-journey-uv": (
+        onboarding_journey_uv,
+        {
+            "e2e-uv": _edit(_CI, '"DADAIA_REQUIRE_UVX": "1"', '"DADAIA_REQUIRE_UVX": "0"'),
+            "e2e-installs-uv": _edit(_G, "pipx install uv==", "pipx install uvx=="),
+            "e2e-runs-journey": _edit(_CI, '"tests/e2e"]', '"tests/e2e/features"]'),
+            "smoke-greenfield": _edit(_RELEASE, "specs init --context", "specs init"),
+        },
+    ),
+    "specs-canon-tracked": (
+        specs_canon_tracked,
+        {
+            "canon-ignored": _edit(".gitignore", "", "/specs/releases/**/TASKS.md\n"),
+            "ignore-lost": _edit(".gitignore", "", "!/specs/releases/_archive/**/local-notes.md\n"),
+            "scratch-tracked": _edit(".gitignore", "", "!/specs/releases/_archive/**/tmp/\n"),
+        },
+    ),
+    "tests-mirror-the-package": (
+        tests_mirror_the_package,
+        {
+            "loose-test": _file("tests/test_loose.py", "def test_x():\n    pass\n"),
+            "empty-dir": _file("tests/ghost/__init__.py", ""),
+            "no-owner": _file("tests/e2e/test_journey.py", '"""A journey."""\n'),
+        },
+    ),
+}

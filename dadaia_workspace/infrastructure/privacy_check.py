@@ -4,7 +4,7 @@ Extracted from ``public_assets.py`` to keep that module under 600 lines.
 All names remain importable from ``dadaia_workspace.infrastructure.public_assets``
 via its re-export block.
 
-Fail-closed posture (R7b / sec F-2): when the operator-private denylist is
+Fail-closed posture: when the operator-private denylist is
 absent (fresh clone, CI, pip install) the check is **never** a no-op. A
 versioned, in-package *baseline structural scan* runs instead, flagging IP
 literals, internal hostnames, ``/home/<user>`` paths, emails, and secret-looking
@@ -14,24 +14,23 @@ merged additively on top of the baseline.
 
 from __future__ import annotations
 
-import importlib.resources
-import json
-import os
-import re
 from collections.abc import Callable, Iterable
-from dataclasses import dataclass
-from functools import lru_cache
 from pathlib import Path
 
-from dadaia_workspace.core.exceptions import WorkspaceNotInitializedError
+from dadaia_workspace.core import platform
+from dadaia_workspace.core.exceptions import DadaiaError
 from dadaia_workspace.core.models.doctor_report import DoctorLine, DoctorStatus
-from dadaia_workspace.core.workspace_layout import REPO_TREE_ARTIFACTS
-from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
+from dadaia_workspace.core.redaction import (
+    BaselinePattern,
+    load_baseline,
+    mask,
+    privacy_matches,
+)
+from dadaia_workspace.infrastructure.ledger_scripts import load_owner
 
-#: Directory names never walked when scanning public assets: the repo-tree artifact
-#: set (`repos/<slug>/AGENTS.md`, one registry — 0.4.7 FR5) plus Python's own bytecode cache.
-#: Never ``.dadaia`` — the staged assets this walk reads live inside it.
-_PUBLIC_ASSET_IGNORED_DIRS = {"__pycache__", *REPO_TREE_ARTIFACTS}
+#: Directory names never walked when scanning public assets: Python's own bytecode cache
+#: (0080). Never ``.dadaia`` — the staged assets this walk reads live inside it.
+_PUBLIC_ASSET_IGNORED_DIRS = {"__pycache__"}
 _PUBLIC_ASSET_IGNORED_SUFFIXES = {".pyc", ".pyo"}
 _PUBLIC_PRIVACY_TEXT_SUFFIXES = {
     ".css",
@@ -39,6 +38,7 @@ _PUBLIC_PRIVACY_TEXT_SUFFIXES = {
     ".j2",
     ".js",
     ".json",
+    ".lock",
     ".md",
     ".py",
     ".sh",
@@ -48,24 +48,8 @@ _PUBLIC_PRIVACY_TEXT_SUFFIXES = {
     ".yaml",
     ".yml",
 }
-# Operator-private privacy terms are NEVER hardcoded in this published library
-# (dev-guardrail rule #4: no consumer-specific data in shipped source). Each
-# workspace supplies its own terms via a runtime file kept OUT of the package:
-#   1. $DADAIA_PRIVACY_DENYLIST            (path to a JSON file), or
-#   2. <workspace_root>/.dadaia/states/privacy_denylist.json
-#      where workspace_root is resolved by walking up from cwd looking for the
-#      .dadaia/states/spec_contexts.json sentinel (via resolve_workspace_root).
-# Format: [["term", "reason"], ...] or {"term": "reason", ...}.
-# Absent -> the baseline structural scan (below) runs instead; the check is
-# never a no-op (fail-closed).
-_PRIVACY_DENYLIST_ENV = "DADAIA_PRIVACY_DENYLIST"
-_PRIVACY_DENYLIST_REL = Path(".dadaia") / "states" / "privacy_denylist.json"
-
-# Packaged, versioned baseline of STRUCTURAL patterns. Shipped inside the wheel
-# so the check is fail-closed even with no operator denylist. Operator terms are
-# additive on top of these.
-_PRIVACY_BASELINE_PKG = "dadaia_workspace.infrastructure.data"
-_PRIVACY_BASELINE_FILE = "privacy_baseline.json"
+# Operator-private privacy terms are NEVER hardcoded in this published library; each
+# workspace keeps them OUT of the package, read by :func:`load_privacy_terms`.
 
 #: The published surface is English-only. These retired
 #: Portuguese control terms are the adoption blocker this closed: a consumer
@@ -90,138 +74,45 @@ _BASELINE_OK_MARKER = DoctorLine(
 )
 
 
-@dataclass(frozen=True)
-class _BaselinePattern:
-    """A compiled structural pattern from the packaged baseline."""
-
-    id: str
-    regex: re.Pattern[str]
-    reason: str
-    exclude: re.Pattern[str] | None
-    #: v0.4.3 T-043-16/FR12/A12.1 — WHY this pattern's carve-out exists. Required
-    #: (checked by :func:`_check_baseline_exclude_rationale`) whenever ``exclude`` is
-    #: set; ``None`` for a pattern with no carve-out at all.
-    exclude_rationale: str | None = None
+_BaselinePattern = BaselinePattern
 
 
-@lru_cache(maxsize=1)
-def _load_privacy_baseline() -> tuple[_BaselinePattern, ...]:
-    """Load and compile the packaged baseline structural patterns.
-
-    The baseline ships inside the wheel under
-    ``dadaia_workspace/infrastructure/data/privacy_baseline.json`` (versioned,
-    documented ``_header``). A malformed or absent file yields an empty tuple —
-    but the file is part of the distribution, so this is a defensive fallback,
-    not the normal absent-operator-denylist path.
-    """
-    try:
-        resource = importlib.resources.files(_PRIVACY_BASELINE_PKG) / _PRIVACY_BASELINE_FILE
-        raw = json.loads(resource.read_text(encoding="utf-8"))
-    except (OSError, ValueError, ModuleNotFoundError):
-        return ()
-    patterns: list[_BaselinePattern] = []
-    for entry in raw.get("patterns", []):
-        if not isinstance(entry, dict):
-            continue
-        pattern_id = str(entry.get("id", ""))
-        regex_src = entry.get("regex")
-        if not isinstance(regex_src, str) or not regex_src:
-            continue
-        exclude_src = entry.get("exclude_regex")
-        try:
-            compiled = re.compile(regex_src)
-            exclude = (
-                re.compile(exclude_src) if isinstance(exclude_src, str) and exclude_src else None
-            )
-        except re.error:
-            continue
-        rationale_src = entry.get("exclude_rationale")
-        patterns.append(
-            _BaselinePattern(
-                id=pattern_id,
-                regex=compiled,
-                reason=str(entry.get("reason", "structural privacy match")),
-                exclude=exclude,
-                exclude_rationale=rationale_src if isinstance(rationale_src, str) else None,
-            )
-        )
-    return tuple(patterns)
+def _load_privacy_baseline() -> tuple[BaselinePattern, ...]:
+    """The packaged baseline through its ONE parser, ``_privacy.load_baseline``."""
+    return load_baseline()
 
 
-def _load_privacy_denylist() -> tuple[tuple[str, str], ...]:
-    """Load operator-private privacy terms from outside the published package.
-
-    Resolution order:
-    1. ``$DADAIA_PRIVACY_DENYLIST`` environment variable — path to a JSON file.
-    2. ``<workspace_root>/.dadaia/states/privacy_denylist.json`` where
-       *workspace_root* is resolved by walking up from ``cwd`` looking for the
-       ``.dadaia/states/spec_contexts.json`` sentinel. Returns ``()`` when no
-       workspace root is found (e.g. pip-installed in site-packages without an
-       active workspace) or the file is absent / unreadable / malformed.
-    """
-    candidates: list[Path] = []
-    env_path = os.environ.get(_PRIVACY_DENYLIST_ENV)
-    if env_path:
-        candidates.append(Path(env_path))
-    # Resolve workspace root via cwd-based walk-up; never fall back to the lib repo.
-    try:
-        workspace_root = resolve_workspace_root()
-        candidates.append(workspace_root / _PRIVACY_DENYLIST_REL)
-    except WorkspaceNotInitializedError:
-        pass  # No workspace found — file-based fallback is simply unavailable.
-    for source in candidates:
-        try:
-            raw = json.loads(source.read_text(encoding="utf-8"))
-        except (OSError, ValueError):
-            continue
-        terms: list[tuple[str, str]] = []
-        if isinstance(raw, dict):
-            terms = [(str(key), str(value)) for key, value in raw.items()]
-        elif isinstance(raw, list):
-            for item in raw:
-                if isinstance(item, (list, tuple)) and len(item) >= 2:
-                    terms.append((str(item[0]), str(item[1])))
-                elif isinstance(item, str):
-                    terms.append((item, "private identifier"))
-        if terms:
-            return tuple(terms)
-    return ()
-
-
-def load_privacy_terms() -> tuple[tuple[str, str], ...]:
-    """Public accessor over the operator denylist loader (SPEC v0.9.0 FR3, source 1).
-
-    Reused by the push-range denylist scan (``features.chokepoints.denylist_scan``)
-    AND, since v0.4.5 FR6 (T-045-19), by the bug-append write-time redaction
-    (the ``dd-bug-resolution/scripts/bugs.py`` write path, threaded through
-    ``container.load_denylist_terms`` -> ``cli/commands/bugs.py``) — the SAME loader,
-    consumed twice, never a second reader — so the CLI wires ONE operator term source,
-    not a second denylist — same resolution order as :func:`check_public_privacy`
-    (``$DADAIA_PRIVACY_DENYLIST``, then ``<workspace>/.dadaia/states/privacy_denylist.json``).
-    Empty when neither resolves.
-    """
-    return _load_privacy_denylist()
+def load_privacy_terms(
+    repo: Path | None = None, *, own: bool = True
+) -> tuple[tuple[str, str], ...]:
+    """The operator denylist of the workspace holding *repo* (``_ledger.terms`` over its
+    ``workspace_of``), minus the terms the name of *repo* carries when *own*. Without *repo*
+    only ``$DADAIA_PRIVACY_DENYLIST`` applies."""
+    ledger = load_owner("dd-bug-resolution", "_ledger")
+    return tuple(ledger.terms(ledger.workspace_of(repo) if repo else None, repo if own else None))
 
 
 def load_baseline_patterns() -> tuple[_BaselinePattern, ...]:
-    """Public accessor over the packaged structural baseline (SPEC v0.9.0 FR3, source 2).
+    """Public accessor over the packaged structural baseline.
 
     Same compiled patterns :func:`check_public_privacy` scans public assets with —
     reused, not forked, so the push-range scan and the public-privacy doctor check stay
     a single source of truth for what counts as a structural privacy match.
     """
-    return _load_privacy_baseline()
+    try:
+        return _load_privacy_baseline()
+    except load_owner("dd-bug-resolution", "_refusal").Refusal as refusal:
+        raise DadaiaError(str(refusal), refusal.fix) from refusal
 
 
 def _check_baseline_exclude_rationale(
     baseline: Iterable[_BaselinePattern],
 ) -> list[DoctorLine]:
-    """A12.1: every baseline pattern carrying an ``exclude_regex`` carve-out must
+    """Every baseline pattern carrying an ``exclude_regex`` carve-out must
     document WHY via ``exclude_rationale`` — flags, by pattern id, any that don't.
 
     A pattern with NO carve-out (``exclude is None``) needs no rationale and is never
-    flagged — this check is about carve-outs specifically, the exact thing the SPEC
-    calls out as having grown "literal by literal" with no attached justification.
+    flagged — this check is about carve-outs specifically.
     Wired into :func:`check_public_privacy` so it runs on every ``dadaia public
     doctor`` invocation, on the SAME ``public-privacy`` doctor line the operator
     already reads — never a second, easy-to-miss check surface.
@@ -235,36 +126,15 @@ def _check_baseline_exclude_rationale(
                 DoctorLine(
                     DoctorStatus.ERROR,
                     f"public-privacy: baseline pattern '{pattern.id}' has an "
-                    "exclude_regex carve-out with no documented exclude_rationale "
-                    "(v0.4.3 FR12/A12.1)",
+                    "exclude_regex carve-out with no documented exclude_rationale",
                 )
             )
     return findings
 
 
-def _scan_text_for_baseline(
-    text: str, patterns: Iterable[_BaselinePattern]
-) -> list[tuple[str, str]]:
-    """Return ``(matched_text, reason)`` pairs for baseline structural hits.
-
-    Each match is filtered through the pattern's optional ``exclude`` regex so
-    loopback / documentation IP ranges, example hostnames, and SHA-like tokens
-    do not produce false positives.
-    """
-    hits: list[tuple[str, str]] = []
-    for pattern in patterns:
-        for match in pattern.regex.finditer(text):
-            value = match.group(0)
-            if pattern.exclude is not None and pattern.exclude.search(value):
-                continue
-            hits.append((value, pattern.reason))
-    return hits
-
-
 def check_public_privacy(
     public_dir: Path,
     iter_files_fn: Callable[[Path], Iterable[Path]],
-    is_ignored_fn: Callable[[Path], bool],
 ) -> list[DoctorLine]:
     """Fail doctor if public distributed assets contain private identifiers.
 
@@ -280,8 +150,12 @@ def check_public_privacy(
     """
     lib_root = public_dir.parent.parent
     roots: list[Path] = [public_dir]
-    denylist = _load_privacy_denylist()
-    baseline = _load_privacy_baseline()
+    ledger = load_owner("dd-bug-resolution", "_ledger")
+    denylist = ledger.terms(ledger.workspace_of(public_dir))
+    try:
+        baseline = _load_privacy_baseline()
+    except load_owner("dd-bug-resolution", "_refusal").Refusal as refusal:
+        return [DoctorLine(DoctorStatus.ERROR, f"public-privacy: {refusal}", refusal.fix)]
     baseline_only = not denylist
     root_agents = lib_root / "AGENTS.md"
     if root_agents.exists():
@@ -292,24 +166,14 @@ def check_public_privacy(
     for root in roots:
         files: list[Path] = [root] if root.is_file() else list(iter_files_fn(root))
         for path in files:
-            if is_ignored_fn(path):
-                continue
             if path.suffix.lower() not in _PUBLIC_PRIVACY_TEXT_SUFFIXES:
                 continue
             try:
-                text = path.read_text(encoding="utf-8")
-            except (UnicodeDecodeError, OSError):
+                text = platform.read_text(path)
+            except (platform.Undecodable, OSError):
                 continue
             rel = path.relative_to(lib_root) if path.is_relative_to(lib_root) else path
             lowered = text.lower()
-            for term, reason in denylist:
-                if term.lower() in lowered:
-                    findings.append(
-                        DoctorLine(
-                            DoctorStatus.ERROR,
-                            f"public-privacy:{rel.as_posix()}: contains '{term}' ({reason})",
-                        )
-                    )
             if path.is_relative_to(public_dir):
                 for term, reason in PORTUGUESE_CONTROL_TERMS:
                     if term.lower() in lowered:
@@ -319,129 +183,15 @@ def check_public_privacy(
                                 f"public-privacy:{rel.as_posix()}: contains '{term}' ({reason})",
                             )
                         )
-            for value, reason in _scan_text_for_baseline(text, baseline):
+            scanned = ledger.scanned_patterns(baseline, rel.as_posix())
+            for value, source, reason in privacy_matches(text, denylist, scanned):
+                kind = "contains" if source == "operator denylist" else "baseline match"
                 findings.append(
                     DoctorLine(
                         DoctorStatus.ERROR,
-                        f"public-privacy:{rel.as_posix()}: baseline match '{value}' ({reason})",
+                        f"public-privacy:{rel.as_posix()}: {kind} '{mask(value)}' ({reason})",
                     )
                 )
     if findings:
         return findings
     return [_BASELINE_OK_MARKER if baseline_only else _OK_MARKER]
-
-
-# ------------------------------------------------------------- structural secret scan
-#
-# Structural secret/identifier patterns — the privacy/secret engine for the
-# dead() --commit review gate (F-5 / AC-R7-01), relocated here from
-# features/spec_context/service.py (F013, 20260830 audit: one privacy home). These are content-shape rules — no
-# operator-specific terms are hardcoded here (dev-guardrail #4). The operator denylist
-# baseline (R7b / T-010-20) lives in infrastructure/privacy_check.py and is orthogonal;
-# this scan is the structural layer that blocks pushing newly-committed files that look
-# like they carry a secret, private IP, or internal hostname.
-_SECRET_SCAN_TEXT_SUFFIXES = {
-    ".cfg",
-    ".conf",
-    ".css",
-    ".env",
-    ".html",
-    ".ini",
-    ".j2",
-    ".js",
-    ".json",
-    ".md",
-    ".py",
-    ".sh",
-    ".toml",
-    ".ts",
-    ".txt",
-    ".yaml",
-    ".yml",
-    "",
-}
-
-# R-2 (v0.1.10 rc-2 sec audit LOW): cryptographic key / certificate material is
-# commonly stored in binary-suffix files (.pem can be text, .key/.p12/.pfx are
-# typically binary) that the text-suffix scan above skips. A private-key file in
-# an untracked dead()-push set is a finding *by its suffix alone* — regardless of
-# whether the bytes happen to be UTF-8 decodable. PEM files are also content-scanned
-# (they overlap with the text path) so a real key block is caught both ways.
-_SECRET_SCAN_KEY_SUFFIXES = {
-    ".pem",
-    ".key",
-    ".p12",
-    ".pfx",
-    ".crt",
-    ".cer",
-    ".der",
-    ".keystore",
-    ".jks",
-}
-
-# (rule-name, compiled-pattern). Names are surfaced in the error; values never are.
-_SECRET_SCAN_RULES: tuple[tuple[str, re.Pattern[str]], ...] = (
-    ("private-key-block", re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----")),
-    ("aws-access-key-id", re.compile(r"\b(?:AKIA|ASIA)[0-9A-Z]{16}\b")),
-    ("github-token", re.compile(r"\bgh[pousr]_[A-Za-z0-9]{20,}\b")),
-    ("slack-token", re.compile(r"\bxox[baprs]-[A-Za-z0-9-]{10,}\b")),
-    (
-        "generic-secret-assignment",
-        re.compile(
-            r"(?i)(?:password|passwd|secret|api[_-]?key|access[_-]?token|"
-            r"private[_-]?key)\s*[:=]\s*['\"]?[A-Za-z0-9/+_\-]{8,}",
-        ),
-    ),
-    (
-        "private-ipv4",
-        re.compile(
-            r"\b(?:10\.\d{1,3}\.\d{1,3}\.\d{1,3}"
-            r"|192\.168\.\d{1,3}\.\d{1,3}"
-            r"|172\.(?:1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3})\b",
-        ),
-    ),
-    (
-        "internal-hostname",
-        re.compile(r"(?i)\b[a-z0-9][a-z0-9-]*\.(?:internal|local|lan|corp|intranet)\b"),
-    ),
-)
-
-
-def scan_file_for_secrets(path: Path) -> list[str]:
-    """Return rule names that match *path* (empty list ⇒ clean).
-
-    Two layers (R-2):
-
-    1. **Suffix presence** — a cryptographic key / certificate suffix
-       (``.pem``/``.key``/``.p12``/``.pfx``/...) is itself a finding
-       (``cert-key-file-suffix``), because such a file does not belong in an
-       untracked dead()-push set regardless of its byte content. This catches
-       binary key material the text scan below skips.
-    2. **Content rules** — for text-decodable files (the text-suffix allowlist,
-       plus PEM/key files that happen to be ASCII), the structural secret rules
-       run over the decoded content.
-
-    Binary / unreadable / unsupported-suffix files that are not key material are
-    skipped. Never returns the matched secret value — only the rule name, so
-    callers can build a redacted report.
-    """
-    suffix = path.suffix.lower()
-    hits: list[str] = []
-
-    is_key_file = suffix in _SECRET_SCAN_KEY_SUFFIXES
-    if is_key_file:
-        # Presence of cert/key material is a finding by itself.
-        hits.append("cert-key-file-suffix")
-
-    # Content-scan only files we can decode: the text allowlist, plus key files
-    # (PEM is frequently ASCII — a decodable .pem also triggers private-key-block).
-    if suffix not in _SECRET_SCAN_TEXT_SUFFIXES and not is_key_file:
-        return hits
-    try:
-        text = path.read_text(encoding="utf-8")
-    except (UnicodeDecodeError, OSError):
-        return hits
-    for rule_name, pattern in _SECRET_SCAN_RULES:
-        if pattern.search(text):
-            hits.append(rule_name)
-    return hits

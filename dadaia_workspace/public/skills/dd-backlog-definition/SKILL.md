@@ -1,65 +1,56 @@
 ---
 name: dd-backlog-definition
 description: >
-  Curate specs/backlog: the BACKLOG.json active[] document, staleness/dedup
-  sanitizing, the operator-gated intake report (the only path to a new entry), and
-  the terminal disposition vocabulary. Use when touching a backlog file, compiling an
-  intake report, or handing release-definition its picked set.
+  Use when adding, deduplicating or exiting a specs/backlog/BACKLOG.json entry, or compiling the operator intake report: backlog.py new|exit|check, staleness/dedup sanitizing and the terminal disposition vocabulary. Picking entries into a candidate is dd-release-definition's.
 ---
 
 # dd-backlog-definition
 
-> `dd-product-engineer` runs this continuously — not a release-boundary event.
+> `dd-product-engineer` runs this continuously.
 
 ## The document
 
-1. Open `specs/backlog/AGENTS.md` (the area's scoped law) and follow it — `BACKLOG.json`
-   shape, required fields, live status tokens, the histo record, the dispositions.
-2. Append via `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py new <slug>`; validate via `dadaia doctor` (`ledgers`
+1. Open `specs/backlog/AGENTS.md` (the area's scoped law) and follow it.
+2. Before `backlog.py new`, read the main thread's `dd-grill-me` backlog-stage handoff (`dd-grill-me`'s `references/backlog.md`).
+3. Write inside the `wt-backlog-<slug>` lane the main thread opened (`worktrees/AGENTS.md` §1). Append via `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py new <slug> --title "…" --description "…" --provenance "<operator words or intake item + date>" --relates <slugs>|none --specs <specs-dir>`; validate via `.dadaia/.venv/bin/dadaia doctor` (`ledgers`
    section).
 
 ## Continuous curation
 
-- Re-read the whole document on every new entry — it is small enough that partial
-  review is a discipline failure.
+- Re-read the whole document on every new entry.
 - Dedup: compare a new entry's title+description against every ACTIVE item for the
-  same subject — by domain concept (`dd-domain-modeling`), not by the request's
-  wording; merge a near-duplicate into the existing entry.
-- Staleness: an ACTIVE item with no reads/updates past a reasonable window is a
+  same subject — by domain concept, not by the request's
+  wording; exit a near-duplicate as `rejected`, its `--reason` `absorbed by <existing slug>`.
+- Before any staleness or cut judgement, read the entry's `provenance` and the operator's verbatim words; an operator-designed requirement is cut only after the operator sees and answers.
+- Staleness: an ACTIVE item untouched since the last closure is a
   sanitize candidate; a confirmed-invalid item exits as `rejected` with a one-line
   `reason`; a merely-postponed one stays `active[]`.
 
 ## The intake gate — the only path to a new entry
 
-- Only the operator creates demand. An entry materializes via the main thread's
-  operator-facing intake report (handoff with `next_handoff.agent: "human"` plus its
-  HTML report), or via an operator-ratified in-release deferral (already counts as
-  intake).
-- Compile every actionable defect (review findings, closure returns, audit
-  observations) into that report at each release close and review round — never
-  write a technical residual directly into `BACKLOG.json`.
+- Intake: `specs/backlog/AGENTS.md`.
+- The main thread compiles every actionable defect (review findings, closure returns, audit
+  observations) into that report at each release close and review round; the operator's ruling on that report is what creates an entry.
 - A record-only observation (INFO-grade, awareness-only) terminates in the
-  reviewer's own findings, not in an intake report.
+  reviewer's own findings.
 
 ## Pick and dispositions
 
-- A picked entry stays in `active[]` with `status: picked` —
-  nothing is purged at pick time.
-- It exits exactly once, at closure, by `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py exit <slug> --disposition
-  delivered|superseded|rejected [--release <id>] [--reason <text>]` — one histo
-  record, refused on a second exit (`dd-release-implementation` RC-FLOW step 7).
-- `dd-release-definition` consumes the picked set with no further triage — the
-  backlog it reads is already sanitized.
+- Pick and exit: `specs/backlog/AGENTS.md` §5. The exit command: `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py exit <slug> --disposition
+  <disposition> [--release <id>] [--reason <text>] --specs <specs-dir>` — one histo
+  record, refused on a second exit (`dd-release-implementation` RC-FLOW step 4).
 
 ## Done when
 
-- Every live candidate is in `active[]` with a live token; every closed one has
-  exactly one histo record.
-- No entry was created outside the operator-gated intake path.
-- A picked entry's SPEC exists in the same commit its `active[]` entry turned `picked`.
+- `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py check --specs <specs-dir>` exits 0 and `.dadaia/.venv/bin/dadaia doctor` prints no `BL-` finding.
+- Every entry added this session names its intake item or operator words in `provenance`.
+- Every pair of active entries was compared by domain subject: no semantic
+  duplicate remains active, and each absorbed duplicate has a `rejected` history record naming the retained slug.
+- Every staleness candidate is classified: a postponed item remains active;
+  an invalid item has a `rejected` history record with its one-line reason.
 
 ## References
 
 - `dd-release-definition` — the picked-set consumer.
-- Script: `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py` — `new`, `exit`, `check`, and `subjects` (the declared aliases plus the document's live bindings).
-- A `subject.ref` naming a code/doc/cli anchor is judged by `dadaia doctor` — `BL-SCHEMA` names the ref it cannot resolve.
+- Script: `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py` — `new`, `exit` and `check`.
+- A `subject.ref` naming a code/doc anchor is judged by `.dadaia/.venv/bin/dadaia doctor` — `BL-SCHEMA` names the ref it cannot resolve.

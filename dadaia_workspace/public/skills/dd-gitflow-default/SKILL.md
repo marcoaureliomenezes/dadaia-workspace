@@ -1,77 +1,92 @@
 ---
 name: dd-gitflow-default
 description: >
-  The three-branch contract whenever git is touched: when to start work, which
-  branch to cut, how a release rides it, the isolated commit shapes, and what gates
-  a push. Use when branching, committing, opening a PR, starting a task, or minting
-  a version.
+  The branch and commit contract (§2a, §3a): which branch to cut and push, the commit shape of each write, and the merge gate. Use when branching, writing a commit message, merging (through a PR where the host has one), or promoting; task and job order is dd-release-implementation's.
 ---
 
 # dd-gitflow-default — The Branch Contract
 
-The branch contract, stated once, and the mechanics that operate it.
+The branch contract by role; the names are `specs/constitution.md`'s `gitflow:` block (`<work>M.m.p` = work prefix + version).
 
 ## 1. When
 
 - Start of any session touching git.
-- Branching, committing, opening a PR, starting a task, or minting a version.
+- Branching, committing, merging.
 - Any bug fix (`dd-bug-resolution`).
 
 ## 2. Steps
 
 1. `git fetch --all --prune`.
-2. Diff `main` against `develop` — a nonzero diff means `develop` carries undeployed work.
-3. Identify the one live `feature/{M.m.p}` branch.
-4. Surface a `feature/{v}` predating `develop`'s last move to the operator first — it is stale.
+2. Ref R is `origin/R` when the repo has a remote, else the local `R`. Read the gitflow block; branch B lacks a change branch A holds when `git merge-tree --write-tree B A` prints a tree other than `git rev-parse B^{tree}` (git ≥ 2.38); the integration branch carries undeployed changes when the principal lacks a change it holds.
+3. Identify the one live work branch `<work>M.m.p`.
+4. Report a work branch that lacks a change the integration branch holds (step 2's test, B the work branch, A the integration branch) first — it is stale.
 5. Branch count, cut point and name follow §2a.
-6. Definition stage: author the candidate's SPEC/PLAN/TASKS at the release root on `feature/{M.m.p}`.
-7. Implementation stage: one commit per completed task group, shaped per §3a.
-8. Candidate closure: open one `feature/{M.m.p}` → `develop` PR and merge it green.
-9. After the merge, ask the operator: **promote or continue?** Continue = the next candidate's `python3 .agents/skills/dd-release-implementation/scripts/release.py new <id>`; promote = step 10.
-10. Promote: open the PR `develop` → `main` (ship verdict pre-staged naming develop's tip, §3b); merging it lets release-please open the release PR that carries the version, the CHANGELOG and the tag.
-11. The moment the release PR merges, record it — `python3 .agents/skills/dd-release-implementation/scripts/release.py phase CLOSURE --sha <sha> --pr <n>` — then delete `feature/{M.m.p}`, cut `feature/{next}` from `main` and `git merge -s ours origin/develop`, in that order.
-12. Tag `archive/<name>` then delete a branch the moment its work lands elsewhere.
+6. Definition stage: where a candidate is defined is `specs/releases/AGENTS.md`'s.
+7. Implementation stage: one commit per task, shaped per §3a.
+8. Candidate closure, on the operator's explicit order (publication): merge the work → integration branch, green (§3b); before that order, "finish" means merged into the work branch.
+9. When a candidate closes — its work → integration merge, or, before the operator's order, its `wt-rc` merged into the work branch — the main thread asks the operator one question: **promote or continue?** — and, for promote, the next release `<id>` or none. Continue = the next candidate's `python3 .agents/skills/dd-release-implementation/scripts/release.py new <id> --specs <specs-dir>`; promote = step 10.
+10. Promote: merge integration → principal (the reviewer's `APPROVED` on its head, §3b); the pipeline PR the project's own release pipeline then opens into the principal, if any, is the promote PR whose merge deploys, else the integration → principal merge is.
+11. After the promote merges, tag the work tip as `archive/<work-name>`; once the next release `<id>` is named (step 9), rename the work branch, never cut a new one: `git -C <repo> branch -m <work><old> <work><id>` (and its remote ref `origin/<work><old>`, when one exists: `git -C <repo> push -u origin <work><id> :<work><old>`). On it a `wt-backlog-<slug>` lane ships the release, its carry owned by `dd-release-implementation/RELEASE-EVENTS.md`, then the new candidate starts in its `wt-rc` (step 9). Until then work continues on the old-named branch; the rename carries every commit, the ship included, to the next work → integration merge.
+12. A `.dadaia/.venv/bin/dadaia worktree` tree and its branch complete under `worktrees/AGENTS.md` §2, which owns their merge and cleanup lifecycle.
+
+- Rewriting the pushed history of, or force-pushing, a branch the gitflow block names is refused unless the operator authorizes that act in its own turn.
 
 ## 2a. The branch contract
 
 | Branch | Pushable | Cut from | Advances by |
 |---|---|---|---|
-| `feature/{M.m.p}` | Yes — local CI preflight + valid name | `main` | the PR below |
-| `develop` | No — never a direct push | `main` (bootstrap only) | PR from `feature/{M.m.p}`, at definition `Approved` and at each `rc` merge |
-| `main` | No — never a direct push | — | PR from `develop`, at the final `rc` |
+| work `<work>M.m.p` | Yes — valid name (each `wt-rc` and hotfix merge into it ran `verify:`; no rerun before a push) | integration | its `wt-rc` and lane merges, and direct `specs/audits/**` commits |
+| integration | Yes | principal | the merge from the row above (step 8) |
+| principal | Yes | — | the integration → principal merge (step 10), or the pipeline PR the project's own release pipeline opens |
+| rc `wt/<M.m.p>/rc-<N>/wt-rc` | Yes | work | its merge into the work branch (`worktrees/AGENTS.md` §2) |
+| job `wt/<M.m.p>/rc-<N>/job-<n>/wt-main` | Yes | its `wt-rc` | its merge into `wt-rc` (`worktrees/AGENTS.md` §2) |
+| task `wt/<M.m.p>/rc-<N>/job-<n>/wt-task-<kkk>` | No | its `wt-main` | its merge into `wt-main` (its task gate) |
+| lane `wt/<M.m.p>/wt-backlog-<slug>` (Yes), `wt/<M.m.p>/wt-hotfix-<bug-id>` (No, local only) | as named | work | its merge into the work branch (`worktrees/AGENTS.md` §2) |
 
-- No `v` prefix, no suffix, no fifth pattern; `hotfix/*` is retired (operator request only, no cadence).
-- Exactly one live `feature/{M.m.p}`, named for the live release; bugs fix on it in any phase, no ceremony.
-- The release version = last published PyPI + 1 patch, minted at birth; it increments ONLY at an operator-approved deploy.
-- Each candidate closure burns one `feature -> develop` merge; after it, ask the operator: promote or continue.
-- Every flow stage runs on `feature/{M.m.p}`; `develop` and `main` are PR targets only, never a working branch.
+- No `v` prefix or suffix; leaf names: `worktrees/AGENTS.md` §1.
+- Exactly one live work branch, cut from the integration branch once and renamed at each promote (§2 step 11): named for the live release, or for the next release's `<id>` once a promote named it; every change but an audit reaches it through an rc's `wt-rc` or a lane (`worktrees/AGENTS.md` §1).
 
-## 3a. Commit shapes — each write alone, in its own shape
+## 3a. Commit shapes — each write in its own shape
 
-| # | Write | Staged set | Message |
+`<code>` is any path outside `specs/`; `<id>` is the bug id in shapes 1, 3 and 4, and in shape 6 the current task id `J<n>.T<k>` (in a lane, its `<slug>`). A `wt-backlog-<slug>` lane writes these only on the operator's order: shape 2's ADR acceptance or rejection (`specs/ADRs/decisions.jsonl`, `specs/memory/ARCHITECTURE.md`, `specs/memory/QUALITY.md`, never product memory), shape 8, shape 9's canonical-memory rewrite.
+
+| # | Tree | Write | Message |
 |---|---|---|---|
-| 1 | Bug registration | `specs/bugs/BUGS.jsonl` alone | `chore(bugs): report <id>` |
-| 2 | Backlog / ADR | `BACKLOG.json` alone, or `ADRs/decisions.jsonl` alone | `chore(backlog): …` / `chore(adrs): …` |
-| 3 | Bug fix | code + regression test + the `BUGS.jsonl` line, together | `fix(bugs): <id> — <cause>` |
-| 4 | Resolve record | commits only; a push happens when asked, `dadaia ci preflight` first | — |
-| 5 | Release definition | SPEC + PLAN + TASKS + the picked entries flipped to `status: picked` + picked bugs, one commit | `feat(specs): define candidate …` |
-| 6 | Task implementation | the task's declared write set | `conventional-commit(task-id): description` — the auditable trace |
+| 1 | `wt-main`, `wt-backlog-<slug>`, `wt-rc (closure)` | Bug registration: `specs/bugs/BUGS.jsonl` | `chore(bugs): report <id>` |
+| 2 | `wt-backlog-<slug>`, `wt-rc` (reconcile) | Backlog entry or exit: `specs/backlog/BACKLOG.json`, `specs/backlog/_archive/backlog_histo.jsonl` | `chore(backlog): …` |
+| 2 | `wt-backlog-<slug>`, `wt-rc` (define) | ADR proposal: `specs/ADRs/decisions.jsonl` | `docs(adr): propose <slug>` |
+| 2 | `wt-backlog-<slug>`, `wt-rc` (define, reconcile) | In-place `measured_by` repair: `specs/ADRs/decisions.jsonl` | `chore(adrs): repair …` |
+| 2 | `wt-rc` (define, reconcile), a `wt-backlog-<slug>` lane | ADR acceptance or rejection: `specs/ADRs/decisions.jsonl`, `specs/memory/*` | `docs(adr): accept <slug>` or `docs(adr): reject <slug>` |
+| 3 | a `wt-task-<kkk>` or `wt-hotfix` tree, `wt-rc (closure)` | Bug fix or REBUILD: `<code>` and the tracked `specs/**/AGENTS.md` mirrors its own scaffold or template change re-renders, by the doctor's render; red loop in the body, `block: <item>` where `specs/bugs/AGENTS.md` §2 requires it; a new regression test lands first as a `test(` commit (a task's shape 6, or the lane's) | `fix(bugs): <id> — <cause>`; a REBUILD `refactor(bugs): <id> — REBUILD <unit>: …`; a group names its N ids |
+| 3 | a `wt-task-<kkk>` or `wt-hotfix` tree, `wt-rc (closure)` | A fix that is itself a test change: the test files | `test(<id>): …`; body: the record's fix line, as `specs/bugs/AGENTS.md` §2 decides |
+| 4 | a `wt-main`, `wt-hotfix`, `wt-backlog-<slug>` tree or `wt-rc (closure)` | Terminal transition without code (`resolve` after its named shape-3 fix commit, `supersede`, `reject`): `specs/bugs/BUGS.jsonl` | `chore(bugs): <verb> <id> — <reason, by task-id, or fix sha>`; per class `chore(bugs): <verb> class <class> — <reason>`, one id per body line |
+| 4 | a `wt-main`, `wt-hotfix`, `wt-backlog-<slug>` tree or `wt-rc (closure)` | Governance update without a status change (`bugs.py update`): `specs/bugs/BUGS.jsonl` | `chore(bugs): update <id> — <field>: <reason>` |
+| 4 | any lane, a `wt-main` job tree or `wt-rc` (reconcile) | Archive terminal bugs: `specs/bugs/BUGS.jsonl`, `specs/bugs/_archive/bugs_histo.jsonl` | `chore(bugs): archive <ids>` |
+| 5 | `wt-rc` (define) | Release definition, and a candidate's birth (`release.py new` writes `_RELEASE.json` and the SPEC stub in one transaction): `specs/releases/<v>/rc-<N>/*`, `specs/releases/<v>/_RELEASE.json` | `feat(specs): define candidate …` |
+| 6 | a task tree, or a `wt-backlog-<slug>` lane (the repo's `AGENTS.md` alone) | Task: its `W:` | `conventional-commit(<id>): description`, a REBUILD `refactor(<id>): REBUILD <unit> — …` |
+| 7 | `wt-hotfix-<bug-id>` | Specs revert, no code: the `specs/` paths of the culprit commit, put back | `Revert "<subject>"`; body `This reverts commit <sha>.` |
+| 8 | `wt-rc` (define), a `wt-backlog-<slug>` lane | SPEC and PLAN approval: `specs/releases/<v>/rc-<N>/{SPEC,PLAN}.md`; the lane: `specs/constitution.md`, a `specs/AGENTS.md` re-render | `docs(specs): …` |
+| 9 | `wt-rc` (reconcile) | Memory pass and derived docs: `specs/memory/*`, `README.md`, `docs/*.md` | `docs(memory): …` |
+| 9 | the `wt-backlog-first-pass` lane | Memory pass: `specs/memory/*` | `docs(memory): …` |
+| 9 | a `wt-backlog-<slug>` lane | Canonical-memory rewrite: `specs/memory/ARCHITECTURE.md`, `specs/memory/QUALITY.md` | `docs(memory): …` |
+| 10 | `wt-rc` (define, reconcile), a `wt-backlog-<slug>` lane on the next work branch (§2 step 11, `ship`) | Release state: `specs/releases/<v>/_RELEASE.json` and `specs/releases/_archive/**`, only when [`RELEASE-EVENTS.md`](../dd-release-implementation/RELEASE-EVENTS.md) requires a current entry | `chore(release): …` |
+| 11 | the job tree that found the defect (`wt-main`) | Pure law or doc text that no program prints (a fix line, `--help` or a schema stays Arm B, shape 3): the file it corrects; no `BUGS.jsonl` record | `docs(law): <what>`; the body cites the finding; one review |
+| 12 | a `wt-task-<kkk>` or `wt-hotfix` tree | Code revert: the culprit commit's paths, put back | `Revert "<subject>"`; body `This reverts commit <sha>.` |
+| 13 | a `wt-task-<kkk>` or `wt-hotfix` tree | Format-only commit: shape 6's `style(<id>): …`, never a `fix(bugs)` or `refactor(bugs)` line (`specs/bugs/AGENTS.md` §2) | `style(<id>): …` |
 
-## 3b. The PR gate
+## 3b. The merge gate
 
-- Both PR edges require CI green (lint, typecheck, tests, doctor, gitleaks) and a
-  `dd-code-reviewer` APPROVED verdict, security lens included, on the PR head; no CI job
-  calls a model API. The ruleset is the operator's.
+- The merges of steps 8 and 10 require the repo's `verify:` line green and a `dd-code-reviewer` APPROVED verdict, security lens included, on the merged head; through a PR when the host has one. The project's own pipeline PR into the principal stays outside this gate.
+- A PR merge: the main thread quotes the verdict in it verbatim, its only record; no script checks it.
 
 ## 4. Done when
 
-- Every commit for a release traces to a candidate's definition, implementation,
-  closure merge, or a bug fix — each write alone in its §3a shape, verifiable by
-  `git log`.
+- Current branches match §2a, and every commit since the work branch's cut, `specs/audits/**` commits aside, matches one §3a row.
+- After a work → integration merge: the merge gate (§3b) holds.
+- After promotion: the `archive/<work-name>` tag resolves to the former work tip, once the next release is named the work branch carries its name and its first merge records the principal merge as `shipped` in the archived state.
 
 ## 5. References
 
-- [`CICD-AUTOMATION.md`](CICD-AUTOMATION.md) — CI/CD checks to suggest a consumer operator.
-- Mechanical enforcement (pre-push hook / CI): branch-name pattern, push refusal,
-  denylist scan, `pr-source-guard`. Everything else in this skill is discipline, upheld by agents and
-  reviewers, unenforced by any hook.
+- `.dadaia/.venv/bin/dadaia worktree --help` lists the verbs; run it, never read its source; the rules: `worktrees/AGENTS.md`.
+- [`CICD-AUTOMATION.md`](CICD-AUTOMATION.md) — optional: plug your own pipeline into the repo's `verify:` lines.
+- Chokepoints: `.dadaia/AGENTS.md` §3 and `worktrees/AGENTS.md`; every other rule here is discipline upheld by agents and reviewers.

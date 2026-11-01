@@ -1,0 +1,88 @@
+"""One table of ROOT ENTRIES through the gate and the doctor: the gate ALLOWs a write that
+creates an entry at a judged level (the root, ``.dadaia/``, ``repos/<r>``, ``worktrees/<r>``)
+iff the doctor does not judge that entry SLOP. Scope inside a registered repo is
+test_sdd_gate's, not this table's.
+
+Rows cover notes/ without a glob and with one, a wrong type, a .dadaia non-zone and
+non-canon states, a root specs/ and the law files.
+Size: MEDIUM (integration: the real ``pre_gate`` subprocess, then ``DoctorService.scan``).
+
+Structural cause pinned: the gate (``root_whitelist``: type-blind names, "an existing
+entry is the operator's", no ``.dadaia/`` judgment) and the doctor (type-aware root,
+zone and states canon) answered "may this entry exist" with four matchers, so the gate
+ALLOWed entries the reaper then moved.
+"""
+
+from __future__ import annotations
+
+import sys
+from datetime import UTC, datetime
+from pathlib import Path
+
+import pytest
+
+from dadaia_workspace.core.workspace_layout import DADAIAIGNORE
+from dadaia_workspace.features.spec_context.doctor import DoctorService, FindingVerdict
+from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
+from tests.fixtures.harness_env import claude_hook_env, run_hook_subprocess
+from tests.fixtures.stores import context_store
+from tests.helpers.oslib import command, write_text
+
+# (target, pre-existing dir or None, exception glob or None, gate allows)
+_TABLE = [
+    ("notes/todo.md", "notes", None, False),
+    ("notes/todo.md", "notes", "notes", True),
+    ("prompt.md/x.md", None, None, False),
+    (".env/x.txt", None, None, False),
+    (".dadaia/scratch/x.txt", None, None, False),
+    (".dadaia/states/mine.json", None, None, False),
+    ("prompt.md", None, None, True),
+    ("specs/bugs/x.md", None, None, False),
+    (".dadaia/newzone/x.txt", None, None, False),
+    ("worktrees/x/0.5.0-rc1/j1/f.py", None, None, False),  # x: no registered slug
+    (".dadaia/tmp/agent/20260927/x.txt", None, None, True),
+]
+
+
+@pytest.mark.parametrize(("target", "existing", "glob", "allows"), _TABLE)
+def test_gate_allows_iff_the_doctor_keeps_the_entry(
+    tmp_path: Path, target: str, existing: str | None, glob: str | None, allows: bool
+) -> None:
+    for zone in ("tmp", "states", "sessions", "reaped"):
+        (tmp_path / ".dadaia" / zone).mkdir(parents=True, exist_ok=True)
+    write_text(tmp_path / ".dadaia" / "states" / "spec_contexts.json", '{"contexts": []}')
+    if existing is not None:
+        (tmp_path / existing).mkdir()
+    if glob is not None:
+        write_text(tmp_path / DADAIAIGNORE, f"{glob}\n")
+    path = tmp_path / target
+    payload = {"tool_name": "Write", "tool_input": {"file_path": str(path), "content": "x"}}
+
+    days = [datetime.now(UTC).strftime("%Y%m%d")]  # the call may cross UTC midnight
+    gate = run_hook_subprocess("pre_gate", payload, claude_hook_env(tmp_path))
+    days.append(datetime.now(UTC).strftime("%Y%m%d"))
+
+    block = gate.block_envelope()
+    assert (block is None) is allows, gate.stdout
+    if block is not None:  # The one fix names the owning zone, never the globs
+        (fix,) = [ln for ln in block["reason"].splitlines() if ln.startswith("fix: ")]
+        tmp = tmp_path.resolve() / ".dadaia" / "tmp" / "main-thread"  # the agent's own day dir
+        assert fix[len("fix: ") :] in [
+            command(
+                sys.executable,
+                "-c",
+                "import pathlib, sys; pathlib.Path(sys.argv[1]).mkdir(parents=True, exist_ok=True)",
+                str(tmp / day),
+            )
+            for day in days
+        ]
+    path.parent.mkdir(parents=True, exist_ok=True)
+    write_text(path, "x")
+    findings = DoctorService(
+        context_store(tmp_path / ".dadaia" / "states"), GitSubprocessClient(), tmp_path
+    ).scan()
+    slop = [f.path for f in findings if f.verdict is FindingVerdict.SLOP]
+    assert (slop == []) is allows, slop
+    if glob is not None:
+        verdicts = {f.path: f.verdict for f in findings}
+        assert verdicts[glob] is FindingVerdict.OPERATOR

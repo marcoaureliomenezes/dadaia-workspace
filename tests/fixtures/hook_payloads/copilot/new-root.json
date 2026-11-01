@@ -1,0 +1,4 @@
+{
+  "toolName": "create",
+  "toolArgs": "{\"path\": \"{ws}/newdir/x.md\", \"file_text\": \"x\"}"
+}

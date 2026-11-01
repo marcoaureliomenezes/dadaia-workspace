@@ -1,0 +1,181 @@
+{
+  "schema_version": "behavior-map-v1",
+  "skill_md_line_soft": 333,
+  "skill_md_line_ceiling": 500,
+  "standalone_skills": [
+    "dd-grill-me",
+    "dd-bug-resolution",
+    "dd-code-review",
+    "dd-ai-eng-knowhow"
+  ],
+  "declared_overlaps": [
+    [
+      "dd-gitflow-default",
+      "dd-release-implementation"
+    ],
+    [
+      "dd-bug-registration",
+      "dd-bug-resolution"
+    ],
+    [
+      "dd-backlog-definition",
+      "dd-release-definition"
+    ],
+    [
+      "dd-audit-project",
+      "dd-bug-resolution"
+    ],
+    [
+      "dd-spec-navigator",
+      "dd-cli-library"
+    ]
+  ],
+  "rows": [
+    {
+      "section": "§2 Who does what",
+      "anchor": null,
+      "skill": "dd-manager-orchestration",
+      "scoped_agents_md": []
+    },
+    {
+      "section": "§2 Who does what",
+      "anchor": null,
+      "skill": "dd-ai-eng-knowhow",
+      "scoped_agents_md": []
+    },
+    {
+      "section": "§3 What is enforced",
+      "anchor": null,
+      "skill": "dd-gitflow-default",
+      "scoped_agents_md": [
+        "dadaia_workspace/public/data/worktrees-AGENTS.md"
+      ]
+    },
+    {
+      "section": "§4 Where things are written",
+      "anchor": null,
+      "skill": "dd-handoff-emitter",
+      "scoped_agents_md": [
+        "dadaia_workspace/public/data/handoff-AGENTS.md"
+      ]
+    },
+    {
+      "section": "§5 Scoped law — open before acting there",
+      "anchor": null,
+      "skill": null,
+      "scoped_agents_md": [
+        "dadaia_workspace/public/data/dadaia-AGENTS.md"
+      ]
+    },
+    {
+      "section": "§4 Where things are written",
+      "anchor": null,
+      "skill": null,
+      "scoped_agents_md": [
+        "dadaia_workspace/public/data/tmp-AGENTS.md"
+      ]
+    },
+    {
+      "section": "§1 The flow",
+      "anchor": "backlog",
+      "skill": "dd-backlog-definition",
+      "scoped_agents_md": [
+        "dadaia_workspace/public/scaffold/backlog/AGENTS.md"
+      ]
+    },
+    {
+      "section": "§1 The flow",
+      "anchor": "releases",
+      "skill": "dd-release-definition",
+      "scoped_agents_md": []
+    },
+    {
+      "section": "§1 The flow",
+      "anchor": "releases",
+      "skill": "dd-release-implementation",
+      "scoped_agents_md": [
+        "dadaia_workspace/public/scaffold/releases/AGENTS.md"
+      ]
+    },
+    {
+      "section": "§6 Skills — `.agents/skills/dd-*`",
+      "anchor": "audits",
+      "skill": "dd-audit-project",
+      "scoped_agents_md": [
+        "dadaia_workspace/public/scaffold/audits/AGENTS.md"
+      ]
+    },
+    {
+      "section": "§5 Scoped law — open before acting there",
+      "anchor": "adrs",
+      "skill": null,
+      "scoped_agents_md": [
+        "dadaia_workspace/public/scaffold/ADRs/AGENTS.md"
+      ]
+    },
+    {
+      "section": "§1 The flow",
+      "anchor": "releases",
+      "skill": "dd-grill-me",
+      "scoped_agents_md": []
+    },
+    {
+      "section": "§5 Scoped law — open before acting there",
+      "anchor": null,
+      "skill": "dd-spec-navigator",
+      "scoped_agents_md": [
+        "dadaia_workspace/public/scaffold/memory/AGENTS.md"
+      ]
+    },
+    {
+      "section": "§1 The flow",
+      "anchor": "bugs",
+      "skill": "dd-bug-resolution",
+      "scoped_agents_md": []
+    },
+    {
+      "section": "§1 The flow",
+      "anchor": "bugs",
+      "skill": "dd-bug-registration",
+      "scoped_agents_md": [
+        "dadaia_workspace/public/scaffold/bugs/AGENTS.md"
+      ]
+    },
+    {
+      "section": "§5 Scoped law — open before acting there",
+      "anchor": null,
+      "skill": null,
+      "scoped_agents_md": [
+        "dadaia_workspace/public/data/states-AGENTS.md"
+      ]
+    },
+    {
+      "section": "§7 Onboarding — three levels",
+      "anchor": null,
+      "skill": "dd-cli-library",
+      "scoped_agents_md": []
+    },
+    {
+      "section": "§4 Where things are written",
+      "anchor": null,
+      "skill": null,
+      "scoped_agents_md": [
+        "dadaia_workspace/public/templates/repo-AGENTS.md"
+      ]
+    },
+    {
+      "section": "§5 Scoped law — open before acting there",
+      "anchor": null,
+      "skill": null,
+      "scoped_agents_md": [
+        "dadaia_workspace/public/templates/specs-AGENTS.md"
+      ]
+    },
+    {
+      "section": "§2 Who does what",
+      "anchor": null,
+      "skill": "dd-code-review",
+      "scoped_agents_md": []
+    }
+  ]
+}

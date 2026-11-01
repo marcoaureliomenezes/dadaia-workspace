@@ -1,15 +1,15 @@
 """Root conftest.py — workspace-level pytest fixtures.
 
-TR-3 (T-GOS-A4): repo-root write-backstop guard.
+Repo-root write-backstop guard.
 
 This fixture captures the set of entries present in specific protected directories
 at the lib repo root BEFORE each test and asserts that no NEW entries have appeared
 in those directories AFTER the test completes.
 
 The guard is intentionally scope=``function`` and autouse=True so it fires around
-every test in the suite.  It is implemented as a *root-write guard only* — it does
-NOT force-chdir tests to a temporary directory (that would break tests that rely on
-their own CWD assumptions).
+every test in the suite.  Every test also STARTS in an empty temporary directory
+(``_hermetic_cwd``): the checkout usually sits inside a live operator instance, and a
+cwd walk from it would resolve and scan that instance.
 
 Protected paths (relative to the repo root, checked recursively):
   .claude/
@@ -34,30 +34,106 @@ Session-level pollution guard (_session_root_pollution_guard):
 from __future__ import annotations
 
 import os
+import shutil
+import subprocess
 import sys
+import tempfile
 from collections.abc import Iterator, Sequence
+from hashlib import sha256
 from pathlib import Path
+from typing import Any
+from unittest import mock
 
 import pytest
 
-from dadaia_workspace.infrastructure.subprocess_runner import ProcessResult
-
-# Every subprocess a test spawns (`python -m dadaia_workspace...`: CLI verbs, hooks) must
-# import THIS checkout, whatever the venv's install mode or the worktree it runs in — bugs
-# hook-subprocess-tests-import-the-installed-package-not-the-checkout and
-# worktree-subprocess-cli-tests-import-the-shared-venvs-editable-install-not-the-worktree.
-# One rule, set once for the whole session; never a per-helper copy.
-_CHECKOUT_ROOT = Path(__file__).resolve().parent.parent
-os.environ["PYTHONPATH"] = os.pathsep.join(
-    [str(_CHECKOUT_ROOT), *[p for p in os.environ.get("PYTHONPATH", "").split(os.pathsep) if p]]
-)
+pytest_plugins = ("pytester", "tests.fixtures.cli_sentence")
 
 # Repo-cleanliness law: the test run must never materialize bytecode caches inside
 # the working tree. Import-time compilation happens BEFORE any in-script
 # ``sys.dont_write_bytecode`` guard can run (e.g. tests importing the
 # ``public/scripts/*.py`` sources), so the suite-wide switch is the only reliable
-# enforcement point (AC-W5-01).
+# enforcement point.
 sys.dont_write_bytecode = True
+
+from dadaia_workspace.infrastructure.subprocess_runner import ProcessResult  # noqa: E402
+from tests.fixtures.harness_env import suite_env  # noqa: E402
+from tests.helpers import oslib  # noqa: E402
+
+# Every subprocess a test spawns (`python -m dadaia_workspace...`: CLI verbs, hooks) must
+# import THIS checkout, whatever the venv's install mode or the worktree it runs in.
+# One rule, in the suite env (pytest_configure); never a per-helper copy.
+_CHECKOUT_ROOT = Path(__file__).resolve().parent.parent
+# A child CPython normalizes its own `sys.executable`; a `../` launch keeps the dots here, so
+# every spawn and every expected fix line reads the normalized path the child will print.
+sys.executable = os.path.normpath(sys.executable)
+
+# No process the suite runs or spawns may resolve the operator instance this checkout sits
+# in, nor the one owning the running venv: the fence is in the suite env every child
+# inherits, and the one resolver honours it. The instance's registry and repos/ are
+# fingerprinted around the session.
+_INSTANCE_SENTINEL = Path(".dadaia") / "states" / "spec_contexts.json"
+_FENCED_ROOTS: tuple[Path, ...] = tuple(
+    p
+    for p in dict.fromkeys([*_CHECKOUT_ROOT.parents, Path(sys.prefix).resolve().parent.parent])
+    if (p / _INSTANCE_SENTINEL).is_file()
+)
+
+# No git process that inherits the suite's environment may start background maintenance:
+# after a commit or a push git forks a detached `gc`/`maintenance run --auto` that holds
+# objects/maintenance.lock while a test copies the repo (a CI flake). A config FILE, never
+# GIT_CONFIG_* env: git strips those from the receive-pack a local push spawns. A test
+# writing its own global config opens it with GIT_QUIET_INCLUDE; a test building git's
+# env from scratch (no GIT_CONFIG_GLOBAL) is outside this rule.
+
+
+def _publish(stem: str, text: str) -> Path:
+    """*text* at a content-addressed ``$TMPDIR`` path: suites of any conftest version, run
+    side by side, never rewrite each other's file; the first writer publishes atomically."""
+    path = (
+        Path(tempfile.gettempdir()) / f"{stem}-{sha256(text.encode()).hexdigest()[:12]}.gitconfig"
+    )
+    if not path.exists():
+        tmp = path.with_name(f"{path.name}.{os.getpid()}")
+        tmp.write_text(text, encoding="utf-8")
+        os.replace(tmp, path)
+    return path
+
+
+_GIT_QUIET = _publish(
+    "dadaia-tests-quiet",
+    "[maintenance]\n\tauto = false\n[gc]\n\tauto = 0\n[receive]\n\tautogc = false\n",
+)
+GIT_QUIET_INCLUDE = f'[include]\n\tpath = "{_GIT_QUIET.as_posix()}"\n'
+# Every git process sees one GLOBAL config carrying a committer identity, never the
+# developer's (CI runners have none): global scope, so a repo's own `user.*` and a
+# test's own GIT_CONFIG_GLOBAL still win — a test about a missing identity sets its own.
+# `core.autocrlf=false` keeps a host's (Windows runner's) system autocrlf off the LF test repos.
+_GIT_GLOBAL = _publish(
+    "dadaia-tests",
+    f"{GIT_QUIET_INCLUDE}[user]\n\tname = T\n\temail = t@example.invalid\n[core]\n\tautocrlf = false\n",
+)
+#: What the suite env adds to the parent's: the checkout first on every child's import path,
+#: the fence, and the quiet git config.
+_SUITE_KEYS = {
+    "PYTHONPATH": os.pathsep.join(
+        [str(_CHECKOUT_ROOT), *[p for p in os.environ.get("PYTHONPATH", "").split(os.pathsep) if p]]
+    ),
+    "DADAIA_FENCED_ROOTS": os.pathsep.join(map(str, _FENCED_ROOTS)),
+    "GIT_CONFIG_GLOBAL": str(_GIT_GLOBAL),
+}
+
+
+def _instance_fingerprint() -> dict[str, object]:
+    """What a leaked CLI call mutates: the context registry bytes and the repos/ listing."""
+    return {
+        str(root): (
+            (root / _INSTANCE_SENTINEL).read_bytes(),
+            sorted(p.name for p in (root / "repos").iterdir()) if (root / "repos").is_dir() else [],
+        )
+        for root in _FENCED_ROOTS
+        if (root / _INSTANCE_SENTINEL).is_file()
+    }
+
 
 # ---------------------------------------------------------------------------
 # Hypothesis: redirect storage dir and disable the on-disk database so
@@ -126,20 +202,35 @@ _GUARDED_ROOT_FILES: tuple[str, ...] = (
     "playwright.config.ts",
 )
 
-_PATH_MARKERS: tuple[tuple[str, str], ...] = (
-    ("tests/unit/", "unit"),
-    ("tests/contract/", "contract"),
-    ("tests/integration/", "integration"),
-    ("tests/e2e/", "e2e"),
-    ("tests/tmp/", "tmp"),
+# Size -> enforced timeout seconds (tests/AGENTS.md size markers). A test that trips its
+# ceiling is MIS-SIZED — mark it ``medium`` or declare an explicit justified
+# @pytest.mark.timeout; never raise these defaults.
+_TIER_TIMEOUTS: dict[str, int] = {"small": 10, "medium": 60, "e2e": 120}
+
+# What makes a test ``medium``: its module reaches a process or real-git seam.
+_PROCESS_MODULES = frozenset(
+    {
+        "subprocess",
+        "tests.helpers.worktree_ws",
+        "dadaia_workspace.infrastructure.subprocess_runner",
+    }
 )
+#: The OS helper's process starters: a module that holds one of them (by any name) is medium.
+_PROCESS_CALLABLES = (
+    oslib.run,
+    oslib.run_bytes,
+    oslib.run_line,
+    oslib.run_cmdline,
+    oslib.popen,
+    oslib.popen_bytes,
+    oslib.stub_cli,
+)
+_SEAM_MODULES = _PROCESS_MODULES | {
+    "tests.fixtures.real_git",
+    "dadaia_workspace.infrastructure.git_subprocess",
+}
 
-# Tier -> enforced timeout seconds (dd-test-stewardship, size tiers; values in its
-# PARAMETERS.md). A test that trips its tier ceiling is MIS-TIERED — fix the tier or
-# declare an explicit justified @pytest.mark.timeout; never raise these defaults.
-_TIER_TIMEOUTS: dict[str, int] = {"unit": 10, "contract": 30, "integration": 60, "e2e": 120}
-
-# Bug ``windows-xdist-workers-crash-on-unit-fast-tier``: the table above is calibrated on
+# The table above is calibrated on
 # the Linux runners. Windows CI runs the tree-copying install/doctor tests 2-3x slower
 # (measured: <5s Linux vs 9.7-16s Windows for one unit test) and pytest-timeout's only
 # Windows method (``thread``) ends the xdist worker with ``os._exit`` — reported as an
@@ -147,8 +238,7 @@ _TIER_TIMEOUTS: dict[str, int] = {"unit": 10, "contract": 30, "integration": 60,
 # never a per-test marker.
 _TIER_TIMEOUT_PLATFORM_FACTOR: dict[str, int] = {"win32": 3}
 # Coverage tracing (pytest --cov) roughly halves execution speed on the same runner
-# (bug tier-ceiling-trips-under-coverage-instrumentation-on-windows-contract-coverage-job:
-# a 30s-ceiling unit test measured 32.3s under --cov on Windows).
+# (a 30s-ceiling unit test measured 32.3s under --cov on Windows).
 _TIER_TIMEOUT_COVERAGE_FACTOR = 2
 
 
@@ -165,19 +255,12 @@ def tier_timeout_seconds(
     return base * factor
 
 
-#: The closed marker set — must stay set-equal with pyproject.toml's markers block
-#: (pinned by tests/contract/test_stewardship_mechanics.py).
-_KNOWN_MARKERS: frozenset[str] = frozenset(
-    {"unit", "contract", "integration", "e2e", "slow", "tmp", "flaky", "quarantine"}
-)
-
-
 def _validate_quarantine_markers(items: list[pytest.Item]) -> None:
-    """S-20/S-21: a quarantined test without a registered bug id refuses collection.
+    """A quarantined test without a registered bug id refuses collection.
 
     Quarantine is a lane out of the gating selectors — usable ONLY with a live bug
     (`@pytest.mark.quarantine(bug="<bug-slug>")`). An unregistered quarantine would be
-    a silent green-with-exclusions, the exact failure the stewardship law forbids.
+    a silent green-with-exclusions.
     """
     for item in items:
         marker = item.get_closest_marker("quarantine")
@@ -188,36 +271,79 @@ def _validate_quarantine_markers(items: list[pytest.Item]) -> None:
             message = (
                 f"{item.nodeid}: @pytest.mark.quarantine requires a registered bug id — "
                 "use @pytest.mark.quarantine(bug='<bug-slug>') and register the bug via "
-                "`dadaia bugs append` first (dd-test-stewardship, flakes and quarantine)."
+                "`dadaia bugs append` first."
             )
             # Under xdist the UsageError kills the worker and surfaces as an opaque
-            # INTERNALERROR on the controller (T-070-09 finding 2) — print the
+            # INTERNALERROR on the controller: print the
             # actionable line to stderr FIRST so it reaches the operator either way.
             print(f"\n[quarantine-discipline] {message}", file=sys.stderr, flush=True)
             raise pytest.UsageError(message)
 
 
-def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
-    """Apply layer markers + tier timeouts from test directory layout.
+def _reaches(item: pytest.Item, seams: frozenset[str]) -> bool:
+    """True when a name in the test module is, or comes from, one of *seams*, or is one of the
+    OS helper's process starters (under any name)."""
+    values = vars(item.module).values() if hasattr(item, "module") else ()
+    return any(
+        v in _PROCESS_CALLABLES or getattr(v, attr, None) in seams
+        for v in values
+        for attr in ("__module__", "__name__")
+    )
 
-    Directory placement is the first enforcement mechanism for the existing
-    suite. Tests may still add explicit markers, but unmarked legacy tests do
-    not fall out of layer-specific commands. The tier timeout is applied only
-    when the test declares no explicit ``timeout`` marker of its own.
-    """
+
+def _size(item: pytest.Item) -> str:
+    """``small`` or ``medium``: an explicit marker wins; else ``medium`` when the test module
+    reaches a process or real-git seam or the test asks for ``pytester``; else ``small``.
+    Never the folder."""
+    for size in ("medium", "small"):
+        if item.get_closest_marker(size) is not None:
+            return size
+    spawns = _reaches(item, frozenset(_SEAM_MODULES)) or "pytester" in getattr(
+        item, "fixturenames", ()
+    )
+    return "medium" if spawns else "small"
+
+
+def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
+    """Apply the size marker and its timeout. A journey under ``tests/e2e/`` is ``e2e``;
+    every other test is ``small`` or ``medium`` by what it reaches (``_size``). The timeout is
+    applied only when the test declares no explicit ``timeout`` marker of its own."""
     covered = bool(getattr(config.option, "cov_source", None))
     for item in items:
         rel = Path(str(item.fspath)).resolve().relative_to(_REPO_ROOT).as_posix()
-        for prefix, marker in _PATH_MARKERS:
-            if rel.startswith(prefix):
-                item.add_marker(getattr(pytest.mark, marker))
-                if marker == "e2e":
-                    item.add_marker(pytest.mark.slow(reason="e2e process-boundary suite"))
-                tier_timeout = tier_timeout_seconds(marker, coverage=covered)
-                if tier_timeout is not None and item.get_closest_marker("timeout") is None:
-                    item.add_marker(pytest.mark.timeout(tier_timeout))
-                break
+        if rel.startswith("tests/tmp/"):
+            item.add_marker(pytest.mark.tmp)
+        if rel.startswith("tests/e2e/"):
+            size = "e2e"
+            item.add_marker(pytest.mark.e2e)
+            item.add_marker(pytest.mark.slow(reason="e2e process-boundary suite"))
+        else:
+            size = _size(item)
+            item.add_marker(getattr(pytest.mark, size))
+        tier_timeout = tier_timeout_seconds(size, coverage=covered)
+        if tier_timeout is not None and item.get_closest_marker("timeout") is None:
+            item.add_marker(pytest.mark.timeout(tier_timeout))
     _validate_quarantine_markers(items)
+
+
+@pytest.hookimpl(wrapper=True)
+def pytest_runtest_call(item: pytest.Item) -> Iterator[None]:
+    """The one decider of what ``small`` means: a test sized small (``_size``) that starts a
+    process (``subprocess.*``, ``os.system``) fails here, whatever helper it goes through."""
+    if item.get_closest_marker("small") is None:
+        return (yield)
+
+    def refuse(*_args: object, **_kwargs: object) -> None:
+        pytest.fail(
+            f"{item.nodeid} is small and starts a process: mark it `medium` or extract its pure core",
+            pytrace=False,
+        )
+
+    with (
+        mock.patch.object(subprocess.Popen, "__init__", refuse),
+        mock.patch.object(os, "system", refuse),
+    ):
+        return (yield)
 
 
 def _collect_entries(
@@ -251,7 +377,7 @@ def _no_real_venv_in_tests() -> Iterator[None]:
     the venv python, so we replace the builder with a no-op that just materialises the
     directory and returns its path (matching FakePythonEnvironmentManager's behaviour).
 
-    Bug test-suite-real-venv-and-ci-longpole — two escapes closed, both guarded by
+    Two escapes are closed, both guarded by
     tests/unit/test_no_real_venv_backstop.py and the import round-trip assertion:
 
     1. SCOPE: this fixture is session-scoped (was function-scoped). pytest instantiates
@@ -262,13 +388,12 @@ def _no_real_venv_in_tests() -> Iterator[None]:
        Tests that need the REAL method (test_python_env.py) already capture it at import
        time and restore it locally — that pattern is unaffected.
 
-    2. SUBPROCESS: ``ImportService.bootstrap`` runs ``dadaia init`` through
+    2. SUBPROCESS: the workspace bootstrap runs ``dadaia init`` through
        ``SubprocessProcessRunner`` — a child process an in-process monkeypatch cannot
        reach, which rebuilt a real venv (~19 s unloaded / 242 s loaded) AND exercised
        whatever dadaia happened to be installed in the ambient interpreter instead of
        the source under test. The runner is patched to execute ``init`` in-process via
-       the CLI app (same argv contract), where the venv stub above applies. Every other
-       argv passes through to the real subprocess runner untouched.
+       the CLI app (same argv contract), where the venv stub above applies.
     """
     from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
     from dadaia_workspace.infrastructure.subprocess_runner import SubprocessProcessRunner
@@ -285,7 +410,7 @@ def _no_real_venv_in_tests() -> Iterator[None]:
         argv: Sequence[str],
         *,
         cwd: Path | None = None,
-        timeout: float | None = None,
+        **kw: Any,
     ) -> ProcessResult:
         argv = list(argv)
         if argv and Path(argv[0]).name.startswith("dadaia") and argv[1:2] == ["init"]:
@@ -296,7 +421,7 @@ def _no_real_venv_in_tests() -> Iterator[None]:
             target = Path(cwd) if cwd is not None else Path.cwd()
             result = CliRunner().invoke(app, ["init", str(target), *argv[2:]])
             return ProcessResult(returncode=result.exit_code, stdout=result.output, stderr="")
-        return real_run(self, argv, cwd=cwd, timeout=timeout)
+        return real_run(self, argv, cwd=cwd, **kw)
 
     mp = pytest.MonkeyPatch()
     mp.setattr(VenvPythonEnvironmentManager, "ensure_workspace_venv", _fake_ensure, raising=True)
@@ -306,32 +431,17 @@ def _no_real_venv_in_tests() -> Iterator[None]:
 
 
 @pytest.fixture(autouse=True)
-def _scrub_entry_signal_env(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Hermeticity envelope: scrub the harness session-id vars.
-
-    A developer running pytest inside a codex TUI carries ``CODEX_SESSION_ID``. An
-    unscrubbed suite would leak that real session identity into tests resolving
-    session ids. This scrub keeps every test hermetic unless it sets a var explicitly.
-    """
-    from tests.fixtures.harness_env import scrub_entry_signal_env
-
-    scrub_entry_signal_env(monkeypatch)
+def _hermetic_cwd(
+    tmp_path_factory: pytest.TempPathFactory, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Start every test in an empty directory, so no cwd walk reaches a real workspace."""
+    monkeypatch.chdir(tmp_path_factory.mktemp("cwd"))
 
 
-@pytest.fixture(autouse=True, scope="session")
-def _no_real_kimi_home_in_tests(tmp_path_factory: pytest.TempPathFactory) -> None:
-    """Disk/user-config guard: never write the real ``~/.kimi-code`` during the suite.
-
-    v0.2.8 (kimi-code): ``harness add kimi-code`` (and therefore
-    ``--target all`` and ``dadaia init``) upserts the managed hook block into
-    ``$KIMI_CODE_HOME/config.toml`` and writes shims under ``$KIMI_CODE_HOME/hooks/``.
-    Unredirected, every all-target install test would mutate the developer's real Kimi
-    Code user config. Point ``KIMI_CODE_HOME`` at a session tmp dir; tests that assert
-    on the wiring re-point it themselves (function scope wins over this default).
-    """
-    import os
-
-    os.environ["KIMI_CODE_HOME"] = str(tmp_path_factory.mktemp("kimi-home"))
+@pytest.fixture(autouse=True)
+def _plain_help(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Typer reads GITHUB_ACTIONS/FORCE_COLOR at import and then colours CliRunner help."""
+    monkeypatch.setattr("typer.rich_utils.FORCE_TERMINAL", False)
 
 
 @pytest.fixture(autouse=True)
@@ -359,21 +469,51 @@ def _repo_root_write_guard() -> object:
 # The pollution guard is a pre/post DIFF: it fails only on dirs CREATED during
 # the session, never on ones that were already present at session start.
 #
-# Why a diff and not an existence check (bug
-# ``ci-preflight-self-pollution-gate-never-passes``, T-010-25): the
-# ``dadaia ci preflight`` gate runs ruff + mypy BEFORE the pytest check.  When
-# those earlier checks created cache dirs at the repo root, the existence-based
-# guard tripped on the gate's OWN artifacts and the gate could never pass on a
-# clean tree.  Detecting whether those dirs should exist *at all* is the job of
-# ``tests/contract/test_source_repo_hygiene.py`` and CI repo-hygiene — not this
-# session guard, whose only job is to catch tests that pollute the root.
+# Why a diff and not an existence check: ruff and mypy run before pytest and may
+# leave cache dirs at the repo root; an existence check would trip on them. Whether
+# those dirs should exist at all is the CI repo-hygiene job's question.
 _PREEXISTING_POLLUTION: set[str] = set()
+_INSTANCE_AT_START: dict[str, object] = {}
+_OUTSIDE_TMP_AT_START: set[str] = set()
+#: (the HOME the process received, the temp home its suite env carries)
+_HOMES = pytest.StashKey[tuple[Path, Path]]()
+
+
+# ponytail: top-level .cache entries only; a write inside an existing ~/.cache/pip is unseen.
+def _outside_tmp(parent_home: Path) -> set[str]:
+    """What a child writing outside tmp leaves: bytecode in the checkout, a parent-HOME cache."""
+    pycache = {
+        p.as_posix()
+        for d in ("dadaia_workspace", "tests")
+        for p in (_REPO_ROOT / d).rglob("__pycache__")
+    }
+    cache = parent_home / ".cache"
+    return pycache | ({f"~/.cache/{p.name}" for p in cache.iterdir()} if cache.is_dir() else set())
+
+
+def pytest_configure(config: pytest.Config) -> None:
+    """The suite env, applied once per process (the xdist controller and each worker), before
+    collection: every child and in-process ``Path.home()`` see a temp home."""
+    homes = Path.home(), Path(tempfile.mkdtemp(prefix="dadaia-test-home-"))
+    config.stash[_HOMES] = homes
+    env = suite_env(os.environ | _SUITE_KEYS, homes[1])
+    os.environ.clear()
+    os.environ.update(env)
+
+
+def pytest_unconfigure(config: pytest.Config) -> None:
+    shutil.rmtree(config.stash[_HOMES][1], ignore_errors=True)
 
 
 def pytest_sessionstart(session: pytest.Session) -> None:
     """Record which pollution dirs already existed before any test ran."""
     _PREEXISTING_POLLUTION.clear()
-    _PREEXISTING_POLLUTION.update(d for d in _POLLUTION_DIRS if (_REPO_ROOT / d).exists())
+    root = session.config.rootpath
+    _PREEXISTING_POLLUTION.update(d for d in _POLLUTION_DIRS if (root / d).exists())
+    _INSTANCE_AT_START.clear()
+    _INSTANCE_AT_START.update(_instance_fingerprint())
+    _OUTSIDE_TMP_AT_START.clear()
+    _OUTSIDE_TMP_AT_START.update(_outside_tmp(session.config.stash[_HOMES][0]))
 
 
 def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
@@ -382,21 +522,32 @@ def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
     Fails the session (exit code 1) if any tool-generated cache or state
     directory was *created during the test run* at the repo root.  Dirs that
     already existed at session start are ignored — flagging their existence at
-    all is the job of ``tests/contract/test_source_repo_hygiene.py`` and CI, not
-    this guard.  This catches misconfigured tool invocations (wrong CWD, missing
+    all is the CI repo-hygiene job's.  This catches misconfigured tool invocations (wrong CWD, missing
     --no-cache flags, etc.) that the per-test _repo_root_write_guard cannot catch
     (e.g. directories created by pytest plugins that run outside fixture scope).
 
     Offending directories:
       .dadaia  .venv  .pytest_cache  .mypy_cache  .hypothesis  .ruff_cache  test-results
     """
+    if _instance_fingerprint() != _INSTANCE_AT_START:
+        print(  # noqa: T201
+            "\n\n[INSTANCE MUTATED] the context registry or repos/ of a fenced instance "
+            f"changed during the session: {', '.join(_INSTANCE_AT_START)}. A test process "
+            "resolved the live instance (bug test-subprocesses-resolve-the-live-instance)."
+        )
+        session.exitstatus = 1
+    gained = sorted(_outside_tmp(session.config.stash[_HOMES][0]) - _OUTSIDE_TMP_AT_START)
+    if gained:
+        print(f"\n\n[OUTSIDE TMP] gained: {gained}")  # noqa: T201
+        session.exitstatus = 1
+    root = session.config.rootpath
     offenders = [
-        d for d in _POLLUTION_DIRS if (_REPO_ROOT / d).exists() and d not in _PREEXISTING_POLLUTION
+        d for d in _POLLUTION_DIRS if (root / d).exists() and d not in _PREEXISTING_POLLUTION
     ]
     if offenders:
         msg = (
             "\n\n[SESSION POLLUTION] The following cache/state directories were found at "
-            f"the repo root ({_REPO_ROOT}) after the test session:\n"
+            f"the repo root ({root}) after the test session:\n"
             + "".join(f"  {d}\n" for d in offenders)
             + "\nThis means a tool was invoked with the wrong working directory or without "
             "the appropriate no-cache flags.  Fix the root cause:\n"

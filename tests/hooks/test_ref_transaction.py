@@ -1,0 +1,198 @@
+"""The reference-transaction hook body: the creation refusal's fix line is the kernel's spelling
+on every host, and an update the hook has no business with loads no kernel.
+
+Owner: dd-sw-engineer-sr
+"""
+
+from __future__ import annotations
+
+import os
+import re
+import sys
+from pathlib import Path
+
+import pytest
+
+from dadaia_workspace.core.cli_line import reinstall_fix
+from dadaia_workspace.core.platform import Capabilities
+from dadaia_workspace.core.skill_owner import load_owner
+from dadaia_workspace.hooks import ref_transaction
+from tests.fixtures.harness_env import suite_env
+from tests.helpers import oslib
+from tests.helpers.oslib import make_executable, run, write_text
+
+pytestmark = pytest.mark.medium
+
+_ZERO, _SHA, _OTHER = "0" * 40, "a" * 40, "b" * 40
+_CREATE = f"{_ZERO} {_SHA} refs/heads/wt/x\n".encode()
+_UPDATE = f"{_SHA} {_OTHER} refs/heads/wt/x\n".encode()
+_BLOCKED = "[ref-gate] BLOCKED refs/heads/wt/x: wt/ branches are created by the worktree runner"
+
+
+@pytest.fixture
+def repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    root = tmp_path / "repo"
+    root.mkdir()
+    run(["git", "init", "-q"], cwd=root, check=True)
+    monkeypatch.chdir(root)
+    return root
+
+
+def _venv(tmp_path: Path, name: str, caps: oslib.Caps | None) -> Path:
+    """A venv at *tmp_path*/*name*; with *caps*, its CLI file where that host keeps it."""
+    venv = tmp_path / name
+    venv.mkdir()
+    if caps:
+        cli = oslib.venv_tool(venv, "dadaia", caps)
+        cli.parent.mkdir(parents=True)
+        write_text(cli, "")
+        make_executable(cli, caps)
+    return venv
+
+
+@pytest.mark.parametrize("host", ["linux", "win32"])
+@pytest.mark.parametrize("name", ["venv", "my venv"])
+def test_the_creation_fix_is_the_kernels_command_on_every_host(
+    host: str,
+    name: str,
+    repo: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    caps = oslib.detect(host)
+    monkeypatch.setattr("dadaia_workspace.core.platform.PLATFORM", Capabilities.detect(host))
+    venv = _venv(tmp_path, name, caps)
+    monkeypatch.setattr(sys, "prefix", str(venv))
+    assert ref_transaction.main(_CREATE) == 1
+    cli = oslib.venv_tool(venv, "dadaia", caps)
+    line = oslib.command(str(cli), "worktree", "new", "repo", "x", caps=caps)
+    assert capsys.readouterr().err == f"{_BLOCKED}\nfix: {line}\n"
+
+
+def test_without_a_cli_the_fix_is_the_reinstall(
+    repo: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    venv = _venv(tmp_path, "venv", None)
+    monkeypatch.setattr(sys, "prefix", str(venv))
+    assert ref_transaction.main(_CREATE) == 1
+    assert capsys.readouterr().err == f"{_BLOCKED}\nfix: {reinstall_fix(venv)}\n"
+
+
+def test_an_update_of_a_wt_branch_loads_no_kernel(tmp_path: Path) -> None:
+    """The common firing, a commit in a wt tree, imports neither the kernel nor pathlib."""
+    code = (
+        "import sys\n"
+        "banned = {'dadaia_workspace.core.platform', 'pathlib', 'types'}\n"
+        "for name in banned:\n"
+        "    sys.modules.pop(name, None)\n"  # a coverage .pth preloads some; only the hook's imports count
+        "from dadaia_workspace.hooks import ref_transaction\n"
+        f"assert ref_transaction.main({_UPDATE!r}) == 0\n"
+        "assert not banned & set(sys.modules)\n"
+    )
+    done = run([sys.executable, "-B", "-c", code], env=suite_env(os.environ, tmp_path), timeout=60)
+    assert done.returncode == 0, done.stderr
+
+
+def test_a_fault_of_the_hook_itself_warns_and_lets_the_update_through(tmp_path: Path) -> None:
+    """With no `git` to find, the hook cannot judge a branch update; it fails open."""
+    env = suite_env(os.environ, tmp_path, overrides={"PATH": ""})
+    line = f"{_SHA} {_OTHER} refs/heads/main\n"
+    argv = [sys.executable, "-B", "-m", "dadaia_workspace.hooks.ref_transaction"]
+    done = run(argv, input=line, cwd=tmp_path, env=env, timeout=60)
+    assert done.returncode == 0, done.stderr
+    assert "update allowed" in done.stderr, done.stderr
+
+
+def _commit_and_branch(repo: Path, *branches: str) -> None:
+    run(["git", "-c", "user.email=t@example.invalid", "-c", "user.name=T", "commit", "-q",
+         "--allow-empty", "-m", "c"], cwd=repo, check=True)  # fmt: skip
+    for name in branches:
+        run(["git", "branch", name], cwd=repo, check=True)
+
+
+def test_a_zero_old_line_for_an_existing_wt_ref_passes(
+    repo: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A ref packing hands git a zero old sha for refs that already exist: not a creation."""
+    _commit_and_branch(repo, "wt/x")
+    assert ref_transaction.main(_CREATE) == 0
+    assert capsys.readouterr().err == ""
+
+
+def test_a_zero_old_line_for_a_missing_wt_ref_is_refused_beside_an_existing_one(
+    repo: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    _commit_and_branch(repo, "wt/y")
+    monkeypatch.setattr(sys, "prefix", str(_venv(tmp_path, "venv", None)))
+    assert ref_transaction.main(_CREATE) == 1
+    assert capsys.readouterr().err.startswith(f"{_BLOCKED}\nfix: ")
+
+
+def test_a_forced_unmarked_move_of_an_existing_wt_branch_passes(repo: Path) -> None:
+    """Through git with the hook installed, `branch -f` moving a wt ref to a commit that does not
+    descend from its tip is no creation and the hook adds no gate for it."""
+    _commit_and_branch(repo, "wt/x")
+    hook = repo / ".git" / "hooks" / "reference-transaction"
+    write_text(
+        hook,
+        f'#!/bin/sh\n[ "$1" = prepared ] || exit 0\nexec "{sys.executable}" -B -m '
+        "dadaia_workspace.hooks.ref_transaction\n",
+    )
+    make_executable(hook, oslib.detect(sys.platform))
+    tree = run(
+        ["git", "hash-object", "-t", "tree", "-w", "--stdin"], cwd=repo, input="", check=True
+    )
+    orphan = run(["git", "-c", "user.email=t@example.invalid", "-c", "user.name=T", "commit-tree",
+                  tree.stdout.strip(), "-m", "d"], cwd=repo, check=True).stdout.strip()  # fmt: skip
+    moved = run(["git", "branch", "-f", "wt/x", orphan], cwd=repo)
+    assert (moved.returncode, moved.stderr) == (0, "")
+    assert run(["git", "rev-parse", "wt/x"], cwd=repo).stdout.strip() == orphan
+
+
+@pytest.mark.parametrize("sub", ["", "sub"])
+@pytest.mark.parametrize("where", ["main", "linked"])
+def test_the_hook_and_main_checkout_name_the_same_repo(
+    where: str,
+    sub: str,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """The slug in the creation fix is the main checkout's folder name, as `_git.main_checkout` reads it."""
+    main = tmp_path / "primary-checkout"
+    main.mkdir()
+    run(["git", "init", "-q"], cwd=main, check=True)
+    run(["git", "-c", "user.email=t@example.invalid", "-c", "user.name=T", "commit", "-q",
+         "--allow-empty", "-m", "c"], cwd=main, check=True)  # fmt: skip
+    linked = tmp_path / "linked-tree"
+    run(["git", "worktree", "add", "-q", "-b", "side", str(linked)], cwd=main, check=True)
+    cwd = (main if where == "main" else linked) / sub
+    cwd.mkdir(exist_ok=True)
+    monkeypatch.chdir(cwd)
+    caps = oslib.detect("linux")
+    monkeypatch.setattr("dadaia_workspace.core.platform.PLATFORM", Capabilities.detect("linux"))
+    monkeypatch.setattr(sys, "prefix", str(_venv(tmp_path, "venv", caps)))
+    assert ref_transaction.main(_CREATE) == 1
+    slug = re.search(r"worktree new (\S+) x", capsys.readouterr().err)
+    assert slug is not None
+    assert slug.group(1) == load_owner("dd-bug-resolution", "_git").main_checkout(cwd).name
+    assert slug.group(1) == "primary-checkout"
+
+
+def test_a_short_run_of_zeros_is_not_the_zero_id(
+    repo: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """One decider of the sentinel: git's zero id is a whole object id, as the kernel reads it."""
+    line = f"0000000 {_SHA} refs/heads/wt/x\n".encode()
+    assert ref_transaction.main(line) == 0
+    assert capsys.readouterr().err == ""
+
+
+def test_the_module_entry_exits_three_on_a_refusal(repo: Path, tmp_path: Path) -> None:
+    """Installed shims run `python -m dadaia_workspace.hooks.ref_transaction` and turn exit 3 into a refusal."""
+    env = suite_env(os.environ, tmp_path)
+    argv = [sys.executable, "-B", "-m", "dadaia_workspace.hooks.ref_transaction"]
+    done = run(argv, input=_CREATE.decode(), cwd=repo, env=env, timeout=60)
+    assert done.returncode == 3, done.stderr
+    assert _BLOCKED in done.stderr

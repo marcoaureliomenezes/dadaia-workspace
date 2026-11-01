@@ -1,0 +1,40 @@
+# Job 3 — the four operator-ordered deletions (FR3)
+
+**Status:** Draft
+
+Wave 1, waits on —. Paths are repository-relative to `repos/dadaia-workspace/`; `S/` = `dadaia_workspace/public/skills/`. Design and evidence: PLAN §1, §1.1, §2. Operator ruling for every removed or moved assert (root map §1): "Yes, all four (Recommended)" (rc-21 grill, Q3). `WT merge` refuses an implementation commit that touches the repo's test globs, so each assert leaves in its own `test(J3.T<k>): …` commit whose body names that ruling, and the source it pinned leaves in the next task's commit.
+
+- **The kept copy (AC3.1).** `tests/core/test_cli_line__fix_line_contract.py:1013` stays: it is the fix-line contract's home and `scripts/guards/slop.py:79` imports its `REPORT_ONLY`. `tests/cli/commands/test_doctor.py:452` goes with the dict and plant helper only it uses (`REPORT_ONLY` at `:365`, `_plant_stale_feature_map` at `:353`) and any import left unused.
+- **The AST grep (AC3.2).** `tests/features/export/test_scan.py:116-123` goes with imports left unused; the import-linter contract `features-no-cross-feature` (`setup.cfg:93`) stays the one check.
+- **Dead state (AC3.3).** Tests T3 first: `tests/cli/commands/test_ci.py:326` (`message_listed`), `tests/core/test_gitflow.py:227` (`several.text` leaves the tuple compared; the other two members stay), `tests/features/migrate/test_state_v2.py:90-91` (the `already_v2` case keeps its `already_v2` asserts; the `schema_version_before == "3"` assert goes; `:77`, the non-current path, stays). Source T4 after: `Decision.message_listed` (`branch_policy.py:39`, no reader); `self.text` in `SeveralWorkBranches.__init__` (`core/gitflow.py:105`; the constructor still takes `text` to build `fix`, and `:117` reads the skill's own `SeveralWork.text`, which stays); the `schema_version_before=` argument of the already-current return in `plan_migration` (`state_v2.py:38`), with the field moved below the required ones and given the default `""` (`migrate.py:36` prints it only on the non-current path, after the `already_v2` exit at `:87`).
+- **MEM-DRIFT-1 leaves the shipped doctor (AC3.4).** The rule reads the library's own `dadaia_workspace/features/` folder (`doctor_memory.py:261-283`), so it never fires in a user's repo. Order: T5 removes its tests, T6 adds the repo guard and its plant, T7 deletes the rule, T8 corrects the two skill lines.
+  - T5: from `tests/features/specs/test_doctor_memory.py` the MEM-DRIFT-1 cases (`:200`, `:252` and their module-docstring line), and from `tests/core/test_cli_line__fix_line_contract.py` the `"MEM-DRIFT-1"` entry of `REPORT_ONLY` with `_plant_stale_feature_map` (`:353`, `:544`); MEM-DRIFT-2 and the other plants stay.
+  - T6: in `scripts/guards/repo.py`, one check beside `memory_canonical_shape`, `features_map_matches_architecture(tree)`: it reads `specs/memory/ARCHITECTURE.md` and the tracked `dadaia_workspace/features/*/__init__.py` through `tree`, and returns one message per name the map's `pkgs[...]` node lists that no live package has (`stale-node:`), and one per live package the node omits (`missing-node:`). The three regexes and `_mermaid_block_after_heading` move from `doctor_memory.py` with it. One plant in the check's plants dict edits the node to name a package that does not exist and must go red on `stale-node:`; the control stays green. The guard runs in `python scripts/ci.py job` (`guards`, `guards --planted`).
+  - T7: delete `check_mem_drift1_features_package_map`, its regexes and helper, and the module docstring words, from `doctor_memory.py`; delete the rule at `rules.py:83`. Closure (PE, not a task): `ARCHITECTURE.md:52` `Measured by:` names the guard, `QUALITY.md:54` and the `workspace-doctor` atom drop the doctor rule.
+  - T8: `S/dd-audit-project/PILLAR-MEMORY.md:16` and `S/dd-release-implementation/MEMORY-UPDATE.md:18` say `MEM-DRIFT-2` where they say `MEM-DRIFT-1/2`; public text names no repo guard.
+- **Net lines (AC3.6).** Production lines (`dadaia_workspace/**`, `scripts/`) fall: the rule and helpers (-45 to -50), `rules.py` (-4), the three dead fields (-6), against the guard (+20 to +25). The reviewer reads `git diff --numstat`, tests excluded; a net at or above 0 returns the job.
+
+**Gate law.** `verify:` is `python scripts/ci.py job`, unchanged; it runs `guards` and `guards --planted`, which prove T6. Definition of done: that run, the reviewer directories below, the own-diff self-check, the sweep greps; no preflight.
+
+**Reviewer test directories** (`python scripts/impact.py <W: files>` at HEAD `84b5a7731`, collapsed).
+- T1 to T3, T5: the edited test files and their own directories: `tests/cli/commands`, `tests/core`, `tests/features/export`, `tests/features/migrate`, `tests/features/specs`.
+- T4 (`branch_policy.py`, `gitflow.py`, `state_v2.py`): 190 files in `tests/{cli,contract,core,e2e,features,fixtures,hooks,infrastructure,public}` and `tests/test_container.py`.
+- T6: `scripts/guards/repo.py` prints `unmapped`; the guard is exercised by `python scripts/guards/run.py` and `--planted`.
+- T7 (`doctor_memory.py`, `rules.py`): 109 files in `tests/{cli,contract,core,e2e,fixtures}`, `tests/features/{backlog,migrate,spec_context,specs,workspace}`.
+- T8: `tests/public/skills/dd_audit_project/scripts`, `tests/public/skills/dd_release_implementation/scripts`.
+The reviewer runs the printed reach of T4 and T7 once each (PLAN §4, seam 3).
+
+**Sweep greps.** `git grep -n "MEM-DRIFT-1" -- dadaia_workspace tests scripts` prints nothing; `git grep -nE "message_listed|schema_version_before" -- dadaia_workspace tests` prints only the non-current path (`state_v2.py`, `migrate.py:36`, `test_state_v2.py:77`); `git grep -n "REPORT_ONLY" -- tests` prints only `tests/core/test_cli_line__fix_line_contract.py`; `git grep -n "features-no-cross-feature" -- setup.cfg` prints the contract; `git grep -n "ast.walk" -- tests/features/export/test_scan.py` prints nothing.
+
+Tasks: 8 (3 sr, 5 jr). Each test-removal task (T1, T2, T3, T5) precedes the source it pinned: T4 follows T3, T7 follows T5 and T6. T1, T2, T3, T5 and T6 share no path and may run in parallel.
+
+| task | who | AC | `W:` | outcome |
+|---|---|---|---|---|
+| J3.T1 | jr | AC3.1, AC3.5 | `tests/cli/commands/test_doctor.py` | `test(J3.T1)`: delete the duplicate judgment-only test and the plants only it uses; owner of the contract stays `tests/core/test_cli_line__fix_line_contract.py` |
+| J3.T2 | jr | AC3.2, AC3.5 | `tests/features/export/test_scan.py` | `test(J3.T2)`: delete the AST grep (`:116-123`) and unused imports; the lint contract is the one check |
+| J3.T3 | jr | AC3.3, AC3.5 | `tests/cli/commands/test_ci.py`, `tests/core/test_gitflow.py`, `tests/features/migrate/test_state_v2.py` | `test(J3.T3)`: remove the three asserts of dead state, nothing else in those tests |
+| J3.T4 | jr | AC3.3 | `dadaia_workspace/features/chokepoints/branch_policy.py`, `dadaia_workspace/core/gitflow.py`, `dadaia_workspace/features/migrate/state_v2.py` | delete `message_listed`, `self.text`, and the already-current `schema_version_before` argument as stated above; owners the surviving asserts of T3's three files |
+| J3.T5 | sr | AC3.4, AC3.5 | `tests/features/specs/test_doctor_memory.py`, `tests/core/test_cli_line__fix_line_contract.py` | `test(J3.T5)`: remove the MEM-DRIFT-1 cases and its `REPORT_ONLY` plant; MEM-DRIFT-2, LINT-1 and the other plants stay unloosened |
+| J3.T6 | sr | AC3.4 | `scripts/guards/repo.py` | ADD the repo guard `features_map_matches_architecture` with one plant, red once on `stale-node:`, control green; net of the move stays under the lines T7 deletes |
+| J3.T7 | sr | AC3.4, AC3.6 | `dadaia_workspace/features/specs/doctor_memory.py`, `dadaia_workspace/features/specs/rules.py` | DELETE MEM-DRIFT-1 from the shipped doctor; owners `tests/features/specs/test_doctor_memory.py`, `tests/core/test_cli_line__fix_line_contract.py` |
+| J3.T8 | jr | AC3.4 | `dadaia_workspace/public/skills/dd-audit-project/PILLAR-MEMORY.md`, `dadaia_workspace/public/skills/dd-release-implementation/MEMORY-UPDATE.md` | the two skill lines name `MEM-DRIFT-2` alone; no other word changes |

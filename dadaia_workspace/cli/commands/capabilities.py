@@ -9,16 +9,18 @@ from rich.console import Console
 from rich.table import Table
 
 from dadaia_workspace.cli.help_digest import command_paths
+from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.features.capabilities import build_capabilities
 
 console = Console()
 
 
 def capabilities(
+    ctx: typer.Context,
     json_output: bool = typer.Option(False, "--json", help="Emit the stable JSON contract."),
 ) -> None:
     """Describe public dadaia-workspace features supported by this installation."""
-    payload = build_capabilities(command_paths())
+    payload = build_capabilities(command_paths(ctx.find_root().command))
     if json_output:
         typer.echo(json.dumps(payload, sort_keys=True))
         return
@@ -36,5 +38,5 @@ def capabilities(
         "Contexts",
         ", ".join(payload["contexts"]["commands"]),
     )
-    table.add_row("Machine output", "dadaia capabilities --json")
+    table.add_row("Machine output", fix_line(None, "capabilities", "--json"))
     console.print(table)

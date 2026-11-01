@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "histo-record-v1",
+  "title": "History Record v1",
+  "description": "One terminal record of one exit, in any of the three append-only history ledgers: 'id'/'ts'/'disposition' are the immutable core, 'release'/'reason'/'summary' nullable free text, 'entry' the removed object or null. Each ledger's validator (_backlog_schema.py, _audit_check.py, _release_check.py) holds its own subset of the disposition enum.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "ts", "disposition", "release", "reason", "summary", "entry"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The exiting subject's own stable identity — the backlog slug, the audit directory name, the release id. One line per id, ever."
+    },
+    "ts": {
+      "type": "string",
+      "minLength": 1,
+      "description": "When the exit happened: an ISO-8601 date or UTC timestamp. Date-only values are accepted."
+    },
+    "disposition": {
+      "type": "string",
+      "enum": ["delivered", "resolved", "superseded", "rejected", "to-bug"],
+      "description": "The terminal verdict; each ledger's validator holds its subset."
+    },
+    "release": {
+      "type": ["string", "null"],
+      "description": "The release that dispositioned this subject, or null when none did."
+    },
+    "reason": {
+      "type": ["string", "null"],
+      "description": "Why this disposition, when the disposition alone does not say it."
+    },
+    "summary": {
+      "type": ["string", "null"],
+      "description": "One-paragraph narrative of the exit."
+    },
+    "entry": {
+      "type": ["object", "null"],
+      "description": "The removed object itself — the backlog active[] entry, the audit's window-end sha and per-pillar counts — or null."
+    }
+  },
+  "examples": [
+    {
+      "id": "push-range-denylist-scan",
+      "ts": "2026-08-14",
+      "disposition": "delivered",
+      "release": "0.9.0",
+      "reason": null,
+      "summary": "Shipped as the pre-push whole-tree denylist scan.",
+      "entry": null
+    }
+  ]
+}

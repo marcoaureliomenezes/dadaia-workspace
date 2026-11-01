@@ -1,0 +1,33 @@
+# Job 4 — release and backlog scripts: spawn refusals, the common-dir helper, the orphan closure line, the 64-hex release state (FR3, FR4.4, FR5, FR10.4)
+
+**Status:** Draft
+
+Wave 2, waits on Job 2, Job 5. Paths are repository-relative to `repos/dadaia-workspace/`. Design and evidence: PLAN §1 and §1.1.
+
+- **Waits.** Job 2 lands `_git.main_checkout`; Job 5 lands the verb whose runnable line the closure fallback names for an orphan `wt/*` branch (AC4.8).
+- **AC4.4 reader.** `_release_phase._refuse_open_worktrees` decides "the rc's own tree" by `Path(...).name != 'wt-rc'`; it reads a `kind` field of the worktree owner's row (Job 5 adds it from `kind_of`) instead, so the leaf grammar is read through `NAME_RE`'s owner only.
+- **Sweep of the AC2.3 pattern.** `_backlog_exit.py:20` imports `_bugs_store` across skills for one `read_records` call: it takes the kernel's `_jsonl.read` (the kernel is the shared folder every skill script puts on its path) or runs `bugs.py`. The SPEC names only `_stats.py`; the pre-review sweep rule makes this hit part of the same class.
+- **AC10.4.** `release-state-v1.schema.json` sha patterns (`:178,183,188`) accept 64 hex; if one is shown unreachable in a SHA-256 repository the task states why and leaves it.
+
+**Gate law (rc-18).** The job's `verify:` is `python scripts/ci.py job` (median 1m52, measured in rc-17; no `verify:` change). An implementer's definition of done is that run, plus the touched test directories (`tests/public/skills/dd_release_implementation`, `tests/public/skills/dd_backlog_definition`), plus the own-diff self-check over `git diff <base>...HEAD`: no removed `assert` line and no newly skipped test unless this file names the order, and the sweep greps. No preflight, no full CI line; CI on push is the net. A RED task fails only on its new RED tests and says which. Every task reads `.dadaia/tmp/main-thread/20261018/rc18-common.md`.
+
+**Sweep greps.** `git grep -n '_bugs_store' -- dadaia_workspace/public/skills | grep -v dd-bug-resolution` prints nothing; `git grep -n 'git-common-dir' -- dadaia_workspace/public/skills/dd-release-implementation` prints nothing.
+
+Tasks: 3 (2 jr, 1 sr, 0 pe). `who` names the dispatched role (`dd-release-definition` §5). Parallelism: T2 and T3 after T1 (disjoint, parallel).
+
+| task | who | AC | `W:` | outcome |
+|---|---|---|---|---|
+| J4.T1 | sr | AC3.1, AC4.4, AC5.1, AC10.4 | `tests/public/skills/dd_release_implementation/scripts/test__release_phase__fix_line.py`, `tests/public/skills/dd_backlog_definition/scripts/test__backlog_exit.py`, `tests/public/skills/dd_release_implementation/scripts/test__release_schema.py` | RED: `OSError` on the worktree-rows spawn and the `release.py origin` spawn each refuse with one fix line; the closure fallback line for an orphan `wt/*` branch runs; the open-worktree check reads the main checkout through the helper; a 64-hex sha is accepted by each reachable release-state pattern |
+| J4.T2 | jr | AC3.1, AC4.4, AC5.1 | `dadaia_workspace/public/skills/dd-release-implementation/scripts/_release_phase.py`, `dadaia_workspace/public/skills/dd-backlog-definition/scripts/_backlog_exit.py`, `tests/public/skills/dd_backlog_definition/scripts/test__backlog_exit.py` (main-thread `W:` amendment: `test__backlog_exit.py`) | the helper call, the `OSError` refusals, the runnable orphan fix line, the `kind` row read, the `_jsonl.read` swap; turns T1 green except the schema row |
+| J4.T3 | jr | AC5.4, AC10.4 | `dadaia_workspace/public/skills/dd-release-implementation/scripts/_release_schema.py`, `dadaia_workspace/public/skills/dd-release-implementation/scripts/schemas/release-state-v1.schema.json` | `_release_schema.py:114` calls `_git.shallow`; the sha patterns widened; turns the schema row green |
+| J4.T4 | sr | AC4.4 | `dadaia_workspace/public/skills/dd-release-implementation/scripts/_release_phase.py`, `tests/public/skills/dd_release_implementation/scripts/test__release_phase__fix_line.py` | `a21d11dea`, `21b22ad26`, `8585fe9ad`: the closure prints the worktree owner's `exit`, else its `fix`; the consumer authors no line |
+| J4.T5 | sr | AC4.4 | `dadaia_workspace/public/skills/dd-gitflow-default/scripts/_worktree_git.py`, `tests/public/skills/dd_gitflow_default/scripts/test__worktree_git.py`, `tests/public/skills/dd_release_implementation/scripts/test__release_phase__fix_line.py` | `eb38b2aa0`, `554e7ff08`: a foreign worktree row carries an agent-act fix; reverted by J4.T6 |
+| J4.T6 | sr | AC4.4 | `dadaia_workspace/public/skills/dd-gitflow-default/scripts/_worktree_git.py`, `dadaia_workspace/public/skills/dd-release-implementation/scripts/_release_phase.py`, `tests/public/skills/dd_gitflow_default/scripts/test__worktree_git.py`, `tests/public/skills/dd_release_implementation/scripts/test__release_phase__fix_line.py` | `769091693`, `d77440398`, `cee0f1a52`, `d9ba8a7f5`: the closure held only job, task and lane trees and the foreign-row act went; superseded by J4.T8 |
+| J4.T7 | sr | AC4.4, AC4.8 | `dadaia_workspace/public/skills/dd-gitflow-default/scripts/_worktree_git.py`, `tests/public/skills/dd_gitflow_default/scripts/test__worktree_git.py` | `751dc387c`, `cd5aa62c0`: an orphan row of the repo's own tree (directory deleted) carries its name, kind and exit |
+| J4.T8 | sr | AC4.4 | `dadaia_workspace/public/skills/dd-gitflow-default/scripts/_worktree_git.py`, `dadaia_workspace/public/skills/dd-release-implementation/scripts/_release_phase.py`, `tests/public/skills/dd_gitflow_default/scripts/test__worktree_git.py`, `tests/public/skills/dd_release_implementation/scripts/test__release_phase__fix_line.py` | `92f3a66c1`, `875168845`, `b92058e85`, `e53e7a077`: CLOSURE holds every owner row but `kind == "rc"` and the tree it runs from; the owner gives every row a line, pinned by a partition test |
+
+**Closure record (main thread, 2026-10-18).** 5 tasks landed beyond the PLAN, the rows after the planned ones, read from `git log wt/0.5.0/rc-18/wt-rc`.
+
+- Ruled, AC4.4: the closure prints the worktree owner's `exit`, else its `fix`; the consumer authors no line (J4.T4). The earlier "runnable orphan merge line" ruling (J4.T2's outcome) was wrong and was reverted after review.
+- Ruled, the closure set (J4.T8, supersedes the J4.T6 ruling): CLOSURE holds every owner row of the repo except `kind == "rc"` and the tree it runs from, which keeps rc-17's contracts in `test__specs__workspace_root.py` (old-grammar work blocks; the running tree is spared). The owner gives every row a line, pinned by a partition test. `RC-FLOW.md` step 4 ("job, task or lane tree") under-stated the set and is corrected in the closure's law pass.
+- `W:` amendment (main thread): J4.T2 writes `test__backlog_exit.py`.

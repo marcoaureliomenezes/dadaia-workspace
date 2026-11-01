@@ -1,32 +1,39 @@
 """Python venv manager — creates .dadaia/.venv/ idempotently.
 
-Executable paths are constructed using ``PLATFORM.venv_scripts_dir`` and
-``PLATFORM.venv_exe_suffix`` so that the paths are correct on both POSIX
+Executable paths come from the platform door, so they are right on both POSIX
 (``bin/python``) and Windows (``Scripts/python.exe``).
 """
 
 import base64
 import hashlib
-import ntpath
+import inspect
 import os
 import re
 import shutil
 import subprocess
 import sys
+import tempfile
 import zipfile
+from collections.abc import Iterable
 from importlib import metadata
 from pathlib import Path
 
+from packaging.version import Version
+
 import dadaia_workspace
+from dadaia_workspace.core import platform
 from dadaia_workspace.core.exceptions import (
     BootstrapPackageError,
     WorkspaceVenvBootstrapError,
+    WorkspaceVenvNewerError,
 )
-from dadaia_workspace.core.platform import PLATFORM
+from dadaia_workspace.core.platform import act
+from dadaia_workspace.infrastructure.provider_version import provider_version
 
 __all__ = [
     "VenvPythonEnvironmentManager",
     "WorkspaceVenvBootstrapError",
+    "WorkspaceVenvNewerError",
     "repack_installed_wheel",
 ]
 
@@ -36,10 +43,10 @@ def repack_installed_wheel(
 ) -> Path | None:
     """Re-pack the RUNNING installed distribution into a wheel under *dest_dir*.
 
-    Bug certify-cannot-install-installed-provider: a disposable venv bootstrap that pins
-    ``dadaia-workspace==<running version>`` cannot resolve an UNPUBLISHED candidate (or a
-    yanked release, or any version on an offline host) from the index. The installed
-    distribution itself IS a reproducible source: a wheel is site-packages payload +
+    A disposable venv bootstrap that pins ``dadaia-workspace==<running version>`` cannot
+    resolve an unpublished candidate (or a yanked release, or any version on an offline
+    host) from the index. The installed distribution itself is a reproducible source: a
+    wheel is site-packages payload +
     dist-info, so the exact running version is re-packed file-for-file with a regenerated
     RECORD (pip verifies those hashes at install time).
 
@@ -103,30 +110,40 @@ def repack_installed_wheel(
 
 # ── requires-python interpreter resolution ────────────────────────────────────────
 #
-# Bug init-venv-bootstrap-inherits-degraded-base-python: stdlib ``venv.create()``
-# resolves a NEW venv's base interpreter through ``sys._base_executable`` of the
-# CALLING process. On a venv created with ``symlinks=False`` ("--copies" — exactly
-# what ``venv.create(..., with_pip=True)`` used here without an explicit ``symlinks``
-# argument), CPython's getpath.c re-derives that value via a landmark search for the
-# OS-level *unversioned* ``python3`` name inside the recorded ``home`` directory — NOT
-# the version-pinned ``executable`` its own ``pyvenv.cfg`` records. When the host's
-# unversioned ``/usr/bin/python3`` is a symlink to an OLDER interpreter than the one
-# actually running (e.g. a Debian/Ubuntu host that keeps 3.10 as the OS default
-# alongside an installed 3.12), every child venv silently degrades and the subsequent
-# package install fails opaquely with "requires a different Python". Reproduced on
-# this exact host class: a `.dadaia/.venv` built with `--copies` reports
-# `sys._base_executable == "/usr/bin/python3"` (a symlink to 3.10) while its own
-# `pyvenv.cfg` `executable` field correctly names `/usr/bin/python3.12` (the
-# interpreter that actually built it), and the running interpreter is itself 3.12.
-#
-# The fix: never trust that implicit resolution. Resolve and VERIFY an interpreter
-# explicitly (by executing each candidate and checking ITS reported version), then
-# hand it to ``python -m venv`` via subprocess — which re-derives its OWN base
-# correctly because IT is not the degraded ``--copies`` binary.
+# ``venv.create()`` takes a new venv's base from the caller's ``sys._base_executable``,
+# which a ``--copies`` venv re-derives from the host's unversioned ``python3`` (possibly an
+# OLDER interpreter). Resolve and VERIFY an interpreter by executing it, then run
+# ``python -m venv`` from THAT interpreter via subprocess.
 
 _REQUIRES_PYTHON_CLAUSE_RE = re.compile(r"(>=|<=|==|!=|>|<)\s*([0-9]+(?:\.[0-9]+){0,2})")
 _REQUIRES_PYTHON_FLOOR_RE = re.compile(r">=\s*3\.(\d+)")
 _DEFAULT_FLOOR_MINOR = 12  # dadaia-workspace's floor today (pyproject.toml: python = "^3.12")
+
+
+def build_digest(files: "Iterable[metadata.PackagePath] | None") -> str:
+    """The payload's installed bytes digested — the build a version label cannot name, and a
+    damaged file changes; the venv probe runs this same source, so both sides hash alike."""
+    import hashlib
+    from pathlib import Path
+
+    digest = hashlib.sha256()
+    for f in sorted(files or (), key=str):
+        if f.parts[0] == "dadaia_workspace" and "__pycache__" not in f.parts:
+            path = Path(f.locate())
+            digest.update(f"{f}\n".encode())
+            digest.update(hashlib.sha256(path.read_bytes() if path.is_file() else b"").digest())
+    return digest.hexdigest()[:16]
+
+
+def provider_build() -> str | None:
+    """``"<version> <build digest>"`` of the running distribution, or ``None``."""
+    version = provider_version()
+    return version and f"{version} {build_digest(metadata.distribution('dadaia-workspace').files)}"
+
+
+def _tail_lines(exc: subprocess.CalledProcessError, count: int = 5) -> str:
+    """The last *count* whole lines of a failed installer's output — never cut mid-line."""
+    return "\n".join((exc.stderr or exc.output or "").strip().split("\n")[-count:])
 
 
 def _version_satisfies(version: tuple[int, ...], spec: str | None) -> bool:
@@ -167,10 +184,13 @@ def _version_satisfies(version: tuple[int, ...], spec: str | None) -> bool:
     return True
 
 
-#: Bound on the interpreter-probe subprocess (v0.4.3 T-043-13/A9.2, CWE-426 sibling
+#: Bound on the interpreter-probe subprocess (CWE-426 sibling
 #: hardening): a hung or interactive candidate must degrade to ``None``, never wedge
 #: the bootstrap indefinitely.
 _INTERPRETER_PROBE_TIMEOUT_SECONDS = 10
+
+
+_VERSION_ARGS = ("-c", "import sys; print(*sys.version_info[:3])")
 
 
 def _interpreter_version(executable: str) -> tuple[int, int, int] | None:
@@ -181,20 +201,22 @@ def _interpreter_version(executable: str) -> tuple[int, int, int] | None:
     skipped, never a hard failure.
 
     The probe is bounded (``timeout=``) and never inherits the caller's stdin
-    (``stdin=subprocess.DEVNULL``, v0.4.3 T-043-13/A9.2) — an interactive or hanging
+    (``stdin=subprocess.DEVNULL``) — an interactive or hanging
     candidate on an untrusted PATH must not wedge the whole bootstrap.
     """
     try:
-        proc = subprocess.run(
-            [executable, "-c", "import sys; print(*sys.version_info[:3])"],
-            capture_output=True,
-            text=True,
-            check=False,
+        proc = platform.run(
+            [executable, *_VERSION_ARGS],
             timeout=_INTERPRETER_PROBE_TIMEOUT_SECONDS,
             stdin=subprocess.DEVNULL,
         )
     except (OSError, subprocess.SubprocessError):
         return None
+    return _parsed_version(proc)
+
+
+def _parsed_version(proc: "subprocess.CompletedProcess[str]") -> tuple[int, int, int] | None:
+    """The ``(major, minor, micro)`` a :data:`_VERSION_ARGS` run printed, ``None`` when it failed."""
     if proc.returncode != 0:
         return None
     parts = proc.stdout.split()
@@ -213,23 +235,23 @@ def _current_venv_pyvenv_executable() -> str | None:
     above) — it was written by the interpreter that actually built THIS venv, so it
     is authoritative regardless of any later OS-level symlink drift.
 
-    CWE-426 (untrusted search path, v0.4.3 T-043-13/A9.1): ``pyvenv.cfg`` is a plain
+    CWE-426 (untrusted search path): ``pyvenv.cfg`` is a plain
     text file a caller could hand-edit or a compromised prior bootstrap could have
     written; its ``executable`` value is REJECTED here — before any caller can hand it
-    to :func:`_interpreter_version`/``subprocess.run`` — unless it is an absolute path.
+    to :func:`_interpreter_version` — unless it is an absolute path.
     """
     cfg = Path(sys.prefix) / "pyvenv.cfg"
     if not cfg.is_file():
         return None
     try:
-        text = cfg.read_text(encoding="utf-8", errors="replace")
+        text = platform.decode(cfg.read_bytes())
     except OSError:
         return None
     for line in text.splitlines():
         key, sep, value = line.partition("=")
         if sep and key.strip() == "executable":
             candidate = value.strip()
-            return candidate if os.path.isabs(candidate) else None
+            return candidate if platform.is_fully_qualified(candidate) else None
     return None
 
 
@@ -252,56 +274,31 @@ def _path_candidates(min_minor: int) -> list[str]:
     alongside it (e.g. ``/usr/bin/python3.12`` next to a ``python3 -> python3.10``
     symlink).
 
-    CWE-426 (untrusted search path, v0.4.3 T-043-13/A9.1): on POSIX, ``shutil.which``
+    CWE-426 (untrusted search path): ``shutil.which``
     can return a RELATIVE path when PATH itself carries a relative entry (e.g. a
     leading ``.`` — an untrusted or misconfigured PATH). A relative result is rejected
-    here, before it can reach :func:`_interpreter_version`/``subprocess.run``.
+    here, before it can reach :func:`_interpreter_version`.
     """
     found: list[str] = []
     for minor in (min_minor + 1, min_minor):
         exe = shutil.which(f"python3.{minor}")
-        if exe and os.path.isabs(exe):
+        if exe and platform.is_fully_qualified(exe):
             found.append(exe)
     return found
 
 
-def _is_fully_qualified(candidate: str) -> bool:
-    """True iff *candidate* is unambiguously rooted regardless of the current working
-    directory OR (on Windows) the current drive (v0.4.3 T-043-23 security-review
-    rework, LOW residual, CWE-426).
-
-    ``os.path.isabs`` alone is not enough at the probe boundary: on Python 3.12,
-    ``ntpath.isabs`` treats a DRIVE-RELATIVE path — exactly one leading separator, no
-    drive letter, e.g. ``\\tools\\python.exe`` — as absolute, even though it resolves
-    against whatever drive happens to be current, not a fully qualified location.
-    (Python 3.13 tightened ``ntpath.isabs`` to require a drive too; this project pins
-    ``python = \"^3.12\"``, so the probe cannot rely on that yet.)
-
-    Routed through the ``ntpath`` module explicitly — never the host-bound ``os.path``
-    — when ``os.name == \"nt\"``: this makes the Windows-specific check provable on any
-    host OS (``ntpath`` is a pure-Python module, always importable regardless of the
-    running platform), and is exactly what real Windows already does (there,
-    ``os.path`` IS ``ntpath``). POSIX (``os.name != \"nt\"``) is unaffected — plain
-    ``os.path.isabs`` has no such gap there.
-    """
-    if os.name == "nt":
-        return ntpath.isabs(candidate) and ntpath.splitdrive(candidate)[0] != ""
-    return os.path.isabs(candidate)
-
-
 class VenvPythonEnvironmentManager:
     def _venv_path(self, workspace_root: str) -> Path:
-        return Path(workspace_root) / ".dadaia" / ".venv"
+        return platform.venv_dir(Path(workspace_root))
 
     def _dadaia_entrypoint(self, workspace_root: str) -> Path:
-        return (
-            self._venv_path(workspace_root)
-            / PLATFORM.venv_scripts_dir
-            / f"dadaia{PLATFORM.venv_exe_suffix}"
-        )
+        return platform.workspace_cli_path(Path(workspace_root))
 
-    def _install_spec(self, workspace_root: str) -> str:
+    def _install_spec(self, scratch_dir: str) -> str:
         """Resolve what to ``pip install`` so the venv mirrors the RUNNING distribution.
+
+        A re-packed wheel is written under *scratch_dir*, which the caller deletes after
+        the install (no wheel is left behind).
 
         Two paths, no index:
 
@@ -313,16 +310,14 @@ class VenvPythonEnvironmentManager:
           (:func:`repack_installed_wheel`) — the installed distribution is itself a
           reproducible source, so the venv gets the bootstrapper's own bytes.
 
-        Bug ``init-venv-installs-index-version-not-running-distribution``: this used to
-        pin ``dadaia-workspace==<running version>`` from the INDEX whenever the package
-        was not importable from a checkout. Under the release-please floor (ADR 0021)
-        every unpublished build declares the last PUBLISHED version, so the pin
-        resolved — to PyPI's bytes, not the bootstrapper's. The venv then ran different
-        code than the process that created it, silently.
+        A package not importable from a checkout is never pinned from the index: an
+        unpublished build declares the last published version, so an index pin would
+        resolve to PyPI's bytes, not the bootstrapper's. The venv is installed from the
+        re-packed running distribution instead.
 
         ``DADAIA_BOOTSTRAP_PACKAGE`` still names an explicit local wheel: it is the
         operator's override for validating a candidate build (see
-        ``CONSUMER_VALIDATION_RECIPE.md``), not a bootstrap path of its own.
+        ``scripts/CONSUMER_VALIDATION_RECIPE.md``), not a bootstrap path of its own.
         """
         candidate = os.environ.get("DADAIA_BOOTSTRAP_PACKAGE", "").strip()
         if candidate:
@@ -333,17 +328,15 @@ class VenvPythonEnvironmentManager:
         src_root = Path(dadaia_workspace.__file__).resolve().parent.parent
         if (src_root / "pyproject.toml").is_file():
             return str(src_root)
-        repacked = repack_installed_wheel(
-            Path(workspace_root) / ".dadaia" / "tmp" / "bootstrap-wheel"
-        )
+        repacked = repack_installed_wheel(Path(scratch_dir))
         if repacked is None:
             raise WorkspaceVenvBootstrapError(
                 "workspace venv bootstrap cannot mirror the running distribution: "
-                f"dadaia-workspace {metadata.version('dadaia-workspace')} is neither a "
+                f"dadaia-workspace {provider_version()} is neither a "
                 "source checkout nor a re-packable installed distribution. Point "
                 "DADAIA_BOOTSTRAP_PACKAGE at a local wheel and retry, e.g. "
                 "DADAIA_BOOTSTRAP_PACKAGE=/path/to/dadaia_workspace-X.Y.Z-py3-none-any.whl "
-                "dadaia init."
+                "uvx dadaia-workspace init <dir> --harness <name>."
             )
         return str(repacked)
 
@@ -352,13 +345,11 @@ class VenvPythonEnvironmentManager:
 
         Idempotent repair, not exists-check-and-bail: an existing venv missing the
         ``dadaia`` entrypoint (the exact state doctor VENV-1 flags) is repaired by
-        installing ``dadaia_workspace`` into it (bug
-        init-venv-never-installs-dadaia-workspace).
+        installing ``dadaia_workspace`` into it.
         """
         venv_dir = self._venv_path(workspace_root)
         if not venv_dir.exists():
-            # Bug init-venv-bootstrap-inherits-degraded-base-python: never hand
-            # venv.create() the implicit (and, on a --copies venv, provably degraded)
+            # Never hand venv.create() the implicit (and, on a --copies venv, provably degraded)
             # sys._base_executable resolution. Resolve and VERIFY an interpreter
             # explicitly, then create the child venv from THAT interpreter via
             # subprocess — it re-derives its own base correctly because it is not the
@@ -367,18 +358,11 @@ class VenvPythonEnvironmentManager:
             # default (module-function default is copies, not symlinks).
             interpreter = self._resolve_child_venv_interpreter()
             try:
-                subprocess.run(
-                    [interpreter, "-m", "venv", "--copies", str(venv_dir)],
-                    check=True,
-                    capture_output=True,
-                    text=True,
-                )
+                platform.run([interpreter, "-m", "venv", "--copies", str(venv_dir)], check=True)
             except OSError as exc:
-                # Bug r3b-portability-import-venv-permission (F-16/F-22 class): on a
-                # noexec mount, the RESOLVED interpreter itself cannot be spawned/run
-                # there. The filesystem limit is legitimate; the ~40-line raw traceback
-                # that used to reach the operator was not. Surface every OSError as one
-                # clean, actionable DadaiaError line naming the path and the likely
+                # On a noexec mount the RESOLVED interpreter itself cannot be spawned or
+                # run there. That filesystem limit is legitimate; every OSError surfaces as
+                # one clean, actionable DadaiaError line naming the path and the likely
                 # cause.
                 raise WorkspaceVenvBootstrapError(
                     f"could not create the workspace venv at '{venv_dir}' with "
@@ -390,23 +374,25 @@ class VenvPythonEnvironmentManager:
                     "filesystem, or remount it without 'noexec', then retry."
                 ) from exc
             except subprocess.CalledProcessError as exc:
-                # Same noexec class, one level deeper: the interpreter spawns fine (it
-                # lives outside the noexec mount) but venv's internal ensurepip step
-                # fails EXECUTING the freshly-copied interpreter inside the
-                # noexec-mounted target dir, surfacing here as a non-zero child exit
-                # rather than an OSError on our own spawn.
-                stderr_tail = (exc.stderr or exc.output or "").strip()[-500:]
+                # venv's own diagnostics name the cause: a base Python without
+                # ensurepip (Debian's python3-venv split) says so; anything else is
+                # most often the noexec class one level deeper (ensurepip executing
+                # the freshly-copied interpreter inside a noexec target dir).
+                stderr_tail = _tail_lines(exc)
+                cause = (
+                    "the base Python lacks the 'ensurepip'/'venv' modules (on Debian/"
+                    "Ubuntu install python3-venv), then retry."
+                    if "ensurepip is not available" in stderr_tail
+                    else "the most common cause is a target filesystem mounted 'noexec' "
+                    "(or lacking execute permission), where the venv's own python "
+                    "cannot be run. Re-target the workspace onto an exec-capable "
+                    "filesystem, or remount it without 'noexec', then retry."
+                )
                 raise WorkspaceVenvBootstrapError(
                     f"could not create the workspace venv at '{venv_dir}' with "
-                    f"interpreter '{interpreter}': venv creation failed. "
-                    "The most common cause is a target filesystem mounted 'noexec' "
-                    "(or lacking execute permission), where the venv's own python "
-                    "cannot be run — /tmp is mounted this way on many hardened hosts "
-                    "and containers. Re-target the workspace onto an exec-capable "
-                    "filesystem, or remount it without 'noexec', then retry. "
-                    f"Diagnostics: {stderr_tail}"
+                    f"interpreter '{interpreter}': {cause} Diagnostics: {stderr_tail}"
                 ) from exc
-        if not self._dadaia_entrypoint(workspace_root).exists():
+        if self.version_change(workspace_root)[2] != "same":
             # Post-condition (BEFORE any pip install): the venv's OWN python must
             # satisfy Requires-Python. Catches an interpreter mismatch from ANY path —
             # a fresh creation this method did not anticipate, or a pre-existing/
@@ -414,26 +400,25 @@ class VenvPythonEnvironmentManager:
             # actionable "interpreter mismatch", never pip's bare, rootless "requires a
             # different Python" failure.
             self._assert_child_interpreter_version(workspace_root)
-            spec = self._install_spec(workspace_root)
-            pip = self.pip_executable(workspace_root)
-            install_cmd = [pip, "install", "--quiet"]
-            editable = Path(spec).is_dir()
-            if editable:
-                install_cmd.append("--editable")
-            install_cmd.append(spec)
-            # Bug init-succeeds-after-provider-bootstrap-failure: pip's stream is
-            # CAPTURED — a failure must not leak a raw "ERROR: Could not find a
-            # version..." into init's output, where it reads as a masked broken
-            # bootstrap.
-            try:
-                subprocess.run(install_cmd, check=True, capture_output=True, text=True)
-            except subprocess.CalledProcessError as exc:
-                pip_tail = ((exc.stderr or exc.output or "") if exc else "").strip()[-400:]
-                raise WorkspaceVenvBootstrapError(
-                    f"workspace venv bootstrap failed installing '{spec}'. Installer "
-                    f"output: {pip_tail}"
-                ) from exc
-            self._ensure_ci_toolchain(pip)
+            with tempfile.TemporaryDirectory(prefix="dadaia-wheel-") as scratch:
+                spec = self._install_spec(scratch)
+                # ONE pip transaction replaces any installed build (same label or not)
+                # with its dependencies; on failure pip rolls back to the old build.
+                install_cmd = ["-m", "pip", "install", "--quiet", "--force-reinstall"]
+                editable = Path(spec).is_dir()
+                if editable:
+                    install_cmd.append("--editable")
+                install_cmd.append(spec)
+                # pip's stream is CAPTURED — a failure must not leak a raw "ERROR: Could not find a
+                # version..." into init's output, where it reads as a masked broken bootstrap.
+                try:
+                    self._run_venv(workspace_root, *install_cmd, check=True)
+                except subprocess.CalledProcessError as exc:
+                    raise WorkspaceVenvBootstrapError(
+                        f"workspace venv bootstrap failed installing '{spec}'. The "
+                        "workspace venv resolves its dependencies from PyPI (network "
+                        f"required). Installer output:\n{_tail_lines(exc)}"
+                    ) from exc
             # Success is only reported after the venv provider VERIFIES independently
             # (clean env, no inherited PYTHONPATH). The re-packed path IS the running
             # distribution, so its exact version is required; an operator-chosen wheel
@@ -442,16 +427,99 @@ class VenvPythonEnvironmentManager:
             expected = (
                 None
                 if editable or os.environ.get("DADAIA_BOOTSTRAP_PACKAGE", "").strip()
-                else self._running_version()
+                else provider_build()
             )
             self._verify_venv_provider(workspace_root, expected=expected)
         return str(venv_dir)
 
+    def version_change(self, workspace_root: str) -> tuple[str | None, str | None, str]:
+        """The ONE decider of which distribution the workspace runs: ``(before, after, action)``.
+
+        The venv's identity is its build AND its binding: ``same`` only when the build
+        equals the running distribution's and the ``dadaia`` entrypoint names THIS venv's
+        python (a copied venv names the original's). ``action`` is ``install`` (no
+        entrypoint), ``repair`` (its probe fails), ``upgrade`` (either differs; re-init is the
+        upgrade) or ``same``; a venv with a NEWER version is refused before any write.
+        """
+        running = provider_build()
+        after = running.split()[0] if running else None
+        if not self._dadaia_entrypoint(workspace_root).exists():
+            return None, after, "install"
+        installed = self.installed_build(workspace_root)
+        before = installed.split()[0] if installed else None
+        if before is None or after is None:
+            return before, after, "repair" if after else "same"
+        if Version(before) > Version(after):
+            raise WorkspaceVenvNewerError(before, after)
+        # distlib writes the path after "#!", or after a double quote or a space (the
+        # /bin/sh exec form for a spaced or over-long path); a copy names the original's.
+        own = rb'(?<![^!"\s])' + re.escape(self.python_executable(workspace_root).encode("utf-8"))
+        bound = re.search(own, self._dadaia_entrypoint(workspace_root).read_bytes())
+        return before, after, "same" if installed == running and bound else "upgrade"
+
+    def installed_build(self, workspace_root: str) -> str | None:
+        """``"<version> <build digest>"`` the venv's own python reports, or ``None``."""
+        if not self._dadaia_entrypoint(workspace_root).exists():
+            return None
+        try:
+            proc = self._probe_provider(workspace_root)
+        except WorkspaceVenvBootstrapError:
+            return None
+        return (proc.stdout or "").strip() or None if proc.returncode == 0 else None
+
+    def _run_venv(
+        self,
+        workspace_root: str,
+        *args: str,
+        check: bool = False,
+        env: dict[str, str] | None = None,
+    ) -> "subprocess.CompletedProcess[str]":
+        """Run the workspace venv's python.
+
+        Args:
+            workspace_root: The workspace whose venv python runs.
+            *args: Its command-line arguments.
+            check: Raise ``CalledProcessError`` on a non-zero exit.
+            env: The child environment; ``None`` inherits this process's.
+
+        Returns:
+            The completed process, its output captured as text.
+
+        Raises:
+            WorkspaceVenvBootstrapError: The python cannot be started; its fix deletes the venv.
+            subprocess.CalledProcessError: *check* and a non-zero exit.
+        """
+        try:
+            return platform.run(
+                [self.python_executable(workspace_root), *args], check=check, env=env
+            )
+        except OSError as exc:
+            raise WorkspaceVenvBootstrapError(
+                f"workspace venv python cannot run: {exc}.",
+                act(
+                    "agent",
+                    f"delete {platform.quote(str(self._venv_path(workspace_root)))} and run "
+                    f"`{platform.inline('uvx', 'dadaia-workspace', 'init', workspace_root)}`",
+                ),
+            ) from exc
+
+    def _probe_provider(self, workspace_root: str) -> "subprocess.CompletedProcess[str]":
+        """Ask the venv's own python, under a CLEAN env, which dadaia-workspace build it imports."""
+        return self._run_venv(
+            workspace_root,
+            "-B",  # this probe writes no .pyc into an editable install's checkout
+            "-c",
+            f"{inspect.getsource(build_digest)}"
+            "import dadaia_workspace, importlib.metadata as m\n"
+            "d = m.distribution('dadaia-workspace')\n"
+            "print(d.version, build_digest(d.files))",
+            env={"PATH": os.environ.get("PATH", "")},
+        )
+
     def _resolve_child_venv_interpreter(self) -> str:
-        """Resolve an interpreter for a NEW child venv that PROVABLY satisfies the
-        package's Requires-Python — never venv.create()'s implicit resolution (bug
-        init-venv-bootstrap-inherits-degraded-base-python; see the module-level note
-        above ``_version_satisfies`` for the root cause).
+        """Resolve an interpreter for a NEW child venv that provably satisfies the
+        package's Requires-Python, never venv.create()'s implicit resolution (see the
+        module-level note above ``_version_satisfies``).
 
         Candidates are tried in order; the first whose OWN reported version satisfies
         Requires-Python wins:
@@ -481,17 +549,10 @@ class VenvPythonEnvironmentManager:
             if not candidate or candidate in seen:
                 continue
             seen.add(candidate)
-            # Defense in depth (CWE-426, v0.4.3 T-043-13/A9.1): both source functions
-            # above already reject a relative candidate, but the probe boundary itself
-            # never spawns a non-absolute path either, regardless of how it got here.
-            # v0.4.3 T-043-23 security-review rework: :func:`_is_fully_qualified`,
-            # not bare ``os.path.isabs`` — see its own docstring for the Windows
-            # drive-relative gap this closes. The two source-function filters above
-            # are left as their original ``os.path.isabs`` form (per the handoff's
-            # own recommendation) — this probe boundary is the one call site that
-            # must never spawn a non-fully-qualified path, regardless of how a
-            # candidate reached ``ordered``.
-            if not _is_fully_qualified(candidate):
+            # Defense in depth (CWE-426): both source functions above already reject a
+            # relative candidate, but the probe boundary itself never spawns a
+            # non-fully-qualified path, however the candidate reached ``ordered``.
+            if not platform.is_fully_qualified(candidate):
                 diagnostics.append(f"{candidate}: relative path rejected")
                 continue
             version = _interpreter_version(candidate)
@@ -500,7 +561,7 @@ class VenvPythonEnvironmentManager:
                 continue
             if _version_satisfies(version, required):
                 return candidate
-            diagnostics.append(f"{candidate}: Python {'.'.join(map(str, version))}")
+            diagnostics.append(f"{candidate}: Python {'.'.join(str(n) for n in version)}")
 
         raise WorkspaceVenvBootstrapError(
             "could not resolve a Python interpreter satisfying dadaia-workspace's "
@@ -516,55 +577,24 @@ class VenvPythonEnvironmentManager:
         could produce one — a fresh creation this method did not anticipate, or a
         pre-existing/manually-created venv doctor's VENV-1 repair walks into — and
         names it as an actionable "interpreter mismatch", never pip's bare, rootless
-        "requires a different Python" failure (bug
-        init-venv-bootstrap-inherits-degraded-base-python).
+        "requires a different Python" failure.
         """
         required = self._running_requires_python()
         if required is None:
-            return  # nothing to check against — fail open, matching _running_version()
-        version = _interpreter_version(self.python_executable(workspace_root))
+            return  # nothing to check against — fail open, matching provider_version()
+        version = _parsed_version(self._run_venv(workspace_root, *_VERSION_ARGS))
         if version is None:
             return  # could not introspect — pip install remains the final authority
         if not _version_satisfies(version, required):
             raise WorkspaceVenvBootstrapError(
                 f"workspace venv interpreter mismatch: the venv at "
                 f"'{self._venv_path(workspace_root)}' carries Python "
-                f"{'.'.join(map(str, version))}, but dadaia-workspace requires Python "
+                f"{'.'.join(str(n) for n in version)}, but dadaia-workspace requires Python "
                 f"{required}. Recreate the venv with an interpreter that satisfies "
-                "this requirement (delete the venv directory and re-run 'dadaia "
-                "init', or point DADAIA_BOOTSTRAP_PACKAGE at a matching build) and "
+                "this requirement (delete the venv directory and re-run 'uvx "
+                "dadaia-workspace init <dir>', or point DADAIA_BOOTSTRAP_PACKAGE at a matching build) and "
                 "retry."
             )
-
-    @staticmethod
-    def _ensure_ci_toolchain(pip: str) -> None:
-        """Best-effort install of the CI/validation toolchain the product promises.
-
-        Bug implementation-review-approves-unexecuted-validation: the generated venv
-        could not even run ``python -m pytest`` — yet ``dadaia ci preflight`` and the
-        executed-test close gate both depend on it. pytest ships with every bootstrap;
-        failure to fetch it is a clean one-line warning, never a bootstrap failure (the
-        close gate reports loudly when tests cannot run).
-        """
-        try:
-            subprocess.run(
-                [pip, "install", "--quiet", "pytest"],
-                check=True,
-                capture_output=True,
-                text=True,
-            )
-        except subprocess.CalledProcessError:
-            print(
-                "[bootstrap] warning: could not install pytest into the workspace venv; "
-                "test validation (ci preflight, closure gate) will report it missing"
-            )
-
-    @staticmethod
-    def _running_version() -> str | None:
-        try:
-            return metadata.version("dadaia-workspace")
-        except metadata.PackageNotFoundError:
-            return None
 
     @staticmethod
     def _running_requires_python() -> str | None:
@@ -576,25 +606,13 @@ class VenvPythonEnvironmentManager:
     def _verify_venv_provider(self, workspace_root: str, expected: str | None = None) -> None:
         """Prove the venv's provider stands on its own — never via inherited paths.
 
-        Bug init-succeeds-after-provider-bootstrap-failure: a generated venv command can
+        A generated venv command can
         LOOK usable through an inherited PYTHONPATH / parent-workspace resolution while
         the venv itself is incomplete. The check imports ``dadaia_workspace`` with the
         venv's own interpreter under a CLEAN environment and, when *expected* is given,
         requires the exact version.
         """
-        clean_env = {"PATH": os.environ.get("PATH", "")}
-        proc = subprocess.run(
-            [
-                self.python_executable(workspace_root),
-                "-c",
-                "import dadaia_workspace, importlib.metadata as m; "
-                "print(m.version('dadaia-workspace'))",
-            ],
-            capture_output=True,
-            text=True,
-            env=clean_env,
-            check=False,
-        )
+        proc = self._probe_provider(workspace_root)
         if proc.returncode != 0:
             raise WorkspaceVenvBootstrapError(
                 "workspace venv provider verification failed: the venv python cannot "
@@ -611,15 +629,4 @@ class VenvPythonEnvironmentManager:
             )
 
     def python_executable(self, workspace_root: str) -> str:
-        return str(
-            self._venv_path(workspace_root)
-            / PLATFORM.venv_scripts_dir
-            / f"python{PLATFORM.venv_exe_suffix}"
-        )
-
-    def pip_executable(self, workspace_root: str) -> str:
-        return str(
-            self._venv_path(workspace_root)
-            / PLATFORM.venv_scripts_dir
-            / f"pip{PLATFORM.venv_exe_suffix}"
-        )
+        return str(platform.python_in(self._venv_path(workspace_root)))

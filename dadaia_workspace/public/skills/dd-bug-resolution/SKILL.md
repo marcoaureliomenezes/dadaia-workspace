@@ -5,36 +5,35 @@ description: >
   red loop, minimise, hypotheses, instrument, seam test, cleanup) plus the resolve
   record and commit. Use when a bug carries an open record in BUGS.jsonl; registering
   one is dd-bug-registration's job.
-compatibility: Standalone Agent Skill. Inside a dadaia-workspace (pip install dadaia-workspace) it also drives the SDD lifecycle — specs, backlog, bugs, releases.
+compatibility: Standalone Agent Skill; the full lifecycle lives in a dadaia-workspace.
 ---
 
 # dd-bug-resolution — Arm B
 
-> `dd-software-engineer` runs this directly once a bug carries a record.
-> Git chokepoints (`.dadaia/AGENTS.md`) are the only mechanical backstop.
+> `dd-sw-engineer-sr` runs this directly once a bug carries a record.
 
 ## 1. Lifecycle frame
 
 1. Inside a dadaia workspace, open `specs/bugs/AGENTS.md` (the area's scoped law) and follow it — its redaction rule
    covers the whole arc: commands, outputs, captured artifacts.
-2. A bug fix rides the live `feature/{M.m.p}` branch in any phase: no separate branch, no SPEC/PLAN/TASKS, no version mint.
-3. Two fixers resolve by whichever `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py resolve` lands first; a losing write
-   fails non-zero — re-read and retry.
+2. Hotfix lane or candidate scope: `specs/bugs/AGENTS.md` §2.
+3. When to fix: `specs/bugs/AGENTS.md` §2; bugs that share a cause are fixed together.
+4. Cap: two fix attempts on one bug, then a fresh session with a written diagnosis.
 
 ## 2. The method — seven phases, each gated
 
-**Phase 0 — Lineage.** Read the bug ledger for prior fixes to the same
-`surface`/`component` in the bounded window ([`LINEAGE.md`](LINEAGE.md)); carry the
-link to Phase 6, where `resolve --caused-by` is its one writer; echo the same
-`caused_by:`/`evidence:`/`prior diffs read:` block in the fix commit body.
-*Done when prior diffs were actually read and the link (or `none`) is decided.*
+**Phase 0 — Lineage.** Read the unit's prior fixes in the bounded window, found by the id-line query of [`LINEAGE.md`](LINEAGE.md) §The filter; inspect every prior fix as [`LINEAGE.md`](LINEAGE.md) §Read persisted facts says; whether this fix is a REBUILD is `specs/bugs/AGENTS.md` §2's;
+grep every decider of the same fact and name its one owner before any fix;
+carry the link to Phase 6 (`resolve --caused-by`; `update` repairs);
+echo the `caused_by:`/`evidence:`/`prior diffs read:`/`rebuild:` block in the fix commit body; a REBUILD names its unit in `rebuild:`, never `rebuild: none`.
+*Done when prior diffs were actually read, the owner is named, and the link and the rebuild decision (`rebuild` or `none`) are decided.*
 
 **Phase 1 — Red loop.** This is the skill; everything after it is mechanical. Build a
-**tight** pass/fail signal that goes red on THIS bug — construction menu, tightening
+**tight** pass/fail signal that goes red on THIS bug (replay the reporter's commands on the reporter's real artifact, red then green; heal state already on disk; a second report of a family gets a class-level fix) — construction menu, tightening
 and non-deterministic bugs: [`RED-LOOP.md`](RED-LOOP.md).
 *Done when you can name ONE command, already run at least once, that is red-capable
-(asserts the exact symptom), deterministic, fast, and agent-runnable. No red-capable
-command, no Phase 2 — reading code to build a theory first is the exact failure this
+(asserts the exact symptom), deterministic, fast, and agent-runnable. Phase 2 starts
+from that command, because a theory built by reading code first is the failure this
 phase prevents.*
 
 **Phase 2 — Minimise.** Shrink the repro one cut at a time, re-running the loop after
@@ -53,30 +52,30 @@ unique prefix (e.g. `[DEBUG-a4f2]`) so cleanup is a single grep. For performance
 regressions: measure a baseline, then bisect — logs mislead.
 *Done when one hypothesis survives by observation, not by reading code.*
 
-**Phase 5 — Seam test.** Write the regression test at the correct seam BEFORE the
-fix, intent and size declared at birth (`dd-test-stewardship`, intent and admission); watch it fail,
+**Phase 5 — Seam test.** The regression test at the correct seam, BEFORE the fix, has a literal
+expected value, covers every caller of the contract, sits at the lowest level that detects it, and, unless an existing contract test already goes red on the bug (that test is the RED, with no `test(` commit for it), is committed first under a `test(` subject; the test rule is the root map §1 line; watch it fail,
 fix the cause, watch it pass, re-run the Phase 1 loop on the original scenario. A
-correct seam exercises the real bug pattern at its call site (`dd-codebase-design`
-owns the seam vocabulary and the deletion test the fix must pass); when none exists, that
-is itself the finding — register an architecture finding and dispatch
-the architecture lens before fixing.
+correct seam exercises the real bug pattern at its call site; when none exists, that
+is itself the finding — return the seam gap to the main thread as a finding
+before fixing.
 *Done when the test fails for the real reason and passes with the fix (or the seam
-gap is registered first).*
+gap was returned first).*
 
-**Phase 6 — Cleanup + resolve.** Grep the probe prefix to zero; the diff leaves the
-touched feature smaller or equal — a fix that grows it routes to
-the architecture lens first (net-positive rule). Then close the
-record:
+**Phase 6 — Cleanup + resolve.** Grep the probe prefix to zero:
 
+- Commit the GREEN source fix with shape 3 of `dd-gitflow-default` §3a, then resolve; it derives
+  `fix_sha` from that commit's id line (`specs/bugs/AGENTS.md` §2):
+
+```bash
+python3 .agents/skills/dd-bug-resolution/scripts/bugs.py resolve <bug-id> --specs <specs-dir> \
+  --cause "…" --caused-by <prior-bug-id>\|<task-id>\|none \
+  --solution "…"
 ```
-python3 .agents/skills/dd-bug-resolution/scripts/bugs.py resolve <bug-id> --cause … --caused-by … --resolved-release …
-  --solution … --evidence-loop … --evidence-seam … --evidence-diff net-negative:…
-```
 
-- `diff_direction` is derived from `--evidence-diff`'s `net-*:` prefix — there is no `--diff-direction` flag.
-- `--caused-by` is validated against the ledger or the literal `none`; an unknown id exits 1.
-- Stage code + regression test + the `BUGS.jsonl` line together — ONE commit, shape 3
-  of `dd-gitflow-default` §3a.
+- `caused_by` names a live or archived bug, a known release task, or `none`, never a loop;
+  writes refuse anything else.
+- Commit the resulting ledger-only `BUGS.jsonl` transition with shape 4 of
+  `dd-gitflow-default` §3a.
 
 ## 3. Done when
 
@@ -84,14 +83,12 @@ python3 .agents/skills/dd-bug-resolution/scripts/bugs.py resolve <bug-id> --caus
 - The red loop was captured before any hypothesis; the repro is minimised to
   load-bearing.
 - The surviving hypothesis was confirmed by instrumentation.
-- The regression test sits at the correct seam, or the seam gap was registered first.
-- Probes are gone; the diff is smaller or equal; the resolve record carries the
-  evidence triple, `caused_by`, `resolved_release` and `closed_at`; one isolated
-  commit; worktree clean.
+- The regression test sits at the correct seam, or the seam gap was returned first.
+- `git grep -n '\[DEBUG-'` prints nothing; the resolve record carries `cause`, `solution`, `caused_by`, `fix_sha`
+  and `closed_at`; the fix and ledger transition are isolated; worktree clean.
+- `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py check --specs <specs-dir>` exits 0.
 
 ## 4. References
 
-- [`LINEAGE.md`](LINEAGE.md) — the lineage window, filter, cap, diff-trust rule.
-- [`RED-LOOP.md`](RED-LOOP.md) — loop construction menu, tightening, non-deterministic bugs.
 - `dd-bug-registration` — classify-first registration; the record this skill requires.
 - `dd-gitflow-default` §3a — the exact commit shape.

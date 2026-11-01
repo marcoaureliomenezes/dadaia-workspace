@@ -1,0 +1,213 @@
+"""dd-audit-project/scripts/audit.py owns specs/audits/<dir>/
+FINDINGS.jsonl and audits_histo.jsonl; the audit ledger verbs live in a stdlib skill script.
+Size: SMALL.
+
+The script reads its two schemas from ``scripts/schemas/`` BESIDE itself — copies
+`public stage` makes — so every test stages the folder exactly as stage does.
+"""
+
+from __future__ import annotations
+
+import json
+import subprocess
+import sys
+from pathlib import Path
+
+import pytest
+
+from dadaia_workspace.infrastructure.ledger_scripts import load_owner
+from tests.helpers.oslib import read_text, run, spell, write_text
+from tests.helpers.skill_scripts import stage_skill_scripts
+
+_PUBLIC = Path(__file__).resolve().parents[5] / "dadaia_workspace" / "public"
+_SCRIPTS = _PUBLIC / "skills" / "dd-audit-project" / "scripts"
+_AUDIT = "20260101-window"
+
+
+@pytest.fixture
+def script(tmp_path: Path) -> Path:
+    """The staged shape: audit.py with both schema copies beside it."""
+    return stage_skill_scripts("dd-audit-project", tmp_path / "staged" / "scripts") / "audit.py"
+
+
+def _finding(index: int, **over: object) -> dict[str, object]:
+    record: dict[str, object] = {
+        "id": f"{_AUDIT}-F{index:03d}",
+        "pillar": "bugs",
+        "severity": "HIGH",
+        "refs": ["dadaia_workspace/cli/main.py:1"],
+        "claim": "the claim",
+        "evidence": "git show <sha> --stat -> 1 file changed",
+        "disposition": "open",
+        "release": None,
+        "reason": None,
+    }
+    record.update(over)
+    return record
+
+
+@pytest.fixture
+def specs(tmp_path: Path) -> Path:
+    tree = tmp_path / "repo" / "specs"
+    audit_dir = tree / "audits" / _AUDIT
+    audit_dir.mkdir(parents=True)
+    (tree / "audits" / "_archive").mkdir()
+    write_text(audit_dir / "AUDIT.md", "# audit\n")
+    write_text(
+        audit_dir / "FINDINGS.jsonl",
+        "".join(json.dumps(_finding(i), sort_keys=True) + "\n" for i in (1, 2)),
+    )
+    return tree
+
+
+def _run(script: Path, *argv: str) -> subprocess.CompletedProcess[str]:
+    return run([sys.executable, str(script), *argv], check=False)
+
+
+def _histo(specs: Path) -> list[dict[str, object]]:
+    return load_owner("dd-bug-resolution", "_ledger").records(
+        specs / "audits" / "_archive" / "audits_histo.jsonl"
+    )
+
+
+@pytest.mark.parametrize(
+    ("argv", "finding", "needle"),
+    [
+        (("close", _AUDIT, "--sha", "abc1234"), _finding(1), "undispositioned"),
+        (
+            ("close", _AUDIT, "--sha", "abc1234"),
+            _finding(1, severity="BANANA", disposition="resolved", release="0.4.8"),
+            "does not pass check",
+        ),
+        (
+            ("disposition", _AUDIT, f"{_AUDIT}-F001", "--disposition", "rejected", "--reason", "r"),
+            _finding(1, severity="BANANA"),
+            "does not pass check",
+        ),
+        (("close", "_archive", "--sha", "abc1234"), _finding(1), "does not name a live audit"),
+    ],
+)
+def test_a_write_verb_refuses_and_leaves_every_byte(
+    script: Path, specs: Path, argv: tuple[str, ...], finding: dict[str, object], needle: str
+) -> None:
+    """A FINDINGS.jsonl failing check makes close exit non-zero, write no histo and keep the
+    directory; an `_archive` id is refused; every write verb runs check over the candidate
+    bytes."""
+    for directory in (specs / "audits" / _AUDIT, specs / "audits" / "_archive"):
+        write_text(directory / "FINDINGS.jsonl", json.dumps(finding) + "\n")
+    before = (specs / "audits" / _AUDIT / "FINDINGS.jsonl").read_bytes()
+
+    result = _run(script, *argv, "--specs", str(specs))
+
+    assert result.returncode == 1
+    assert needle in result.stderr and result.stderr.count("fix: ") == 1
+    assert (specs / "audits" / _AUDIT / "FINDINGS.jsonl").read_bytes() == before
+    assert (specs / "audits" / "_archive" / "FINDINGS.jsonl").is_file()
+    assert _histo(specs) == []
+
+
+def test_disposition_then_close_appends_the_histo_and_removes_the_directory(
+    script: Path, specs: Path
+) -> None:
+    for index in (1, 2):
+        done = _run(
+            script, "disposition", _AUDIT, f"{_AUDIT}-F{index:03d}",
+            "--disposition", "resolved", "--release", "0.4.8", "--specs", str(specs),
+        )  # fmt: skip
+        assert done.returncode == 0, done.stderr
+
+    # A histo record without its window-end sha is unrecordable.
+    assert _run(script, "close", _AUDIT, "--specs", str(specs)).returncode == 2
+    result = _run(script, "close", _AUDIT, "--sha", "abc1234", "--specs", str(specs))
+
+    assert result.returncode == 0, result.stderr
+    assert not (specs / "audits" / _AUDIT).exists()
+    records = _histo(specs)
+    assert len(records) == 1
+    assert records[0]["id"] == _AUDIT
+    assert records[0]["disposition"] == "resolved"
+    assert records[0]["release"] == "0.4.8"
+    assert records[0]["entry"] == {
+        "sha": "abc1234",
+        "pillars": {"bugs": 2, "specs": 0, "memory": 0},
+        "dispositions": {"resolved": 2},
+    }
+
+
+def test_disposition_refuses_the_retired_deferred_verdict(script: Path, specs: Path) -> None:
+    result = _run(
+        script, "disposition", _AUDIT, f"{_AUDIT}-F001",
+        "--disposition", "deferred", "--specs", str(specs),
+    )  # fmt: skip
+
+    assert result.returncode == 2
+    assert "invalid choice: 'deferred'" in result.stderr
+    findings = load_owner("dd-bug-resolution", "_ledger").records(
+        specs / "audits" / _AUDIT / "FINDINGS.jsonl"
+    )
+    assert findings[0]["disposition"] == "open"
+
+
+def test_check_passes_on_a_valid_tree_and_fails_on_a_broken_record(
+    script: Path, specs: Path
+) -> None:
+    clean = _run(script, "check", "--specs", str(specs))
+    assert clean.returncode == 0, clean.stdout + clean.stderr
+
+    findings = specs / "audits" / _AUDIT / "FINDINGS.jsonl"
+    write_text(findings, json.dumps(_finding(1, severity="URGENT"), sort_keys=True) + "\n")
+    broken = _run(script, "check", "--specs", str(specs))
+
+    assert broken.returncode == 1
+    assert "LEDGER-FINDINGS-SCHEMA" in broken.stdout
+    assert "severity" in broken.stdout
+
+
+@pytest.mark.parametrize(
+    ("verdicts", "expected"),
+    [
+        ((), "rejected"),
+        (("rejected", "rejected"), "rejected"),
+    ],
+)
+def test_close_without_a_resolved_finding_never_records_resolved(
+    script: Path, specs: Path, verdicts: tuple[str, ...], expected: str
+) -> None:
+    """All rejected gives the histo disposition rejected, never resolved; a clean audit
+    still closes."""
+    records = [_finding(i + 1, disposition=v, reason="r") for i, v in enumerate(verdicts)]
+    write_text(
+        specs / "audits" / _AUDIT / "FINDINGS.jsonl", "".join(json.dumps(r) + "\n" for r in records)
+    )
+
+    # A histo record without its window-end sha is unrecordable.
+    assert _run(script, "close", _AUDIT, "--specs", str(specs)).returncode == 2
+    result = _run(script, "close", _AUDIT, "--sha", "abc1234", "--specs", str(specs))
+
+    assert result.returncode == 0, result.stderr
+    assert not (specs / "audits" / _AUDIT).exists()
+    [record] = _histo(specs)
+    assert (record["disposition"], record["release"]) == (expected, None)
+    assert record["entry"]["pillars"] == {"bugs": len(verdicts), "specs": 0, "memory": 0}
+
+
+def test_the_doctor_neither_folds_findings_nor_recommends_close() -> None:
+    """No doctor rule recommends `audit.py close`; features/specs parses no finding record."""
+    from dadaia_workspace.features.specs.rules import RULES
+
+    assert not [r.codes for r in RULES if "close" in str(r.fix_help)]
+    specs_src = Path(__file__).resolve().parents[5] / "dadaia_workspace" / "features" / "specs"
+    assert not [p for p in specs_src.glob("*.py") if "from_dict" in read_text(p)]
+
+
+def test_an_unknown_finding_refusal_greps_the_findings_file_by_its_absolute_path(
+    script: Path, specs: Path
+) -> None:
+    findings = specs / "audits" / _AUDIT / "FINDINGS.jsonl"
+    result = _run(
+        script, "disposition", _AUDIT, f"{_AUDIT}-F099", "--disposition", "rejected",
+        "--reason", "r", "--specs", str(specs),
+    )  # fmt: skip
+    assert result.returncode == 1
+    assert result.stderr.count("fix: ") == 1
+    assert f"fix: grep {_AUDIT}-F099 {spell(str(findings))}\n" in result.stderr

@@ -14,9 +14,13 @@ from functools import partial
 from pathlib import Path
 from typing import Any
 
-from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES
+from dadaia_workspace.core import platform
+from dadaia_workspace.core.harness_registry import HARNESS_RECORDS, L1_ENTRY_HARNESSES
 from dadaia_workspace.core.redaction import Redactor
+from dadaia_workspace.core.skill_owner import load_owner
+from dadaia_workspace.core.workspace_resolver import fenced_env
 from dadaia_workspace.infrastructure.certification_process import SubprocessCertificationProcess
+from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 
 
 @dataclass(frozen=True)
@@ -37,18 +41,8 @@ class CertificationResult:
         return asdict(self)
 
 
-def _git(process: SubprocessCertificationProcess, cwd: Path, *args: str) -> None:
-    proc = process.run(
-        ["git", "-c", "user.email=certify@dadaia.invalid", "-c", "user.name=dadaia-certify", *args],
-        cwd=cwd,
-        timeout=60,
-    )
-    if proc.returncode != 0:
-        raise RuntimeError(proc.stderr.strip() or proc.stdout.strip() or f"git {args} failed")
-
-
 class _CertificationSkip(Exception):
-    """An honest, non-failing degrade for one certification check (A22.4).
+    """An honest, non-failing degrade for one certification check.
 
     Raised when the runtime dependency a check would exercise is genuinely
     unavailable in this environment — absent entirely (e.g. no Codex CLI on PATH), or
@@ -63,9 +57,9 @@ class _CertificationSkip(Exception):
 _LiveProbe = Callable[[SubprocessCertificationProcess, Path, str, str], str]
 
 
-# A22.4 — codex-live-probe: exercises the INSTALLED Codex CLI with a real `codex exec`
-# call, bounded and read-only. Static Codex projection tests (TOML shape, frontmatter
-# parsing) never attest this — they cannot prove a live session actually answers.
+# Live probe of the installed Codex CLI: a real `codex exec`, bounded and read-only. Static Codex
+# projection tests (TOML shape, frontmatter parsing) never attest this — they cannot prove a
+# live session actually answers.
 _CODEX_LIVE_PROBE_PROMPT = (
     "Reply with exactly the single line: DADAIA-LIVE-PROBE-OK. No tool calls, no other text."
 )
@@ -99,7 +93,7 @@ def _codex_probe_outcome(output: str, cwd: Path) -> tuple[bool, str]:
     lowered = output.lower()
     for phrase in _CODEX_ENV_UNAVAILABLE_PHRASES:
         if phrase in lowered:
-            line = next((ln for ln in output.splitlines() if phrase in ln.lower()), phrase)
+            line = next((ln for ln in output.split("\n") if phrase in ln.lower()), phrase)
             return True, _codex_capped_detail(line, cwd)
     for match in re.finditer(r"\{.*?\}\}", output):
         try:
@@ -122,19 +116,6 @@ def _codex_probe_outcome(output: str, cwd: Path) -> tuple[bool, str]:
     )
 
 
-#: The CLI binary each registered harness installs. It is NOT a field on
-#: ``HarnessRecord``: the record describes what the workspace PROJECTS for a harness, and
-#: nothing in the projection depends on the binary's name — only this probe does, so the
-#: fact lives with its one consumer instead of widening a core dataclass.
-_HARNESS_PROBE_BINARIES: dict[str, str] = {
-    "claude": "claude",
-    "codex": "codex",
-    "kimi-code": "kimi",
-    "cursor": "cursor-agent",
-    "devin": "devin",
-    "copilot": "copilot",
-}
-
 #: A record with a probe deeper than "the binary answers" names it here; every other
 #: record falls back to :func:`_version_probe_detail`. There is NO version floor: the
 #: workspace derives the same four behaviours into every harness and pins no release of
@@ -156,7 +137,7 @@ def _installed_binary(
     if resolved is None:
         raise _CertificationSkip(
             f"UNVERIFIED: no {binary!r} binary on PATH, so the {harness} runtime claim is "
-            "unproven in this environment (A22.4 honest degrade; the projection tests "
+            "unproven in this environment (honest degrade; the projection tests "
             "validate file shape only, never runtime behavior)"
         )
     proc = process.run([resolved, "--version"], cwd=cwd, timeout=_CODEX_VERSION_PROBE_TIMEOUT)
@@ -178,7 +159,7 @@ def _version_probe_detail(
 def _codex_live_probe_detail(
     process: SubprocessCertificationProcess, cwd: Path, harness: str, binary: str
 ) -> str:
-    """A22.4: prove the installed Codex CLI actually answers, not just that its files exist.
+    """Prove the installed Codex CLI actually answers, not just that its files exist.
 
     Runs ``codex --version`` then a bounded, read-only, non-interactive ``codex exec``
     that must echo back a fixed marker. Raises :class:`_CertificationSkip` (never
@@ -209,7 +190,7 @@ def _codex_live_probe_detail(
         if unavailable:
             raise _CertificationSkip(
                 "codex CLI installed but unusable in this environment — "
-                f"{detail} (A22.4 honest degrade; upstream auth/entitlement "
+                f"{detail} (honest degrade; upstream auth/entitlement "
                 "rejection, not a probe defect)"
             )
         raise RuntimeError(f"codex exec exited {exec_proc.returncode}: {detail}")
@@ -225,37 +206,13 @@ _DEEP_LIVE_PROBES["codex"] = _codex_live_probe_detail
 
 
 def _all_checks_ok(checks: Iterable[CertificationCheck]) -> bool:
-    """PASS and SKIP are both acceptable certification outcomes (A22.4).
+    """PASS and SKIP are both acceptable certification outcomes.
 
     An honest degrade for an absent OPTIONAL runtime dependency (e.g. no installed
     Codex CLI on this host) must never turn a certification run RED — only a genuine
     FAIL does.
     """
     return all(item.status in ("PASS", "SKIP") for item in checks)
-
-
-#: The doctor sections the certification tree owns — the `workspace` section reads the
-#: sandbox itself and belongs to `exact-version-reconciliation`'s own step.
-_OWNED_DOCTOR_SECTIONS = ("specs", "ledgers")
-
-
-def _owned_doctor_sections_clean(stdout: str) -> str:
-    """The verdict on a `dadaia doctor --json` payload: both owned sections, no findings.
-
-    An absent section is a FAILURE, never a silent pass: a renamed or dropped section
-    means the check saw nothing, and "clean" about nothing is not a verdict.
-    """
-    sections = json.loads(stdout)["sections"]
-    missing = [name for name in _OWNED_DOCTOR_SECTIONS if name not in sections]
-    if missing:
-        raise RuntimeError(
-            f"doctor payload carries no {', '.join(missing)} section — this check judges "
-            f"{', '.join(_OWNED_DOCTOR_SECTIONS)} and cannot vouch for a section it never read"
-        )
-    owned = {name: sections[name]["findings"] for name in _OWNED_DOCTOR_SECTIONS}
-    if any(owned.values()):
-        raise RuntimeError(f"doctor not clean: {json.dumps(owned, sort_keys=True)}")
-    return "specs and ledgers sections clean"
 
 
 def certify(
@@ -276,11 +233,10 @@ def certify(
     pythonpath = os.pathsep.join(
         [*source_pythonpath, *([inherited_pythonpath] if inherited_pythonpath else [])]
     )
-    env = {
-        **os.environ,
-        "HOME": str(home),
-        "PYTHONDONTWRITEBYTECODE": "1",
-    }
+    # every child acts on the sandbox only
+    env = load_owner("dd-bug-resolution", "_git").scrubbed_env(
+        fenced_env(target)
+    ) | platform.home_env(home)
     if pythonpath:
         env["PYTHONPATH"] = pythonpath
     else:
@@ -288,9 +244,7 @@ def certify(
     for key in (
         "DADAIA_CONTEXT",
         "DADAIA_SESSION_ID",
-        "CLAUDE_CODE_SESSION_ID",
-        "CODEX_SESSION_ID",
-        "CODEX_THREAD_ID",
+        *(v for r in HARNESS_RECORDS.values() for v in r.session_env),
     ):
         env.pop(key, None)
 
@@ -321,24 +275,9 @@ def certify(
             checks.append(CertificationCheck(name=name, status="FAIL", detail=str(exc)))
 
     def doctor_clean(*args: str) -> str:
-        """`dadaia doctor` over the tree these arguments NAME, judged on the sections
-        that tree owns: `specs` and `ledgers`.
-
-        The `workspace` section reads the certification sandbox itself, which
-        `exact-version-reconciliation`'s own `workspace-doctor` step already owns — so
-        judging it here would make two checks fail for one defect, in a tree neither
-        argument names. The doctor's exit code is that whole-workspace verdict, hence
-        the direct run: a non-zero exit is not this check's failure to report.
-        """
-        proc = process.run(
-            [sys.executable, "-m", "dadaia_workspace.cli.main", "doctor", *args, "--json"],
-            cwd=target,
-            env=env,
-            timeout=180,
-        )
-        if not proc.stdout.strip():
-            raise RuntimeError(f"doctor emitted no payload: {(proc.stderr or '').strip()}")
-        return _owned_doctor_sections_clean(proc.stdout)
+        """`dadaia doctor` over the sandbox and the tree *args* name: its exit code is the
+        verdict, every section judged — certify never picks a subset."""
+        return cli("doctor", *args) and "doctor clean"
 
     check(
         "workspace-init",
@@ -377,26 +316,20 @@ def certify(
         ),
     )
 
-    bare = run_root / "consumer.git"
+    bare = run_root / "certified-consumer.git"  # slug == context name
 
     def empty_remote() -> str:
-        _git(process, run_root, "init", "--bare", str(bare))
-        cli(
-            "context",
-            "create",
-            "certified-consumer",
-            "--main-repo",
-            "certified-consumer",
-            "--url",
-            str(bare),
-        )
-        cli("context", "alive", "certified-consumer")
+        git = GitSubprocessClient().git
+        git(run_root, "init", "--bare", str(bare))
+        git(bare, "config", "core.longpaths", "true")
+        cli("context", "create", "certified-consumer", "--main-repo", str(bare))
         repo = target / "repos" / "certified-consumer"
-        _git(process, repo, "config", "user.email", "certify@dadaia.invalid")
-        _git(process, repo, "config", "user.name", "dadaia-certify")
-        cli("context", "baseline", "certified-consumer", "--yes", "--push")
-        _git(process, repo, "rev-parse", "--verify", "HEAD")
-        return "empty remote materialized, scaffolded, committed, and pushed"
+        git(repo, "config", "user.email", "certify@dadaia.invalid")
+        git(repo, "config", "user.name", "dadaia-certify")
+        cli("specs", "init", "--context", "certified-consumer")
+        cli("context", "baseline", "certified-consumer")
+        git(repo, "rev-parse", "--verify", "HEAD")
+        return "empty remote cloned, specs initialized, baseline committed and pushed"
 
     check("context-empty-remote-baseline", empty_remote)
 
@@ -411,10 +344,10 @@ def certify(
 
     check("context-list-show-json", context_json)
 
-    harness_env = {"CODEX_THREAD_ID": "certification-session"}
+    bind_env = {"DADAIA_SESSION_ID": "certification-session"}
 
     def bind() -> str:
-        output = cli("context", "bind", "certified-consumer", extra_env=harness_env)
+        output = cli("context", "bind", "certified-consumer", extra_env=bind_env)
         if "certified-consumer" not in output:
             raise RuntimeError(output)
         return "caller-owned bind"
@@ -428,12 +361,13 @@ def certify(
     def handoff_validation() -> str:
         path = target / ".dadaia" / "handoff" / "certified-consumer" / "cert.handoff.json"
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(
+        platform.write_text(
+            path,
             json.dumps(
                 {
                     "schema_version": "handoff-v1.2",
                     "self_pull": {"refs": ["specs/memory/QUALITY.md"]},
-                    "agent": "qa-engineer",
+                    "agent": "dd-code-reviewer",
                     "context": "certified-consumer",
                     "produced_at": "2026-07-15T00:00:00Z",
                     "artifact": {"type": "other"},
@@ -442,7 +376,6 @@ def certify(
                 }
             )
             + "\n",
-            encoding="utf-8",
         )
         cli("reports", "validate", str(path), "--json")
         return "reports validate accepted a handoff-v1.2 record"
@@ -450,7 +383,7 @@ def certify(
     check("reports-handoff-validation", handoff_validation)
 
     def context_round_trip() -> str:
-        cli("context", "dead", "certified-consumer", "--commit")
+        cli("context", "dead", "certified-consumer")
         cli("context", "alive", "certified-consumer")
         cli("context", "dead", "certified-consumer")
         cli("context", "delete", "certified-consumer")
@@ -466,7 +399,7 @@ def certify(
     # tests attest file shape only; these attest that the runtime answers. An absent
     # binary leaves the claim UNVERIFIED (honest SKIP), never a FAIL.
     for harness in L1_ENTRY_HARNESSES:
-        binary = _HARNESS_PROBE_BINARIES[harness]
+        binary = HARNESS_RECORDS[harness].binary
         probe = _DEEP_LIVE_PROBES.get(harness, _version_probe_detail)
         check(f"{harness}-live-probe", partial(probe, process, target, harness, binary))
 

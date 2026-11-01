@@ -1,40 +1,29 @@
-"""v0.4.4 T-044-06 (FR3): the v2 branch contract across the REAL CLI boundary.
+"""`ci push-gate-check` driven as the pre-push hook drives it (git's ref lines on stdin,
+harness-free env, no handoff on disk). A push of a work, principal or integration branch, a branch
+deletion and a tag push pass; the branch names come from the committed constitution's gitflow
+(custom, absent -> default + one warning, inherited by an associated repo; its main repo absent ->
+default + one warning).
 
-The pre-push hook forwards git's pre-push stdin ref lines (``<local-ref> <local-sha>
-<remote-ref> <remote-sha>``) into ``dadaia ci push-gate-check``. Rather than stand up a
-real remote and a real ``git push`` (slow, networked, nondeterministic), this drives the
-SAME boundary the hook drives: it spawns ``ci push-gate-check`` through THIS interpreter
-with the ref lines on stdin and no ``.dadaia/handoff/`` tree on disk at all — exactly the
-contract ``pre-push-ci-gate.sh`` line 106 invokes.
-
-Scenarios (v2):
-
-* (a) a ``feature/{M.m.p}`` push flows — no security-reviewer handoff needed anywhere on
-  disk (A3.4: the verdict is no longer checked on this path at all; it is a PR gate now,
-  FR4).
-* (b) a ``develop`` push is BLOCKED, naming the PR path (``feature/{M.m.p}`` → develop).
-* (c) branch deletion (zero local sha) and a tag push both pass — never review-gated.
-
-Supersedes v0.6.0's verdict-keyed scenarios (a covering security-reviewer APPROVE
-required for ``develop`` to flow, and the "keys on the stdin sha, never HEAD" regression,
-which only had meaning while a verdict lookup existed on this path) — deleted per A3.4,
-not disabled.
-
-The CLI is invoked harness-free (no PreToolUse/PostToolUse payload), with only
-``WORKSPACE_ROOT`` set, so this also covers the headless runtime the chokepoint protects.
-
-Intent: CONTRACT — v0.4.4 A3.1
-Owner: dd-software-engineer
+Owner: dd-sw-engineer-sr
 """
 
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 import sys
 from pathlib import Path
 
 import pytest
+
+from dadaia_workspace.core.cli_line import cli_words
+from dadaia_workspace.core.platform import inline
+from dadaia_workspace.core.specs_version import CANONICAL_SPECS_VERSION
+from dadaia_workspace.features.spec_context import sweep
+from tests.fakes import land_fix
+from tests.fixtures.harness_env import suite_env
+from tests.helpers.oslib import make_readonly, run, write_text
 
 pytestmark = pytest.mark.e2e
 
@@ -46,87 +35,138 @@ _ZERO = "0" * 40
 def _init_repo(workspace: Path, slug: str) -> tuple[Path, str]:
     """A real git repo at ``<workspace>/repos/<slug>`` with one real commit.
 
-    Returns ``(repo, commit_sha)``. The v0.9.0 push-range denylist scan needs a
+    Returns ``(repo, commit_sha)``. The push-range denylist scan needs a
     resolvable git object for the pushed ``local_sha`` — a synthetic literal sha fails
-    closed as a genuine git-read failure (FR6 row 2), so tests use a REAL commit sha.
+    closed as a genuine git-read failure, so tests use a REAL commit sha.
     """
     (workspace / ".dadaia" / "states").mkdir(parents=True, exist_ok=True)
-    (workspace / ".dadaia" / "states" / "spec_contexts.json").write_text("{}", encoding="utf-8")
+    write_text(workspace / ".dadaia" / "states" / "spec_contexts.json", '{"contexts": []}')
     repo = workspace / "repos" / slug
     repo.mkdir(parents=True)
-    subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
-    subprocess.run(["git", "config", "user.email", "t@example.com"], cwd=repo, check=True)
-    subprocess.run(["git", "config", "user.name", "Test"], cwd=repo, check=True)
-    (repo / "seed.txt").write_text("seed\n", encoding="utf-8")
-    subprocess.run(["git", "add", "seed.txt"], cwd=repo, check=True)
-    subprocess.run(["git", "commit", "-q", "-m", "seed"], cwd=repo, check=True)
-    sha = subprocess.run(
-        ["git", "rev-parse", "HEAD"], cwd=repo, capture_output=True, text=True, check=True
-    ).stdout.strip()
+    run(["git", "init", "-q"], cwd=repo, check=True)
+    run(["git", "config", "user.email", "t@example.com"], cwd=repo, check=True)
+    run(["git", "config", "user.name", "Test"], cwd=repo, check=True)
+    write_text(repo / "seed.txt", "seed\n")
+    run(["git", "add", "seed.txt"], cwd=repo, check=True)
+    run(["git", "commit", "-q", "-m", "seed"], cwd=repo, check=True)
+    sha = run(["git", "rev-parse", "HEAD"], cwd=repo, check=True).stdout.strip()
     return repo, sha
-
-
-def _hook_env(workspace: Path) -> dict[str, str]:
-    """A harness-FREE env: only WORKSPACE_ROOT (mirrors the installed pre-push hook child)."""
-    env = dict(os.environ)
-    for bad in ("CLAUDE_CODE_SESSION_ID", "CODEX_SESSION_ID", "DADAIA_MODE"):
-        env.pop(bad, None)
-    env["WORKSPACE_ROOT"] = str(workspace)
-    return env
 
 
 def _run_push_gate(
     repo: Path, workspace: Path, stdin_text: str
 ) -> subprocess.CompletedProcess[str]:
     """Drive ``ci push-gate-check`` exactly as the pre-push hook does (ref lines on stdin)."""
-    return subprocess.run(
+    return run(
         [sys.executable, "-m", "dadaia_workspace.cli.main", "ci", "push-gate-check"],
         cwd=repo,
         input=stdin_text,
-        capture_output=True,
-        text=True,
-        env=_hook_env(workspace),
+        env=suite_env(os.environ, Path.home()),
         timeout=_EXIT_DEADLINE,
     )
 
 
-def test_feature_branch_push_flows_with_no_verdict_anywhere(tmp_path: Path) -> None:
-    workspace = tmp_path
-    repo, sha = _init_repo(workspace, _SLUG)
-    # No handoff on disk at all — the verdict is no longer checked on this path (A3.4).
-    result = _run_push_gate(
-        repo, workspace, f"refs/heads/feature/0.0.1 {sha} refs/heads/feature/0.0.1 {_ZERO}\n"
-    )
+@pytest.mark.parametrize(
+    "line",
+    [
+        pytest.param("refs/heads/feature/0.0.1 {sha} refs/heads/feature/0.0.1 " + _ZERO, id="work-branch-push"),
+        pytest.param("refs/heads/old " + _ZERO + " refs/heads/old {sha}", id="branch-deletion"),
+        pytest.param("refs/heads/main {sha} refs/heads/main {sha}", id="principal-update"),
+        pytest.param("refs/heads/develop {sha} refs/heads/develop {sha}", id="integration-update"),
+        pytest.param("refs/tags/v1 {sha} refs/tags/v1 " + _ZERO, id="tag-push"),
+    ],
+)  # fmt: skip
+def test_pass_matrix(tmp_path: Path, line: str) -> None:
+    """Never review-gated: the verdict is the merge gate's, not this path's; no role branch is refused."""
+    repo, sha = _init_repo(tmp_path, _SLUG)
+    result = _run_push_gate(repo, tmp_path, line.format(sha=sha) + "\n")
     assert result.returncode == 0, result.stdout + result.stderr
 
 
-def test_develop_push_is_blocked_naming_the_pr_path(tmp_path: Path) -> None:
-    workspace = tmp_path
-    repo, sha = _init_repo(workspace, _SLUG)
-    result = _run_push_gate(
-        repo, workspace, f"refs/heads/develop {sha} refs/heads/develop {_ZERO}\n"
+_CUSTOM_BLOCK = "---\ngitflow: {principal: trunk, integration: next, work: work/}\n---\n# C\n"
+
+
+def _push(branch: str, sha: str) -> str:
+    return f"refs/heads/{branch} {sha} refs/heads/{branch} {_ZERO}\n"
+
+
+def _write_constitution(repo: Path, text: str) -> None:
+    """Committed: the gate reads HEAD's constitution, never the working tree."""
+    (repo / "specs").mkdir(exist_ok=True)
+    write_text(repo / "specs" / "constitution.md", text)
+    git = ["git", "-c", "user.name=t", "-c", "user.email=t@t.invalid"]
+    run([*git, "add", "specs"], cwd=repo, check=True)
+    run([*git, "commit", "-qm", "c"], cwd=repo, check=True)
+
+
+def test_a_custom_gitflow_governs_the_push(tmp_path: Path) -> None:
+    repo, sha = _init_repo(tmp_path, _SLUG)
+    _write_constitution(repo, _CUSTOM_BLOCK)
+
+    assert _run_push_gate(repo, tmp_path, _push("work/0.0.1", sha)).returncode == 0
+    refused = _run_push_gate(repo, tmp_path, _push("feature/0.0.1", sha))
+    assert refused.returncode != 0
+    fix = land_fix(lambda root, *words: inline(*cli_words(root, *words)))
+    assert f"fix: {fix}" in refused.stderr, refused.stderr
+
+
+def test_an_absent_gitflow_block_warns_and_falls_back_to_the_default(tmp_path: Path) -> None:
+    repo, sha = _init_repo(tmp_path, _SLUG)
+    _write_constitution(repo, "---\nspecs_pattern_version: 7\n---\n# C\n")
+
+    result = _run_push_gate(repo, tmp_path, _push("feature/0.0.1", sha))
+    assert result.returncode == 0, result.stderr
+    assert "WARNING" in result.stderr and "default gitflow" in result.stderr
+
+
+def test_an_associated_repo_inherits_its_context_gitflow(tmp_path: Path) -> None:
+    main, _ = _init_repo(tmp_path, _SLUG)
+    _write_constitution(main, _CUSTOM_BLOCK)
+    infra, sha = _init_repo(tmp_path, "demo-infra")
+    write_text(
+        tmp_path / ".dadaia" / "states" / "spec_contexts.json",
+        json.dumps(
+            {
+                "schema_version": "2",
+                "contexts": [
+                    {
+                        "name": _SLUG,
+                        "state": "alive",
+                        "repo_slug": _SLUG,
+                        "associated_repos": [{"slug": "demo-infra"}],
+                    }
+                ],
+            }
+        ),
     )
-    out = result.stdout + result.stderr
-    assert result.returncode != 0, out
-    assert "BLOCKED" in out, out
-    assert "PR" in out, out
-    assert "feature/" in out, out
+
+    result = _run_push_gate(infra, tmp_path, _push("work/0.0.1", sha))
+    assert result.returncode == 0, result.stderr
+    assert "WARNING" not in result.stderr
+    assert _run_push_gate(infra, tmp_path, _push("feature/0.0.1", sha)).returncode != 0
+    # An absent main repo carries no committed text: the default plus one warning, never a
+    # traceback.
+    for fan in (main / ".git/objects").iterdir():  # git's read-only objects, as on Windows
+        make_readonly(fan)
+    assert sweep.rmtree(main) is None
+    result = _run_push_gate(infra, tmp_path, _push("feature/0.0.1", sha))
+    assert result.returncode == 0 and result.stderr.count("WARNING") == 1, result.stderr
+    _write_constitution(infra, _CUSTOM_BLOCK)  # its own constitution is read first
+    result = _run_push_gate(infra, tmp_path, _push("work/0.0.1", sha))
+    assert result.returncode == 0 and "WARNING" not in result.stderr, result.stderr
 
 
 @pytest.mark.parametrize(
-    "variant",
-    ["branch-deletion", "tag-push"],
-    ids=["branch-deletion-passes", "tag-push-passes"],
+    "stamp",
+    [f"{CANONICAL_SPECS_VERSION}", f"{CANONICAL_SPECS_VERSION}\ngitflow: {{principal: main"],
 )
-def test_pass_matrix(tmp_path: Path, variant: str) -> None:
-    """Branch deletion (zero local sha) and a tag push both pass with NO verdict on
-    disk — never review-gated, exactly as before A3.4 (the check simply does not exist
-    anywhere on this path now)."""
-    workspace = tmp_path
-    repo, sha = _init_repo(workspace, _SLUG)
-
-    if variant == "branch-deletion":
-        result = _run_push_gate(repo, workspace, f"refs/heads/old {_ZERO} refs/heads/old {sha}\n")
-    else:
-        result = _run_push_gate(repo, workspace, f"refs/tags/v1 {sha} refs/tags/v1 {_ZERO}\n")
-    assert result.returncode == 0, result.stdout + result.stderr
+def test_the_pushed_commits_tree_state_governs_the_canon_scan(tmp_path: Path, stamp: str) -> None:
+    """The pushed commit's stamp governs, not a checkout stamped 6; a malformed one still scans."""
+    repo, _ = _init_repo(tmp_path, _SLUG)
+    (repo / "specs").mkdir()
+    write_text(repo / "specs" / "stray-notes.txt", "x\n")
+    _write_constitution(repo, f"---\nspecs_pattern_version: {stamp}\n---\n# C\n")
+    write_text(repo / "specs" / "constitution.md", "---\nspecs_pattern_version: 6\n---\n")
+    sha = run(["git", "rev-parse", "HEAD"], cwd=repo)
+    result = _run_push_gate(repo, tmp_path, _push("feature/0.0.1", sha.stdout.strip()))
+    assert result.returncode != 0 and "BLOCKED" in result.stderr, result.stderr

@@ -1,43 +1,51 @@
 """``dadaia init <dir> --harness claude --repo <url>`` end to end, through the console script.
 
-Intent: CONTRACT — 0.4.7 FR1 / AC1.1 (T-047-79).
-
-Size: LARGE, justified — AC1.1 is a statement about the *installed* distribution, not
+Size: LARGE, justified — the statement is about the *installed* distribution, not
 about any in-process wiring: an operator types one line and the workspace that appears
 must pass its own ``doctor``. Every seam below (venv provisioning, asset install, the
 clone, the context store, the session binding, the git chokepoint, the doctor's zone
 walk) is crossed by a REAL ``dadaia`` process, so nothing this test asserts survives
 being demoted to the CLI runner. This is the suite's ONE test that exercises the
-installed console script; every narrower contract of FR1 is already covered MEDIUM in
-``tests/integration/test_init_with_repo.py``.
+installed console script; every narrower contract is already covered by MEDIUM tests.
 
 Hermetic by construction — no network, no container:
 
 * ``--repo`` is a LOCAL bare repository, so the clone is the real git path with no remote.
 * ``HOME`` is a tmp dir and the child environment carries no inherited ``DADAIA_*``.
-* The workspace venv is pre-seeded (see ``_seed_venv_entrypoint``). ``tests/conftest.py``'s
+* The workspace venv is pre-seeded HEALTHY (``tests.fixtures.stores.fake_venv``). ``tests/conftest.py``'s
   ``_no_real_venv_in_tests`` backstop is an in-process monkeypatch and cannot reach a
-  child process, so this test honours the same law on the child's own terms: it uses
-  ``ensure_workspace_venv``'s documented idempotent-repair contract (a venv directory
-  that already carries an executable ``dadaia`` entrypoint is left alone), which is also
-  exactly what doctor's VENV-1 check asserts. No ``venv.create``, no ``pip install``.
+  child process, so this test honours the same law on the child's own terms: the seeded
+  venv's python runs and reports the running build and its ``dadaia`` entrypoint is bound
+  to it, so ``ensure_workspace_venv`` answers ``same`` and takes its no-op path (a venv
+  whose probe fails is repaired, never left alone). No ``venv.create`` or ``pip install``
+  by init.
+
+Owner: dd-sw-engineer-sr
 """
 
 from __future__ import annotations
 
+import email
 import json
 import os
 import re
 import shutil
 import subprocess
 import sys
+import zipfile
 from importlib import metadata
 from pathlib import Path
 
 import pytest
+from packaging.requirements import Requirement
 
 from dadaia_workspace.core import workspace_layout
 from dadaia_workspace.core.platform import PLATFORM
+from dadaia_workspace.infrastructure.provider_version import provider_version
+from tests.conftest import GIT_QUIET_INCLUDE
+from tests.fixtures.harness_env import suite_env
+from tests.fixtures.stores import fake_venv
+from tests.helpers.oslib import run, write_text
 
 pytestmark = [pytest.mark.e2e, pytest.mark.slow]
 
@@ -47,8 +55,15 @@ _CONSOLE_SCRIPT = Path(sys.executable).parent / f"dadaia{PLATFORM.venv_exe_suffi
 
 
 def _child_env(home: Path) -> dict[str, str]:
-    """A clean environment: no inherited ``DADAIA_*``, a tmp ``HOME``, a git identity."""
-    env = {k: v for k, v in os.environ.items() if not k.startswith("DADAIA_")}
+    """A clean environment: no inherited ``DADAIA_*`` but the suite's fence (the dev CLI's
+    own workspace is never this child's), a tmp ``HOME``, a git identity."""
+    keep = "DADAIA_FENCED_ROOTS"
+    write_text(home / "gitconfig", GIT_QUIET_INCLUDE)
+    env = {
+        k: v
+        for k, v in suite_env(os.environ, Path.home()).items()
+        if not k.startswith("DADAIA_") or k == keep
+    }
     env.update(
         HOME=str(home),
         XDG_CONFIG_HOME=str(home / ".config"),
@@ -70,32 +85,12 @@ def _dadaia(
 ) -> subprocess.CompletedProcess[str]:
     env = _child_env(home)
     env.update(extra_env or {})
-    return subprocess.run(
-        [str(_CONSOLE_SCRIPT), *argv],
-        cwd=cwd,
-        env=env,
-        capture_output=True,
-        text=True,
-        timeout=_TIMEOUT,
-    )
+    return run([str(_CONSOLE_SCRIPT), *argv], cwd=cwd, env=env, timeout=_TIMEOUT)
 
 
-def _git(*args: str, cwd: Path, home: Path) -> None:
-    subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True, env=_child_env(home))
-
-
-def _seed_venv_entrypoint(workspace: Path) -> None:
-    """Materialise ``.dadaia/.venv`` with an executable ``dadaia`` entrypoint.
-
-    The child process' equivalent of the suite's no-real-venv backstop: with the
-    entrypoint already present, ``ensure_workspace_venv`` takes its idempotent no-op
-    path and the test never builds a 30-50 MB venv nor runs ``pip``.
-    """
-    bin_dir = workspace / ".dadaia" / ".venv" / PLATFORM.venv_scripts_dir
-    bin_dir.mkdir(parents=True)
-    entry = bin_dir / f"dadaia{PLATFORM.venv_exe_suffix}"
-    entry.write_text(f"#!{sys.executable}\n", encoding="utf-8")
-    entry.chmod(0o755)
+def _git(*args: str, cwd: Path, home: Path) -> str:
+    env = _child_env(home)
+    return run(["git", *args], cwd=cwd, check=True, env=env).stdout
 
 
 @pytest.fixture()
@@ -114,7 +109,7 @@ def origin(tmp_path: Path, home: Path) -> Path:
     work = tmp_path / "seed"
     work.mkdir()
     _git("init", "--initial-branch=main", cwd=work, home=home)
-    (work / "README.md").write_text("# demo-project\n", encoding="utf-8")
+    write_text(work / "README.md", "# demo-project\n")
     _git("add", "README.md", cwd=work, home=home)
     _git("commit", "-m", "seed", cwd=work, home=home)
     _git("remote", "add", "origin", str(bare), cwd=work, home=home)
@@ -129,30 +124,39 @@ def origin(tmp_path: Path, home: Path) -> Path:
 def test_one_line_bootstrap_yields_a_doctor_clean_workspace(
     tmp_path: Path, home: Path, origin: Path
 ) -> None:
-    """AC1.1: one line, then ``doctor`` exit 0 and the repo ALIVE as ``main_repo``."""
+    """One line, then ``doctor`` exit 0 and the repo ALIVE as ``main_repo``;
+    the user repo is untouched."""
     workspace = tmp_path / "demo"
     workspace.mkdir()
-    _seed_venv_entrypoint(workspace)
+    fake_venv(workspace, cli="#!python\n", pth=True)
 
     init = _dadaia(
         "init", "demo", "--harness", "claude", "--repo", str(origin), cwd=tmp_path, home=home
     )
     assert init.returncode == 0, f"init failed:\n{init.stdout}\n{init.stderr}"
+    # the seeded venv is healthy: init answers "already at", never repairs it through pip
+    assert f"already at {provider_version()}" in init.stdout.splitlines(), init.stdout
+    # `init --repo` commits nothing into the user repo — clean tree, HEAD at origin.
+    repo = workspace / "repos" / "demo-project"
+    assert _git("status", "--porcelain", cwd=repo, home=home) == ""
+    assert _git("rev-parse", "HEAD", cwd=repo, home=home) == _git(
+        "rev-parse", "main", cwd=origin, home=home
+    )
 
-    # With --repo the closing notes are replaced by the binding's export lines.
-    assert "Sessions launch at the workspace root." not in init.stdout
-    assert "instructionFiles" not in init.stdout
-    assert "Projects live under repos/" not in init.stdout
+    # A short closing names the CLI by its absolute venv path, no bare verb.
+    assert len(init.stdout.splitlines()) <= 12, init.stdout
+    assert not re.search(r"(^|[\s`])dadaia (context|doctor|specs) ", init.stdout), init.stdout
+    cli = workspace / ".dadaia" / ".venv" / PLATFORM.venv_scripts_dir
+    assert f"CLI: {cli / f'dadaia{PLATFORM.venv_exe_suffix}'}" in init.stdout.splitlines()
 
     doctor = _dadaia("doctor", cwd=workspace, home=home)
     assert doctor.returncode == 0, f"doctor is not clean:\n{doctor.stdout}\n{doctor.stderr}"
 
-    # The operator's next act is `eval $(...)` on the printed export lines — the binding
-    # those lines carry is what makes `context show` answer about THIS workspace.
-    binding = dict(re.findall(r"export (DADAIA_[A-Z_]+)=(\S+)", init.stdout))
-    assert set(binding) == {"DADAIA_CONTEXT", "DADAIA_SESSION_ID"}, init.stdout
+    # init binds nothing and prints no export line; `context show` names
+    # the context explicitly.
+    assert "export DADAIA_" not in init.stdout, init.stdout
 
-    show = _dadaia("context", "show", "--json", cwd=workspace, home=home, extra_env=binding)
+    show = _dadaia("context", "show", "demo-project", "--json", cwd=workspace, home=home)
     assert show.returncode == 0, f"context show failed:\n{show.stdout}\n{show.stderr}"
     record = json.loads(show.stdout)
     assert record["main_repo"] == "demo-project"
@@ -166,10 +170,8 @@ def test_one_line_bootstrap_yields_a_doctor_clean_workspace(
 
 # ── the venv mirrors the RUNNING distribution, never the index ───────────────────
 #
-# Bug init-venv-installs-index-version-not-running-distribution. The test above
-# pre-seeds `.dadaia/.venv`, so it never crosses the provisioning seam — which is
-# exactly why a uvx bootstrap could project HEAD's assets into a workspace whose venv
-# ran PyPI's 0.4.6. The test below crosses it for real, hermetically.
+# The test above pre-seeds `.dadaia/.venv`, so it never crosses the provisioning seam.
+# The test below crosses it for real, hermetically.
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _DECOY_MODULE = "_decoy_marker_from_the_index.py"
@@ -182,7 +184,7 @@ def _build_wheel(source: Path, dest: Path) -> Path:
     installed beside this interpreter, so pip never reaches for an index.
     """
     dest.mkdir(parents=True, exist_ok=True)
-    subprocess.run(  # noqa: S603
+    run(
         [
             str(Path(sys.executable).parent / "pip"),
             "wheel",
@@ -192,55 +194,49 @@ def _build_wheel(source: Path, dest: Path) -> Path:
             "--wheel-dir",
             str(dest),
             str(source),
-        ],  # fmt: skip
+        ],
         check=True,
-        capture_output=True,
-        text=True,
         timeout=_TIMEOUT,
-        env={**os.environ, "PIP_NO_INDEX": "1"},
+        env=suite_env(os.environ, Path.home()) | {"PIP_NO_INDEX": "1"},
     )
     built = sorted(dest.glob("dadaia_workspace-*.whl"))
     assert len(built) == 1, f"expected one wheel in {dest}, got {built}"
     return built[0]
 
 
-def _repack_dependency_closure(dest: Path) -> Path:
-    """Re-pack this distribution's installed runtime dependencies into *dest*.
+def _repack_dependency_closure(wheel: Path, dest: Path) -> Path:
+    """Re-pack the runtime dependency closure of *wheel* into *dest*.
 
     The offline dependency mirror both venvs resolve against, built with the product's
     OWN :func:`repack_installed_wheel` — the same function the fix under test uses for
-    ``dadaia-workspace`` itself. 17 wheels, well under a second.
+    ``dadaia-workspace`` itself. The walk starts at the wheel's own ``Requires-Dist``, never
+    the installed metadata, which a stale editable install leaves behind; a dependency
+    missing from this venv fails here, by name.
     """
     from dadaia_workspace.infrastructure.python_env import repack_installed_wheel
 
     dest.mkdir(parents=True, exist_ok=True)
+    with zipfile.ZipFile(wheel) as archive:
+        meta = next(n for n in archive.namelist() if n.endswith(".dist-info/METADATA"))
+        requires = email.message_from_bytes(archive.read(meta)).get_all("Requires-Dist") or []
     seen: set[str] = set()
-    stack = ["dadaia-workspace"]
+    stack = list(requires)
     while stack:
-        name = stack.pop()
-        key = name.lower().replace("_", "-")
-        if key in seen:
-            continue
+        requirement = Requirement(stack.pop())
+        key = requirement.name.lower().replace("_", "-")
+        if key in seen or (requirement.marker and not requirement.marker.evaluate({"extra": ""})):
+            continue  # an optional extra or another platform's dependency
         seen.add(key)
-        try:
-            dist = metadata.distribution(name)
-        except metadata.PackageNotFoundError:
-            continue
-        for requirement in dist.requires or []:
-            if "extra ==" in requirement:
-                continue
-            dependency = re.split(r"[<>=!~;\[\s]", requirement.strip())[0]
-            if dependency:
-                stack.append(dependency)
-        if key != "dadaia-workspace":
-            repack_installed_wheel(dest, dist=dist)
+        dist = metadata.distribution(requirement.name)
+        stack.extend(dist.requires or [])
+        repack_installed_wheel(dest, dist=dist)
     return dest
 
 
 def _decoy_source(tmp_path: Path) -> Path:
     """A copy of this distribution carrying ONE extra module, built at the SAME version.
 
-    This is the index's side of the bug, reproduced without a network: under the
+    This is the index's side, reproduced without a network: under the
     release-please floor an unpublished build and the last published release declare
     the same version, so a pin on that version resolves to whichever bytes the index
     happens to hold. Here those bytes are marked.
@@ -252,7 +248,7 @@ def _decoy_source(tmp_path: Path) -> Path:
     shutil.copytree(
         _REPO_ROOT / "dadaia_workspace", source / "dadaia_workspace", dirs_exist_ok=True
     )
-    (source / "dadaia_workspace" / _DECOY_MODULE).write_text("INDEX = True\n", encoding="utf-8")
+    write_text(source / "dadaia_workspace" / _DECOY_MODULE, "INDEX = True\n")
     return source
 
 
@@ -261,19 +257,17 @@ def _decoy_source(tmp_path: Path) -> Path:
     reason=f"the dadaia console script is not installed next to {sys.executable}",
 )
 def test_the_workspace_venv_carries_the_bootstrappers_own_bytes(tmp_path: Path, home: Path) -> None:
-    """Intent: CONTRACT — bug init-venv-installs-index-version-not-running-distribution.
-
-    The consumer shape, end to end and hermetic: a NON-checkout install of this
+    """The consumer shape, end to end and hermetic: a NON-checkout install of this
     distribution (a wheel in its own venv — pipx/uvx/a git bootstrap) runs ``init``, and
     the workspace venv it provisions must carry ITS bytes.
 
     The index is present and poisoned: ``PIP_FIND_LINKS`` serves a wheel of the same
     version carrying one extra module, and ``PIP_NO_INDEX`` keeps every other resolution
-    offline. Under the old ``dadaia-workspace==<running version>`` pin that decoy is
+    offline. Under a ``dadaia-workspace==<running version>`` pin that decoy is
     what pip resolved and installed. The assertion is therefore not "a version matches"
-    — the version is identical by construction, which is the whole bug — but "the decoy
-    module did not come along", plus the ``<dir>`` argument the pre-c8 published CLI
-    does not have.
+    — the version is identical by construction — but "the decoy
+    module did not come along", plus the ``<dir>`` argument that the older published
+    CLI does not have.
 
     Size: LARGE, justified — two real venvs and two real wheel builds. Nothing smaller
     reaches the seam: it exists only between an installed distribution and the venv it
@@ -282,7 +276,7 @@ def test_the_workspace_venv_carries_the_bootstrappers_own_bytes(tmp_path: Path, 
     same accommodation the sibling test documents.
     """
     real_wheel = _build_wheel(_REPO_ROOT, tmp_path / "dist")
-    deps = _repack_dependency_closure(tmp_path / "deps")
+    deps = _repack_dependency_closure(real_wheel, tmp_path / "deps")
     decoy_dir = tmp_path / "decoy-dist"
     decoy_wheel = _build_wheel(_decoy_source(tmp_path), decoy_dir)
     assert decoy_wheel.name == real_wheel.name, "the decoy must be indistinguishable by version"
@@ -291,17 +285,13 @@ def test_the_workspace_venv_carries_the_bootstrappers_own_bytes(tmp_path: Path, 
     # the consumer path (no pyproject.toml beside the package) rather than the editable
     # self-hosting one.
     bootstrapper = tmp_path / "bootstrapper"
-    subprocess.run(  # noqa: S603
-        [sys.executable, "-m", "venv", str(bootstrapper)], check=True, capture_output=True
-    )
+    run([sys.executable, "-m", "venv", str(bootstrapper)], check=True)
     boot_bin = bootstrapper / PLATFORM.venv_scripts_dir
-    subprocess.run(  # noqa: S603
+    run(
         [str(boot_bin / "pip"), "install", "--quiet", str(real_wheel)],
         check=True,
-        capture_output=True,
-        text=True,
         timeout=_TIMEOUT,
-        env={**os.environ, "PIP_NO_INDEX": "1", "PIP_FIND_LINKS": str(deps)},
+        env=suite_env(os.environ, Path.home()) | {"PIP_NO_INDEX": "1", "PIP_FIND_LINKS": str(deps)},
     )
 
     env = _child_env(home)
@@ -311,12 +301,10 @@ def test_the_workspace_venv_carries_the_bootstrappers_own_bytes(tmp_path: Path, 
     # own installed wheel and take the consumer path.
     env.pop("PYTHONPATH", None)
     env.update(PIP_NO_INDEX="1", PIP_FIND_LINKS=f"{deps} {decoy_dir}")
-    init = subprocess.run(  # noqa: S603
+    init = run(
         [str(boot_bin / f"dadaia{PLATFORM.venv_exe_suffix}"), "init", "ws", "--harness", "claude"],
         cwd=tmp_path,
         env=env,
-        capture_output=True,
-        text=True,
         timeout=_TIMEOUT,
     )
     assert init.returncode == 0, f"init failed:\n{init.stdout}\n{init.stderr}"
@@ -328,12 +316,10 @@ def test_the_workspace_venv_carries_the_bootstrappers_own_bytes(tmp_path: Path, 
         "the workspace venv carries the INDEX's bytes, not the bootstrapper's"
     )
 
-    help_text = subprocess.run(  # noqa: S603
+    help_text = run(
         [str(venv_bin / f"dadaia{PLATFORM.venv_exe_suffix}"), "init", "--help"],
-        capture_output=True,
-        text=True,
         timeout=_TIMEOUT,
-        env={k: v for k, v in _child_env(home).items() if k != "PYTHONPATH"},
+        env=suite_env(_child_env(home), home, unset=("PYTHONPATH",)),
     )
     assert help_text.returncode == 0, help_text.stderr
     assert "DIR" in help_text.stdout, (

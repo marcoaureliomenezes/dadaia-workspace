@@ -1,111 +1,44 @@
 """dadaia public subcommands."""
 
-from pathlib import Path
-from typing import Literal
-
 import typer
 from rich.console import Console
 
 from dadaia_workspace import container
-from dadaia_workspace.core.models.doctor_report import DoctorLine, DoctorStatus
+from dadaia_workspace.cli.help_digest import write_digest
+from dadaia_workspace.core.cli_line import fix_line, spell_fix
+from dadaia_workspace.core.exceptions import PublicAssetError
+from dadaia_workspace.core.model_registry import TEMPLATES
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
-
-#: Display styles by status. Rendering only — the verdict NEVER depends on this map:
-#: an unmapped status prints unstyled and still blocks if its status blocks.
-_STYLE_BY_STATUS: dict[DoctorStatus, str] = {
-    DoctorStatus.OK: "green",
-    DoctorStatus.MISSING: "yellow",
-    DoctorStatus.DRIFT: "yellow",
-    DoctorStatus.ERROR: "red",
-    DoctorStatus.LEAK: "red",
-    DoctorStatus.EXTRA: "yellow",
-    DoctorStatus.NOT_APPLICABLE: "cyan",
-    DoctorStatus.UNSUPPORTED: "cyan",
-}
 
 app = typer.Typer(help="Manage distributed public agent assets.")
 console = Console()
-_ONLY_CHOICES = (
-    "agents",
-    "skills",
-    "rules",
-    "schemas",
-    "scripts",
-    "runtime",
-    "templates",
-    "data",
+
+
+@app.command(
+    epilog="Recipe:\n\n" + "\n\n".join(fix_line(None, "public", v) for v in ("install", "doctor"))
 )
-
-
-@app.command()
-def stage() -> None:
-    """Stage packaged public assets into .dadaia/agentic/."""
-    workspace_root = resolve_workspace_root()
-    # Defence-in-depth (rc-4 / T-017-36, bug agent-skill-surface-slop): fail staging on broken
-    # agent→skill references so a stage with dangling skills never silently succeeds (doctor
-    # also catches these post-hoc; this blocks them at the source).
-    from dadaia_workspace.infrastructure.entity_doctor import check_agent_skill_refs
-
-    public_dir = Path(__file__).resolve().parent.parent.parent / "public"
-    ref_drift = [r for r in check_agent_skill_refs(public_dir) if r.status is DoctorStatus.DRIFT]
-    if ref_drift:
-        console.print("[red]✗ staging blocked — broken agent→skill references:[/red]")
-        for issue in ref_drift:
-            console.print(f"  {issue.render()}", markup=False)
-        raise typer.Exit(1)
-    staged = container.build_public_service().stage(workspace_root)
-    if staged:
-        console.print(f"[green]✓[/green] {len(staged)} asset group(s) staged:")
-        for item in staged:
-            console.print(f"  {item}", markup=False)
-    else:
-        console.print("[dim]No assets to stage.[/dim]")
-
-
-@app.command(epilog="Recipe: dadaia public stage && dadaia public install && dadaia public doctor")
 def install(
+    ctx: typer.Context,
     force: bool = typer.Option(False, "--force", help="Overwrite existing files"),
-    repos_only: bool = typer.Option(
-        False, "--repos-only", help="Install only consumer repo assets."
-    ),
-    workspace_only: bool = typer.Option(
-        False, "--workspace-only", help="Install only workspace-root guardrail pair."
-    ),
-    only: str = typer.Option(
-        "",
-        "--only",
-        help=f"Install only one asset category: {', '.join(_ONLY_CHOICES)}",
+    template: str | None = typer.Option(
+        None,
+        "--template",
+        help="Agent-model template to save and apply: " + ", ".join(TEMPLATES) + ".",
     ),
 ) -> None:
-    """Install staged public assets into runtime projections.
+    """Stage the packaged public assets, then install them into runtime projections.
 
     Projects the shared authored set plus every harness registered in
     `.dadaia/states/harness_profile.json` — the roster of record. A harness enters
-    that roster through `dadaia harness add <name>`, never through a flag here.
+    that roster through `harness add <name>`, never through a flag here.
     """
-    if repos_only and workspace_only:
-        typer.echo("Error: --repos-only and --workspace-only are mutually exclusive.", err=True)
-        raise typer.Exit(1)
-
-    only_value: str | None = only if only else None
-    if only_value is not None and only_value not in _ONLY_CHOICES:
-        typer.echo(
-            f"Error: --only '{only_value}' is not valid. Choose from: {', '.join(_ONLY_CHOICES)}",
-            err=True,
-        )
-        raise typer.Exit(1)
-
-    scope: Literal["all", "repos-only", "workspace-only"]
-    if repos_only:
-        scope = "repos-only"
-    elif workspace_only:
-        scope = "workspace-only"
-    else:
-        scope = "all"
-
     workspace_root = resolve_workspace_root()
     svc = container.build_public_service()
-    installed = svc.install(workspace_root, force=force, scope=scope, only=only_value)
+    try:
+        installed = svc.install(workspace_root, force=force, template=template)
+    except PublicAssetError as exc:
+        console.print(f"✗ {exc}", style="red", markup=False)
+        raise typer.Exit(1) from exc
 
     if installed:
         console.print(f"[green]✓[/green] {len(installed)} asset(s) processed:")
@@ -114,11 +47,8 @@ def install(
     else:
         console.print("[dim]No assets to install.[/dim]")
 
-    # Derived help digest rider (backlog cli-help-architecture): regenerate the
-    # version-stamped digest at install time — never at hook fire. Fail-soft.
-    from dadaia_workspace.cli.help_digest import write_digest
-
-    write_digest(workspace_root)
+    # Derived help digest rider: regenerate at install time, never at hook fire. Fail-soft.
+    write_digest(workspace_root, ctx.find_root().command)
 
 
 @app.command()
@@ -129,12 +59,9 @@ def doctor() -> None:
     harnesses registered in the profile.
     """
     workspace_root = resolve_workspace_root()
-    report = container.build_public_service().doctor(workspace_root)
-    lines: list[DoctorLine] = list(report.lines)
+    lines, fix = container.build_public_service().verdict(workspace_root)
     for line in lines:
-        console.print(line.render(), style=_STYLE_BY_STATUS.get(line.status), markup=False)
-    # The verdict is the typed report's — fail-closed: EVERY blocking status exits 1,
-    # including ones this CLI never special-cased (bug public-doctor-exits-zero-
-    # despite-error: [error] used to fall into a decorative else and exit 0).
-    if any(line.status.blocking for line in lines):
+        print(line.render())  # plain: a fix line is never wrapped at the terminal width
+    if fix:
+        print(spell_fix(fix))
         raise typer.Exit(1)

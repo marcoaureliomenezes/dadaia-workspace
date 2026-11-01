@@ -4,19 +4,19 @@
   "title": "Handoff Document v1.2",
   "description": "Structured handoff emitted by an agent at the end of any task (handoff-first; an HTML report artifact is optional). Validates the handoff contract between pipeline stages.",
   "type": "object",
-  "required": ["schema_version", "agent", "context", "produced_at", "artifact", "scope", "metrics"],
+  "required": ["schema_version", "self_pull", "agent", "context", "produced_at", "artifact", "scope", "metrics"],
   "additionalProperties": false,
   "properties": {
     "schema_version": {
       "type": "string",
-      "enum": ["handoff-v1", "handoff-v1.1", "handoff-v1.2"],
-      "description": "Schema version identifier. Use 'handoff-v1.2' for new handoffs. Historical v1/v1.1 documents stay valid (transition posture)."
+      "enum": ["handoff-v1.2"],
+      "description": "Schema version identifier: 'handoff-v1.2', the only version (v1 and v1.1 are retired; re-emit an old handoff as v1.2 with self_pull)."
     },
     "self_pull": {
       "type": "object",
       "required": ["refs"],
       "additionalProperties": false,
-      "description": "Layer-1 self-pull audit line (v1.2). Records the memory atoms the emitting session actually read, in InjectedContext ref style (context-relative, specs/-prefixed). Optional at schema level; REQUIRED for schema_version handoff-v1.2 by the service-layer conditional (the stdlib validator has no if/then).",
+      "description": "Layer-1 self-pull audit line, always required. Records the memory atoms the emitting session actually read, in InjectedContext ref style (context-relative, specs/-prefixed).",
       "properties": {
         "refs": {
           "type": "array",
@@ -32,7 +32,7 @@
     },
     "agent": {
       "type": "string",
-      "description": "Name of the agent that produced this handoff (e.g. 'dd-software-engineer')."
+      "description": "Name of the agent that produced this handoff (e.g. 'dd-sw-engineer-sr')."
     },
     "context": {
       "type": "string",
@@ -47,6 +47,16 @@
     "scope": {
       "type": "string",
       "description": "Scope descriptor for the handoff (e.g. file path, module, component)."
+    },
+    "reviewed_sha": {
+      "type": "string",
+      "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$",
+      "description": "The commit a verdict judged; written only by the emitter's verdict.py."
+    },
+    "diff_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "The hash of the diff a verdict judged, from `.dadaia/.venv/bin/dadaia worktree hash`; written only by verdict.py."
     },
     "metrics": {
       "type": "object",
@@ -71,7 +81,7 @@
         "content_hash": {
           "type": "string",
           "pattern": "^[a-f0-9]{64}$",
-          "description": "SHA-256 hex digest of the artifact file content. Required whenever path is present — `dadaia reports validate` recomputes the file hash and fails on mismatch or absence."
+          "description": "SHA-256 hex digest of the artifact file content. Required whenever path is present — the CLI's `reports validate` verb recomputes the file hash and fails on mismatch or absence."
         }
       }
     },
@@ -138,7 +148,7 @@
     "verdict": {
       "type": "string",
       "enum": ["APPROVED", "REJECTED"],
-      "description": "Optional approval verdict emitted by dd-code-reviewer. When present, must be APPROVED or REJECTED. Enables machine-checkable dual-approval gate at release CLOSURE."
+      "description": "Optional approval verdict emitted by dd-code-reviewer. When present, must be APPROVED or REJECTED. Read by `.dadaia/.venv/bin/dadaia worktree merge` (worktrees/AGENTS.md §2)."
     },
     "verdict_reason": {
       "type": "string",

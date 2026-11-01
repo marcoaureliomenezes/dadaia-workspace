@@ -1,0 +1,302 @@
+"""Characterization net for the six public ``bugs.py`` seams."""
+
+from __future__ import annotations
+
+import json
+import os
+import re
+import subprocess
+import sys
+from pathlib import Path
+
+import pytest
+
+from dadaia_workspace.core.skill_owner import load_owner
+from tests.fixtures.harness_env import suite_env
+from tests.helpers.oslib import read_text, run, write_text
+from tests.helpers.skill_scripts import stage_skill_scripts
+
+pytestmark = [
+    pytest.mark.medium,
+    pytest.mark.slow(reason="runs six public-script subprocesses over a real Git fixture"),
+]
+
+_OPENED = "2026-10-09T10:00:00Z"
+_CLOSED = "2026-10-09T12:00:00Z"
+
+
+def _open(bug_id: str) -> dict[str, object]:
+    return {
+        "id": bug_id,
+        "ts": _OPENED,
+        "reported_by": "fixture",
+        "title": f"Title {bug_id}",
+        "severity": "LOW",
+        "surface": "src",
+        "component": "writer",
+        "context": "characterization",
+        "symptom": f"Symptom {bug_id}",
+        "repro": "python -m fixture",
+        "expected": "Expected behavior",
+        "status": "open",
+        "cause": None,
+        "caused_by": None,
+        "closed_at": None,
+    }
+
+
+def _bytes(*records: dict[str, object]) -> bytes:
+    return "".join(
+        json.dumps(record, sort_keys=True, ensure_ascii=False) + "\n" for record in records
+    ).encode()
+
+
+def _git(repo: Path, *args: str) -> None:
+    run(
+        [
+            "git",
+            "-c",
+            "user.name=fixture",
+            "-c",
+            "user.email=fixture@example.invalid",
+            *args,
+        ],
+        cwd=repo,
+        env=suite_env(os.environ, repo),
+        check=True,
+    )
+
+
+def _run(
+    script: Path, repo: Path, *args: str, fixed_clock: bool = False
+) -> subprocess.CompletedProcess[str]:
+    command = [sys.executable, str(script), *args]
+    if fixed_clock:
+        bootstrap = (
+            "import sys; from pathlib import Path; "
+            "sys.path.insert(0, str(Path(sys.argv.pop(1)))); "
+            "import bugs; "
+            f"bugs.tr.now_iso = lambda: {_CLOSED!r}; "
+            "raise SystemExit(bugs.main(sys.argv[1:]))"
+        )
+        command = [sys.executable, "-c", bootstrap, str(script.parent), *args]
+    return run(command, cwd=repo, env=suite_env(os.environ, repo), check=False)
+
+
+def test_all_public_bug_verbs_pin_output_and_each_ledger_write(tmp_path: Path) -> None:
+    stage_skill_scripts(
+        "dd-release-implementation", tmp_path / "skills/dd-release-implementation/scripts"
+    )
+    script = (
+        stage_skill_scripts("dd-bug-resolution", tmp_path / "skills/dd-bug-resolution/scripts")
+        / "bugs.py"
+    )
+    repo = tmp_path / "repo"
+    specs = repo / "specs"
+    ledger = specs / "bugs/BUGS.jsonl"
+    ledger.parent.mkdir(parents=True)
+    source = repo / "src/module.py"
+    source.parent.mkdir(parents=True)
+    write_text(source, "value = 1\n")
+    replacement = _open("replacement")
+    rejected = _open("to-reject")
+    resolved = _open("to-resolve")
+    superseded = _open("to-supersede")
+    ledger.write_bytes(_bytes(replacement, rejected, resolved, superseded))
+    repo.mkdir(exist_ok=True)
+    _git(repo.parent, "init", "-q", str(repo))
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-qm", "fixture")
+
+    appended = {
+        **_open("appended"),
+        "reported_by": "characterizer",
+        "title": "Appended bug",
+        "severity": "MEDIUM",
+        "component": "src/module.py",
+        "symptom": "Append symptom",
+        "repro": "python -m append",
+        "expected": "Append succeeds",
+        "correlates": [],
+    }
+    del appended["surface"]
+    append = _run(
+        script,
+        repo,
+        "append",
+        "--bug-id",
+        "appended",
+        "--reported-by",
+        "characterizer",
+        "--title",
+        "Appended bug",
+        "--severity",
+        "MEDIUM",
+        "--component",
+        "src/module.py",
+        "--context",
+        "characterization",
+        "--symptom",
+        "Append symptom",
+        "--repro",
+        "python -m append",
+        "--expected",
+        "Append succeeds",
+        "--correlates",
+        "none",
+        "--specs",
+        str(specs),
+    )
+    records = load_owner("dd-bug-resolution", "_ledger").parse(read_text(ledger))
+    stamped = records[-1]
+    assert re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", stamped["ts"])
+    appended["ts"] = stamped["ts"]
+    after_append = _bytes(replacement, rejected, resolved, superseded, appended)
+    assert (append.returncode, append.stdout, append.stderr) == (
+        0,
+        f"[ok] registered appended -> {specs}\n",
+        "",
+    )
+    assert ledger.read_bytes() == after_append
+
+    status = _run(script, repo, "status", "--specs", str(specs))
+    assert (status.returncode, status.stdout, status.stderr) == (
+        0,
+        "appended\topen\tMEDIUM\n"
+        "replacement\topen\tLOW\n"
+        "to-reject\topen\tLOW\n"
+        "to-resolve\topen\tLOW\n"
+        "to-supersede\topen\tLOW\n"
+        "[ok] 5 open bug(s).\n",
+        "",
+    )
+    assert ledger.read_bytes() == after_append
+
+    _git(repo, "commit", "-q", "--allow-empty", "-m", "fix(bugs): to-resolve \u2014 Root cause")
+    fix_sha = run(["git", "rev-parse", "HEAD"], cwd=repo, env=suite_env(os.environ, repo), check=True).stdout.strip()  # fmt: skip
+    resolved = {
+        **resolved,
+        "cause": "Root cause",
+        "caused_by": "none",
+        "closed_at": _CLOSED,
+        "fix_sha": fix_sha,
+        "solution": "Fixed once",
+        "status": "resolved",
+    }
+    resolve = _run(
+        script,
+        repo,
+        "resolve",
+        "to-resolve",
+        "--cause",
+        "Root cause",
+        "--caused-by",
+        "none",
+        "--solution",
+        "Fixed once",
+        "--specs",
+        str(specs),
+        fixed_clock=True,
+    )
+    assert (resolve.returncode, resolve.stdout, resolve.stderr) == (
+        0,
+        "[ok] resolved to-resolve\n",
+        "",
+    )
+    assert ledger.read_bytes() == _bytes(replacement, rejected, resolved, superseded, appended)
+
+    superseded = {
+        **superseded,
+        "closed_at": _CLOSED,
+        "status": "superseded",
+        "superseded_by": "replacement",
+    }
+    supersede = _run(
+        script,
+        repo,
+        "supersede",
+        "to-supersede",
+        "--by",
+        "replacement",
+        "--specs",
+        str(specs),
+        fixed_clock=True,
+    )
+    assert (supersede.returncode, supersede.stdout, supersede.stderr) == (
+        0,
+        "[ok] superseded to-supersede\n",
+        "",
+    )
+    assert ledger.read_bytes() == _bytes(replacement, rejected, resolved, superseded, appended)
+
+    rejected = {
+        **rejected,
+        "cause": "Not a defect",
+        "closed_at": _CLOSED,
+        "status": "rejected",
+    }
+    reject = _run(
+        script,
+        repo,
+        "reject",
+        "to-reject",
+        "--reason",
+        "Not a defect",
+        "--specs",
+        str(specs),
+        fixed_clock=True,
+    )
+    assert (reject.returncode, reject.stdout, reject.stderr) == (
+        0,
+        "[ok] rejected to-reject\n",
+        "",
+    )
+    assert ledger.read_bytes() == _bytes(replacement, rejected, resolved, superseded, appended)
+
+    archive = _run(
+        script,
+        repo,
+        "archive",
+        "to-reject",
+        "to-resolve",
+        "to-supersede",
+        "--specs",
+        str(specs),
+    )
+    assert (archive.returncode, archive.stdout, archive.stderr) == (
+        0,
+        "[ok] archived 3 record(s), 2 kept.\n",
+        "",
+    )
+    assert ledger.read_bytes() == _bytes(replacement, appended)
+    assert (specs / "bugs/_archive/bugs_histo.jsonl").read_bytes() == _bytes(
+        rejected, resolved, superseded
+    )
+
+
+def test_append_rejects_ts_option_as_unknown(tmp_path: Path) -> None:
+    stage_skill_scripts(
+        "dd-release-implementation", tmp_path / "skills/dd-release-implementation/scripts"
+    )
+    script = (
+        stage_skill_scripts("dd-bug-resolution", tmp_path / "skills/dd-bug-resolution/scripts")
+        / "bugs.py"
+    )
+    repo = tmp_path / "repo"
+    ledger = repo / "specs/bugs/BUGS.jsonl"
+    ledger.parent.mkdir(parents=True)
+    ledger.write_bytes(b"")
+    (repo / "src").mkdir()
+    write_text(repo / "src/module.py", "value = 1\n")
+    _git(repo.parent, "init", "-q", str(repo))
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-qm", "fixture")
+    valid = [
+        "append", "--bug-id", "x", "--reported-by", "r", "--title", "T", "--severity", "LOW",
+        "--component", "src/module.py", "--context", "k", "--symptom", "s",
+        "--repro", "p", "--expected", "e", "--correlates", "none", "--specs", str(repo / "specs"),
+    ]  # fmt: skip
+    result = _run(script, repo, *valid, "--ts", _OPENED)
+    assert result.returncode == 2
+    assert "unrecognized arguments: --ts" in result.stderr
+    assert ledger.read_bytes() == b""

@@ -1,0 +1,98 @@
+"""One provider_version()
+answers "which version is running", for every verb. Size: SMALL — the importlib.metadata
+boundary is faked; every reader above it runs for real."""
+
+from __future__ import annotations
+
+import ast
+import json
+from pathlib import Path
+
+import pytest
+from typer.testing import CliRunner
+
+from dadaia_workspace.cli.main import app
+from dadaia_workspace.features.reconcile.service import reconcile_workspace
+from dadaia_workspace.infrastructure.provider_version import provider_version
+from tests.fixtures.provider_dist import install_fake_dist
+from tests.helpers.oslib import Undecodable, read_text, write_text
+
+_PKG = Path(__file__).resolve().parents[2] / "dadaia_workspace"
+
+
+def _source(tmp_path: Path, version: str) -> Path:
+    (tmp_path / "src").mkdir()
+    write_text(tmp_path / "src" / "pyproject.toml", f'[tool.poetry]\nversion = "{version}"\n')
+    return tmp_path / "src"
+
+
+def _three_verbs(tmp_path: Path) -> tuple[str, str, str | None]:
+    runner = CliRunner()
+    shown = runner.invoke(app, ["--version"]).output.strip()
+    caps = json.loads(runner.invoke(app, ["capabilities", "--json"]).output)
+    reconciled = reconcile_workspace(
+        tmp_path, expected_version="0.4.7", public_service=None, doctor_service=None
+    )
+    return shown, caps["provider"]["distribution_version"], reconciled.error
+
+
+def test_an_editable_install_reports_its_source_version_everywhere(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Dist-info frozen at 0.1.4, editable
+    to a source declaring 0.4.7 — `--version`, `capabilities --json` and `reconcile
+    --expect-version 0.4.7` all answer 0.4.7 and reconcile accepts the version."""
+    install_fake_dist(monkeypatch, "0.1.4", editable_source=_source(tmp_path, "0.4.7"))
+
+    shown, caps, reconcile_error = _three_verbs(tmp_path)
+
+    assert provider_version() == "0.4.7"
+    assert shown == "dadaia-workspace 0.4.7"
+    assert caps == "0.4.7"
+    assert "provider version mismatch" not in str(reconcile_error)
+
+
+def test_a_wheel_install_reports_its_dist_info_version(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A non-editable install answers its
+    dist-info version in all three verbs."""
+    install_fake_dist(monkeypatch, "0.4.7")
+
+    shown, caps, reconcile_error = _three_verbs(tmp_path)
+
+    assert (shown, caps) == ("dadaia-workspace 0.4.7", "0.4.7")
+    assert "provider version mismatch" not in str(reconcile_error)
+
+
+def test_the_running_version_is_read_in_one_place() -> None:
+    """metadata.version('dadaia-workspace')
+    is called nowhere but inside infrastructure/provider_version.py."""
+    readers = []
+    for path in sorted(_PKG.rglob("*.py")):
+        if path == _PKG / "infrastructure" / "provider_version.py":
+            continue
+        for node in ast.walk(ast.parse(read_text(path))):
+            if (
+                isinstance(node, ast.Call)
+                and ast.unparse(node.func).split(".")[-1] == "version"
+                and any(
+                    isinstance(a, ast.Constant) and a.value == "dadaia-workspace" for a in node.args
+                )
+            ):
+                readers.append(f"{path.relative_to(_PKG)}:{node.lineno}")
+    assert readers == []
+
+
+def test_an_editable_source_whose_pyproject_is_not_utf8_is_undecodable(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = tmp_path / "src"
+    source.mkdir()
+    (source / "pyproject.toml").write_bytes(b'[tool.poetry]\nversion = "0.4.7"\n# caf\xe9\n')
+    install_fake_dist(monkeypatch, "0.1.4", editable_source=source)
+
+    with pytest.raises(Undecodable) as refused:
+        provider_version()
+
+    assert refused.value.path == source / "pyproject.toml"

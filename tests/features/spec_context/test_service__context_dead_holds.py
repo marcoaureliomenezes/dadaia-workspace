@@ -1,0 +1,384 @@
+"""`context alive`/`context dead` over the whole repo set (main + associated).
+
+A local branch carrying a commit origin lacks,
+  in ANY repo of the set, refuses dead; a linked
+  worktree registered by the repo or nested inside it refuses dead; any `wt/*`
+  refuses dead with the owner's `worktree.py merge` fix, checked out or orphan, and
+  rows the owner cannot read refuse with its fix; a refused hold refuses dead;
+  a refusal touches nothing, the record stays ALIVE; otherwise each repo is HELD under `.dadaia/reaped/`.
+- alive clones the whole set, idempotently. An untracked file
+  or a remote-less repo anywhere in the set refuses dead before any repo acts.
+- dead back-fills each repo's URL from
+  origin, refuses a repo it could never clone back; alive refuses a URL-less missing repo
+  with a runnable fix line.
+- An empty unborn clone is held, never pushed.
+- dead never commits; a dirty checkout refuses, one fix line per
+  file; a gitignored file is not dirty.
+The refusal fix lines on the main repo are the refusal harness's Cases
+(`test_refusal_fix_lines_clear_their_refusal.py`: untracked, no_origin,
+unpushed_side_branch, commits_no_remote).
+Size: MEDIUM — real git and bare origins in tmp_path (the question is a git question).
+"""
+
+from __future__ import annotations
+
+import re
+import sys
+from collections.abc import Callable
+from dataclasses import replace
+from functools import partial
+from pathlib import Path
+
+import pytest
+
+from dadaia_workspace.container import scan_publish_candidates
+from dadaia_workspace.core.cli_line import shell_line
+from dadaia_workspace.core.exceptions import ContextStateError, RepoUrlMissingError
+from dadaia_workspace.core.models.spec_context import (
+    AssociatedRepo,
+    ContextState,
+    SpecContextProject,
+)
+from dadaia_workspace.core.platform import PLATFORM
+from dadaia_workspace.features.spec_context.service import (
+    DeadReviewRequiredError,
+    DeadUnpushedCommitsError,
+    SpecContextService,
+)
+from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
+from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
+from tests.fixtures.harness_env import retire_tree
+from tests.fixtures.stores import context_store, fake_venv
+from tests.helpers.oslib import link, read_text, run, run_line, write_text
+from tests.helpers.privacy_fixtures import aws_key_shape
+
+pytestmark = pytest.mark.slow
+
+
+def _git(*args: str, cwd: Path) -> None:
+    run(["git", *args], cwd=cwd, check=True)
+
+
+def _published(tmp_path: Path, repo: Path) -> Path:
+    bare = tmp_path / f"{repo.name}.git"
+    _git("init", "--bare", "-b", "main", str(bare), cwd=tmp_path)
+    repo.parent.mkdir(parents=True, exist_ok=True)
+    _git("clone", str(bare), str(repo), cwd=tmp_path)
+    _git("config", "user.email", "t@example.com", cwd=repo)
+    _git("config", "user.name", "T", cwd=repo)
+    write_text(repo / "README.md", "init\n")
+    write_text(repo / ".gitignore", ".worktrees/\nignored.txt\n")
+    _git("add", "README.md", ".gitignore", cwd=repo)
+    _git("commit", "-m", "init", cwd=repo)
+    _git("push", "-u", "origin", "HEAD", cwd=repo)
+    _git("push", "origin", "HEAD:refs/heads/develop", cwd=repo)
+    return bare
+
+
+def _alive(
+    tmp_path: Path, lib_url: str | None = None
+) -> tuple[SpecContextService, JsonContextStore, Path]:
+    """ALIVE `proj`: main repo `repos/main` + associated `repos/lib`, both published."""
+    ws = tmp_path / "ws"
+    repo = ws / "repos" / "main"
+    bare = _published(tmp_path, repo)
+    lib = _published(tmp_path, ws / "repos" / "lib")
+    store = context_store(ws / ".dadaia" / "states")
+    # the real CLI worktree.py lists through
+    fake_venv(ws, cli=True)
+    store.save(
+        SpecContextProject(
+            "proj", ContextState.ALIVE, "main", str(bare), "2026-09-27T00:00:00+00:00",
+            associated_repos=(AssociatedRepo("lib", str(lib) if lib_url is None else lib_url),),
+        )
+    )  # fmt: skip
+    service = SpecContextService(
+        context_store=store,
+        git_client=GitSubprocessClient(),
+        workspace_root=ws,
+        install_hooks=lambda _repo: None,
+        secret_scan=scan_publish_candidates,
+    )
+    return service, store, repo
+
+
+def _side_branch(repo: Path) -> None:
+    _git("switch", "-c", "topic", cwd=repo)
+    write_text(repo / "t.txt", "work\n")
+    _git("add", "t.txt", cwd=repo)
+    _git("commit", "-m", "topic work", cwd=repo)
+    _git("switch", "main", cwd=repo)
+
+
+def _worktree(repo: Path) -> None:
+    outside = repo.parents[2] / "wt"
+    _git("worktree", "add", "-b", "wt", str(outside), cwd=repo)
+    _git("push", "-u", "origin", "wt", cwd=repo)
+    write_text(outside / "uncommitted.txt", "keep\n")
+
+
+def _wt(repo: Path, *, checked_out: bool) -> None:
+    """An UNPUSHED `wt/` lane worktree carrying a commit — `dadaia:`-locked in its canonical
+    tree, or an orphan with none."""
+    tree = repo.parents[1] / "worktrees" / repo.name / "0.5.0/wt-hotfix-b"
+    _git("branch", "feature/0.5.0", cwd=repo)  # the work branch it is ahead of
+    _git("worktree", "add", "-b", "wt/0.5.0/wt-hotfix-b", str(tree), cwd=repo)
+    write_text(tree / "w.txt", "w\n")
+    _git("add", "w.txt", cwd=tree)
+    _git("-c", "user.name=T", "-c", "user.email=t@example.com", "commit", "-qm", "w", cwd=tree)
+    if checked_out:
+        _git("worktree", "lock", "--reason", "dadaia: impl", str(tree), cwd=repo)
+    else:
+        _git("worktree", "remove", str(tree), cwd=repo)
+
+
+def _paused_lane_bundle(repo: Path) -> None:
+    """An open `_wt` lane as pause leaves it: tree removed, local `wt/*` ref gone, a bundle in dist."""
+    tree = repo.parents[1] / "worktrees" / repo.name / "0.5.0/wt-hotfix-b"
+    bundle = repo.parents[1] / ".dadaia" / "dist" / repo.name / "0.5.0/wt-hotfix-b.bundle"
+    bundle.parent.mkdir(parents=True)
+    _git("bundle", "create", str(bundle), "wt/0.5.0/wt-hotfix-b", cwd=repo)
+    _git("worktree", "unlock", str(tree), cwd=repo)
+    _git("worktree", "remove", "--force", str(tree), cwd=repo)
+    _git("branch", "-D", "wt/0.5.0/wt-hotfix-b", cwd=repo)
+
+
+def _ahead_with_work(repo: Path) -> None:
+    _git("branch", "feature/0.3.0", cwd=repo)
+    _ahead_on_main(repo)
+
+
+def _ahead_on_main(repo: Path) -> None:
+    write_text(repo / "ahead.md", "unpushed\n")
+    _git("add", "ahead.md", cwd=repo)
+    _git("commit", "-m", "ahead", cwd=repo)
+
+
+def _no_remote(repo: Path) -> None:
+    _git("remote", "remove", "origin", cwd=repo)
+    write_text(repo / "notes.md", "local only\n")
+    _git("add", "notes.md", cwd=repo)
+    _git("commit", "-m", "local only", cwd=repo)
+
+
+def _url_less(repo: Path) -> None:
+    retire_tree(repo, repo.parents[2])
+    _git("init", str(repo), cwd=repo.parent)
+
+
+def _repos_outside(repo: Path) -> None:
+    """`repos/` resolves outside the workspace: preflight passes, the hold refuses."""
+    outside = repo.parents[2] / "outside"
+    repo.parent.rename(outside)
+    assert link(str(outside), repo.parent, is_dir=False)
+
+
+_REFUSALS = [
+    pytest.param("main", _side_branch, DeadUnpushedCommitsError, r"fix: git -C \S+ -c \S+ push origin topic:refs/tags/archive/topic/[0-9a-f]{7}$", id="C3-side-branch-main"),
+    pytest.param("lib", _side_branch, DeadUnpushedCommitsError, r"fix: git -C \S+ -c \S+ push origin topic:refs/tags/archive/topic/[0-9a-f]{7}$", id="C4-side-branch-lib"),
+    pytest.param("main", _worktree, DeadUnpushedCommitsError, r"fix: git -C \S+ worktree remove ", id="C2-registered-worktree"),
+    pytest.param("lib", partial(_wt, checked_out=True), DeadUnpushedCommitsError, rf"fix: {re.escape(shell_line(sys.executable))} \S+worktree\.py merge \S+/worktrees/lib/0\.5\.0/wt-hotfix-b$", id="AC1.10-open-wt-worktree"),
+    pytest.param("main", partial(_wt, checked_out=False), DeadUnpushedCommitsError, rf"fix: {re.escape(shell_line(sys.executable))} \S+worktree\.py merge \S+/worktrees/main/0\.5\.0/wt-hotfix-b$", id="AC1.10-unpushed-orphan-wt"),
+    pytest.param("main", lambda r: (r.parents[1] / ".dadaia/.venv" / PLATFORM.venv_scripts_dir / f"dadaia{PLATFORM.venv_exe_suffix}").unlink(), DeadUnpushedCommitsError, r"no workspace CLI[\s\S]*fix: uvx dadaia-workspace init \S+/ws$", id="AC1.10-rows-unreadable-fails-closed"),
+    pytest.param("lib", lambda r: write_text(r / "leftover.txt", "x\n"), DeadReviewRequiredError, r"lib[\s\S]*leftover\.txt", id="A16.2-untracked-in-lib"),
+    pytest.param("lib", lambda r: write_text(r / "README.md", "edited\n"), DeadReviewRequiredError, r"^Context 'proj': repo 'lib' has 1 uncommitted change\(s\); dead never commits", id="AC3.2-dirty-refusal-names-context-and-repo"),
+    pytest.param("lib", _ahead_on_main, DeadReviewRequiredError, r"fix: git -C \S+/repos/lib checkout -b feature/0\.1\.0$", id="the-fix-creates-the-work-branch"),
+    pytest.param("lib", _ahead_with_work, DeadReviewRequiredError, r"fix: git -C \S+/repos/lib switch feature/0\.3\.0$", id="the-fix-switches-to-the-existing-work-branch"),
+    pytest.param("lib", _no_remote, DeadUnpushedCommitsError, "lib", id="A16.2-local-commits-no-remote-in-lib"),
+    pytest.param("main", _repos_outside, ContextStateError, rf"skipped 'repos/main' \(outside the workspace\)\nfix: Agent action: free \S+{re.escape(str(Path('/', 'repos', 'main')))} for the move", id="AC2.11-hold-refused"),
+    pytest.param("lib", _url_less, RepoUrlMissingError, r"fix: Agent action: add the clone URL of \S+[\\/]repos[\\/]lib as its origin remote", id="url-less-never-clone-back"),
+]  # fmt: skip
+
+
+@pytest.mark.parametrize(("offender", "plant", "error", "match"), _REFUSALS)
+def test_dead_refuses_an_unrecoverable_repo_anywhere_in_the_set_and_touches_nothing(
+    tmp_path: Path,
+    offender: str,
+    plant: Callable[[Path], object],
+    error: type[Exception],
+    match: str,
+) -> None:
+    """The refusal names the repo's fix; every repo stays, nothing is held, ALIVE."""
+    service, store, repo = _alive(tmp_path, lib_url="" if plant is _url_less else None)
+    plant(repo.parent / offender)
+
+    with pytest.raises(error, match=match):
+        service.dead("proj")
+
+    assert (repo / ".git").is_dir() and (repo.parent / "lib" / ".git").is_dir()
+    assert not (tmp_path / "ws" / ".dadaia" / "reaped").exists()
+    assert store.get("proj").state is ContextState.ALIVE  # type: ignore[union-attr]
+
+
+def test_dead_refuses_an_open_lane_and_passes_once_the_lane_is_paused(tmp_path: Path) -> None:
+    """The open lane refuses with the merge fix; the paused files leave nothing for dead to lose."""
+    service, store, repo = _alive(tmp_path)
+    lib = repo.parent / "lib"
+    _wt(lib, checked_out=True)
+    with pytest.raises(DeadUnpushedCommitsError, match=r"worktree\.py merge"):
+        service.dead("proj")
+
+    _paused_lane_bundle(lib)
+    service.dead("proj")
+
+    assert store.get("proj").state is ContextState.DEAD  # type: ignore[union-attr]
+    with pytest.raises(ContextStateError, match=r"paused[\s\S]*worktree\.py resume"):
+        service.delete("proj")
+    assert store.get("proj") is not None
+
+
+def test_dead_fix_for_an_unpushable_branch_clears_the_block(tmp_path: Path) -> None:
+    """With the work branch already local the fix switches to it, and `dead` stops refusing the branch."""
+    service, _store, repo = _alive(tmp_path)
+    lib = repo.parent / "lib"
+    _ahead_with_work(lib)
+    with pytest.raises(DeadReviewRequiredError) as refused:
+        service.dead("proj")
+    (fix,) = [ln for ln in str(refused.value).splitlines() if ln.startswith("fix: ")]
+
+    run_line(fix.removeprefix("fix: "), check=True)
+
+    assert _git_out(lib, "branch", "--show-current") == "feature/0.3.0"
+    with pytest.raises(DeadUnpushedCommitsError):
+        service.dead("proj")
+
+
+def _git_out(cwd: Path, *args: str) -> str:
+    return run(["git", *args], cwd=cwd, check=True).stdout.strip()
+
+
+def _unborn(repo: Path, *files: str) -> None:
+    retire_tree(repo, repo.parents[2])
+    _git("init", str(repo), cwd=repo.parent)
+    _git("remote", "add", "origin", str(repo.parents[2] / "vanished.git"), cwd=repo)
+    for name in files:
+        write_text(repo / name, "scaffold\n")
+
+
+_HOLDS = [
+    pytest.param(lambda r: None, "README.md", "init\n", id="C1-clean-set"),
+    pytest.param(lambda r: write_text(r / "ignored.txt", f"k={aws_key_shape()}\n"), "ignored.txt", None, id="gitignored-is-not-untracked"),
+    pytest.param(_unborn, ".git/HEAD", None, id="unborn-empty-clone-no-push"),
+]  # fmt: skip
+
+
+@pytest.mark.parametrize(("plant", "held", "content"), _HOLDS)
+def test_dead_holds_every_repo_of_the_set_under_reaped(
+    tmp_path: Path, plant: Callable[[Path], object], held: str, content: str | None
+) -> None:
+    """Each repo leaves `repos/` and is held byte-intact; the record turns DEAD."""
+    service, store, repo = _alive(tmp_path)
+    plant(repo.parent / "lib")
+
+    service.dead("proj")
+
+    reaped = tmp_path / "ws" / ".dadaia" / "reaped"
+    assert [read_text(p) for p in reaped.glob("*/repos/main/README.md")] == ["init\n"]
+    kept = list(reaped.glob(f"*/repos/lib/{held}"))
+    assert len(kept) == 1 and (content is None or read_text(kept[0]) == content)
+    assert not repo.exists() and not (repo.parent / "lib").exists()
+    assert store.get("proj").state is ContextState.DEAD  # type: ignore[union-attr]
+
+
+def test_c2_a_nested_foreign_worktree_is_refused_and_its_fix_clears_it(tmp_path: Path) -> None:
+    """A gitignored linked worktree of ANOTHER repo nested in the checkout: the hold
+    would skip it, so dead refuses up front instead of recording DEAD with the repo on
+    disk; the fix line (its command, the kept directory appended) clears the refusal."""
+    service, store, repo = _alive(tmp_path)
+    other = tmp_path / "other"
+    _published(tmp_path, other)
+    nested = repo / ".worktrees" / "wt"
+    _git("worktree", "add", "-b", "wt", str(nested), cwd=other)
+    write_text(nested / "uncommitted.txt", "keep\n")
+
+    with pytest.raises(DeadUnpushedCommitsError) as refused:
+        service.dead("proj")
+
+    assert read_text(nested / "uncommitted.txt") == "keep\n"
+    assert store.get("proj").state is ContextState.ALIVE  # type: ignore[union-attr]
+    fix = str(refused.value).rsplit("fix: ", 1)[1]
+    move = f"{fix.split('`')[1]} {tmp_path / 'kept'}"
+    # Git runs from the common git dir, never inside the tree it moves: Windows refuses
+    # to rename a process's cwd.
+    assert Path(move.split()[2]).samefile(other / ".git"), fix
+    run_line(move, check=True)
+    service.dead("proj")
+    assert read_text(tmp_path / "kept" / "uncommitted.txt") == "keep\n"
+    assert store.get("proj").state is ContextState.DEAD  # type: ignore[union-attr]
+
+
+def test_alive_dead_alive_keeps_every_repo_obtainable(tmp_path: Path) -> None:
+    """A lib registered with no
+    URL gets origin's URL back-filled by dead; alive then re-clones the whole set, and a
+    second alive (clone into a populated dir would fail) is a no-op."""
+    service, store, repo = _alive(tmp_path, lib_url="")
+
+    dead = service.dead("proj")
+    service.alive("proj")
+    again = service.alive("proj")
+
+    assert dead.associated_repos == (AssociatedRepo("lib", str(tmp_path / "lib.git")),)
+    assert again.state is ContextState.ALIVE and again.associated_repos == dead.associated_repos
+    assert (repo / "README.md").is_file() and (repo.parent / "lib" / "README.md").is_file()
+
+
+def test_alive_refuses_a_legacy_url_less_missing_repo_with_a_fix_line(tmp_path: Path) -> None:
+    service, store, repo = _alive(tmp_path, lib_url="")
+    service.dead("proj")
+    store.update(replace(store.get("proj"), associated_repos=(AssociatedRepo("lib", ""),)))  # type: ignore[type-var]
+
+    with pytest.raises(RepoUrlMissingError) as refused:
+        service.alive("proj")
+
+    # the operator's clone, which alive then adopts, its origin back-filled
+    clone = f"Agent action: clone the 'lib' repository into {repo.parent / 'lib'}"
+    assert str(refused.value).endswith(f"fix: {clone}")
+    assert store.get("proj").state == ContextState.DEAD  # type: ignore[union-attr]
+
+
+def test_dead_refuses_a_dirty_checkout_with_one_fix_line_naming_every_file(tmp_path: Path) -> None:
+    """Dead never commits — a dirty checkout
+    refuses with exactly one fix line naming every dirty path and leaves tree and origin untouched."""
+    service, store, repo = _alive(tmp_path)
+    lib = repo.parent / "lib"
+    write_text(lib / "README.md", "edited\n")
+    write_text(lib / "new.txt", "new\n")
+    origin_before = run(["git", "ls-remote", str(tmp_path / "lib.git")], check=True).stdout
+
+    with pytest.raises(DeadReviewRequiredError) as refused:
+        service.dead("proj")
+
+    fixes = [line for line in str(refused.value).splitlines() if line.startswith("fix: ")]
+    assert fixes == [
+        f"fix: Agent action: move {lib / 'README.md'}, {lib / 'new.txt'} into a worktree",
+    ]
+    assert read_text(lib / "README.md") == "edited\n" and (lib / "new.txt").is_file()
+    assert run(["git", "ls-remote", str(tmp_path / "lib.git")], check=True).stdout == origin_before
+    assert store.get("proj").state is ContextState.ALIVE  # type: ignore[union-attr]
+
+
+def test_an_oserror_in_the_hold_loop_refuses_with_a_fix_line(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A hold that fails is
+    dead's refusal with a fix line, never an escaping OSError; the record stays ALIVE."""
+    from dadaia_workspace.core.cli_line import fix_line
+    from dadaia_workspace.features.spec_context import sweep
+
+    service, store, repo = _alive(tmp_path)
+
+    def _denied(src: object, dst: object) -> None:
+        raise PermissionError(13, "Permission denied")
+
+    monkeypatch.setattr(sweep.os, "replace", _denied)
+
+    with pytest.raises(ContextStateError) as refused:
+        service.dead("proj")
+
+    again = fix_line(tmp_path / "ws", "context", "dead", "proj")
+    assert str(refused.value) == (
+        "Context 'proj' stays ALIVE: skipped 'repos/main' (errno 13: Permission denied)\n"
+        f"fix: Agent action: free {repo} for the move, then run `{again}`"
+    )
+    assert (repo / ".git").is_dir()
+    assert store.get("proj").state is ContextState.ALIVE  # type: ignore[union-attr]

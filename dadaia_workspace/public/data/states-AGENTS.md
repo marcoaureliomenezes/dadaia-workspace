@@ -2,32 +2,17 @@
 
 Scope: this file governs `.dadaia/states/**`.
 
-State files are machine-owned JSON records used by dadaia services and hooks.
-They are not documentation and not an implementation workspace.
+Each state file is written only by its owning verb or skill script; `privacy_denylist.json` is the operator's own file.
 
 ## 1. Canon
 
-The closed canon of `.dadaia/states/`, rendered from `core/workspace_layout.py`
-(`STATES_CANON`) at `dadaia public stage`; any other entry is slop `dadaia doctor` reports.
+The closed canon of `.dadaia/states/`, rendered at `.dadaia/.venv/bin/dadaia public install`; any other entry is slop `.dadaia/.venv/bin/dadaia doctor` reports.
 
 <!-- canon -->
 
-## 2. Rules
-
-- Prefer dadaia CLI commands over manual edits.
-- Preserve valid JSON, stable keys, and atomic-write semantics.
-- Do not store secrets, tokens, private keys, or credentials.
-- Do not hand-edit state to bypass SDD gates, task locks, or context locks.
-- If a state schema changes, update migration/doctor logic and tests.
-
-## 3. When manual repair is acceptable
-
-- Only for corrupted local state, after diagnosing the owner and recording what changed in a report.
-- Keep the edit minimal; run the owning doctor/command immediately after.
-
-## 4. Validation
+## 2. Validation
 
 ```bash
-dadaia context show --json
-dadaia public doctor
+.dadaia/.venv/bin/dadaia context show --json
+.dadaia/.venv/bin/dadaia doctor
 ```

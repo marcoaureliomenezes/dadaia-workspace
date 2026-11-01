@@ -1,0 +1,93 @@
+"""Characterization of public install/doctor at the public CLI."""
+
+from __future__ import annotations
+
+import json
+import shutil
+from pathlib import Path
+
+import pytest
+from typer.testing import CliRunner
+
+from dadaia_workspace import container
+from dadaia_workspace.cli.commands.public import app as public_app
+from dadaia_workspace.cli.main import app
+from dadaia_workspace.core.cli_line import fix_line
+from dadaia_workspace.core.platform import PLATFORM
+from dadaia_workspace.features.public.service import PublicAssetService
+from dadaia_workspace.infrastructure.json_agent_model_policy_store import (
+    JsonAgentModelPolicyStore,
+)
+from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
+from tests.helpers import public_asset_roster
+
+_FIXTURE_SOURCE = b"# fixture root law\n\nRoot holds only: `<!-- root -->`.\n"
+_FIXTURE_RENDERED = (
+    b"# fixture root law\n\nRoot holds only: `.agents/ .claude/ .codex/ .cursor/ "
+    b".dadaia/ .devin/ .github/ repos/ worktrees/ .dadaiaignore AGENTS.md prompt.md`.\n"
+)
+
+
+@pytest.mark.medium
+@pytest.mark.slow(reason="runs three public CLI projection operations")
+def test_public_projection_lifecycle(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    ws = tmp_path / "ws"
+    states = ws / ".dadaia" / "states"
+    states.mkdir(parents=True)
+    (states / "spec_contexts.json").write_bytes(b'{\n  "schema_version": "2",\n  "contexts": []\n}')
+    (states / "harness_profile.json").write_bytes(
+        b'{\n  "schema_version": "1",\n  "harnesses": [\n    "claude"\n  ]\n}'
+    )
+
+    # Match the suite's mirror-package fixture pattern: the filesystem adapter receives a
+    # package-shaped public tree at its data-provider boundary, while its real stage,
+    # install and doctor implementations remain intact. The characterized law input is
+    # literal, so unrelated edits to the checkout's live law cannot move this oracle.
+    package_dir = tmp_path / "package" / "dadaia_workspace"
+    source_public = public_asset_roster.default_public_dir()
+    public_dir = shutil.copytree(source_public, package_dir / "public")
+    shutil.copytree(source_public.parent / "hooks", package_dir / "hooks")
+    (public_dir / "data" / "AGENTS.md").write_bytes(_FIXTURE_SOURCE)
+    manager = FileSystemPublicAssetManager()
+    manager._public_dir = public_dir
+    service = PublicAssetService(
+        manager, agent_policy_loader=lambda root: JsonAgentModelPolicyStore(root).load()
+    )
+    monkeypatch.setattr(container, "build_public_service", lambda: service)
+    monkeypatch.chdir(ws)
+
+    staged = service.stage(ws)
+    install = CliRunner().invoke(app, ["public", "install"])
+    doctor = CliRunner().invoke(app, ["public", "doctor"])
+
+    assert (install.exit_code, doctor.exit_code) == (0, 0), doctor.output
+    assert len(staged) == (32 if PLATFORM.windows else 8)
+    assert install.output.splitlines()[0].endswith(" asset(s) processed:")
+    assert "fix:" not in install.output
+    assert "fix:" not in doctor.output
+    doctor_lines = doctor.output.splitlines()
+    assert "[ok] stage:data/AGENTS.md" in doctor_lines
+    assert "[ok] root:AGENTS.md" in doctor_lines
+    assert doctor_lines[-3:] == [
+        "[ok] public-privacy (baseline structural scan, no operator denylist)",
+        "[ok] entities-derivation: 5 Personas ↔ 5 core sub-agents; 5 Deterministic Behaviors "
+        "derived for every harness with a hook derivation (ENT-DERIVE-1)",
+        "[ok] model-resolution: template balanced",
+    ]
+
+    manifest = json.loads((ws / ".dadaia" / "agentic" / "manifest.json").read_bytes())
+    assert next(asset for asset in manifest["assets"] if asset["path"] == "data/AGENTS.md") == {
+        "path": "data/AGENTS.md",
+        "sha256": "181abbc82681aabf0fa4cd8f35b4bb6815ec079d0cfc21da872e2e79524ff8f1",
+        "type": "data",
+    }
+    assert (ws / ".dadaia" / "agentic" / "data" / "AGENTS.md").read_bytes() == _FIXTURE_RENDERED
+    assert (ws / "AGENTS.md").read_bytes() == _FIXTURE_RENDERED
+
+
+def test_public_install_recipe_is_two_whole_fixes_without_a_chain_operator() -> None:
+    """PowerShell 5.1 has no ``&&``: the recipe lists one runnable line per verb."""
+    install = next(c for c in public_app.registered_commands if c.callback.__name__ == "install")
+    assert install.epilog == (
+        f"Recipe:\n\n{fix_line(None, 'public', 'install')}\n\n{fix_line(None, 'public', 'doctor')}"
+    )

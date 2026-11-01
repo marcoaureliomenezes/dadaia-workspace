@@ -1,166 +1,47 @@
-"""CLI command group: `dadaia ci <verb>` — local CI-equivalent preflight gate + chokepoints."""
+"""CLI command group: `dadaia ci <verb>` — the git-hook chokepoints."""
 
 from __future__ import annotations
 
-import re
-import subprocess
 import sys
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable, Sequence
+from dataclasses import replace
 from pathlib import Path
 
 import typer
 
+from dadaia_workspace.cli._fail import fail
 from dadaia_workspace.cli._specs_resolution import (
+    repo_owner,
     resolve_workspace_root_for_cli,
+    scope,
 )
-from dadaia_workspace.container import is_source_repo_root as _is_source_repo_root
-from dadaia_workspace.core.exceptions import CiPreflightScopeError
-from dadaia_workspace.features.ci_preflight import (
-    all_passed,
-    checks_for,
-    failed_names,
-    run_preflight,
-    subprocess_runner,
+from dadaia_workspace.core.cli_line import fix_line, spell_fix
+from dadaia_workspace.core.exceptions import DadaiaError, GitSyncError
+from dadaia_workspace.core.gitflow import Gitflow, SeveralWorkBranches, work_branch
+from dadaia_workspace.core.platform import act
+from dadaia_workspace.features.chokepoints.branch_policy import (
+    HEADS_PREFIX,
+    Decision,
+    GateFixes,
+    PushRef,
+    check_ref_policy,
+    parse_push_stdin,
 )
-from dadaia_workspace.features.workspace.bootstrap import install_git_hooks
+from dadaia_workspace.features.chokepoints.denylist_scan import BaselinePatternLike
+from dadaia_workspace.features.spec_context.service import install_git_hooks
+from dadaia_workspace.infrastructure.git_subprocess import gitflow_fix
 
-app = typer.Typer(help="Local CI-equivalent preflight gate + git-hook chokepoints.")
+app = typer.Typer(help="Git-hook chokepoints: the pre-push and ref gates and their installer.")
 
 
 def _repo_root() -> Path:
     """Resolve the enclosing git repo root, or fail with a clear message."""
+    from dadaia_workspace.container import build_git_client
+
     try:
-        out = subprocess.run(
-            ["git", "rev-parse", "--show-toplevel"],
-            capture_output=True,
-            text=True,
-            check=True,
-        )
-    except (subprocess.CalledProcessError, FileNotFoundError) as exc:
-        raise typer.BadParameter("not inside a git repository") from exc
-    return Path(out.stdout.strip())
-
-
-def _repo_identity_root(worktree_root: Path) -> Path:
-    """The repository's main working tree — its identity under ``<workspace>/repos/``.
-
-    A linked worktree (``git worktree add``) may sit anywhere on disk; the repo it
-    belongs to is named by the git common dir's parent, never by the worktree's own
-    filesystem position. Falls back to *worktree_root* when git cannot answer.
-    """
-    try:
-        out = subprocess.run(
-            ["git", "rev-parse", "--git-common-dir"],
-            cwd=worktree_root,
-            capture_output=True,
-            text=True,
-            check=True,
-        )
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        return worktree_root
-    # git prints ".git" (relative) from the main checkout and an absolute path from a
-    # linked worktree; anchoring on the worktree root covers both without a git>=2.31 flag.
-    return (worktree_root / out.stdout.strip()).resolve().parent
-
-
-@app.command()
-def preflight(
-    quick: bool = typer.Option(False, "--quick", help="Skip the slow e2e suite."),
-    fail_fast: bool = typer.Option(
-        True, "--fail-fast/--no-fail-fast", help="Stop at the first failing check."
-    ),
-) -> None:
-    """Run the five local CI checks; exit non-zero if any fail.
-
-    The checks, in order: ruff format --check, ruff check, mypy --strict,
-    lint-imports, pytest. Run it before pushing — locally-solvable failures must
-    never reach a push.
-    """
-    root = _repo_root()
-    # The checks are structurally bound to this repo: they lint `dadaia_workspace/` and
-    # `tests/`, type-check `dadaia_workspace/`, and read this repo's setup.cfg. In a
-    # consumer repo none of those paths exist and the consumer venv has no ruff/mypy, so
-    # the gate reported a phantom lint FAIL and blamed a missing poetry — sending the
-    # operator to install a tool that would not have helped
-    # (bug ci-preflight-unusable-outside-the-source-repo). Refuse honestly instead. The
-    # source-repo test is the existing one, not a second definition.
-    if not _is_source_repo_root(root):
-        raise CiPreflightScopeError(
-            f"`dadaia ci preflight` targets the dadaia-workspace source repo; "
-            f"{str(root)!r} is not it. The gate lints and type-checks the library's own "
-            "paths, which do not exist here. Run your repo's own CI checks instead."
-        )
-    checks = checks_for(quick=quick)
-    typer.echo(f"Running {len(checks)} preflight check(s){' (quick)' if quick else ''}…")
-    results = run_preflight(checks, subprocess_runner(root), fail_fast=fail_fast)
-
-    for result in results:
-        marker = "PASS" if result.passed else "FAIL"
-        typer.echo(f"  [{marker}] {result.name}")
-
-    if not all_passed(results):
-        typer.secho(
-            f"\nPre-push gate FAILED: {', '.join(failed_names(results))}",
-            fg=typer.colors.RED,
-            err=True,
-        )
-        for result in results:
-            if not result.passed:
-                tail = "\n".join(result.output.strip().splitlines()[-20:])
-                if tail:
-                    typer.echo(f"\n--- {result.name} ---\n{tail}", err=True)
-        raise typer.Exit(1)
-
-    typer.secho("\nAll preflight checks passed.", fg=typer.colors.GREEN)
-
-
-def _foreign_repo_slugs(
-    workspace: Path,
-    own_slug: str | None,
-    registry_identities: Iterable[tuple[str, str]],
-) -> list[str]:
-    """The v0.11.0 FR5 registry-derived foreign-name set, union'd with the v0.9.0 FR3
-    directory-derived set, minus the pushed repo's own identities.
-
-    ``{registry context names} UNION {registry repo_slugs} UNION {repos/ dir names} -
-    {own context name, own repo slug}`` (SPEC v0.11.0 FR5). *own_slug* is the pushed
-    repo's directory name under ``repos/`` (``context_slug_for_path``); *own_name* is
-    resolved from *registry_identities* as the ``name`` of whichever entry's
-    ``repo_slug`` equals *own_slug* — ``None`` when the pushed repo is not itself
-    registered (a fresh/unregistered checkout), in which case only the slug is
-    subtracted, exactly as v0.9.0 did.
-
-    **Both** self-identities are subtracted (A5.2): a context's ``name`` and its
-    ``repo_slug`` are separate fields (``core/models/spec_context.py``) and may
-    differ — subtracting only the slug would re-open the A3.2 regression (matching the
-    pushed repo's own slug would block every push of this repository) through the new
-    door the registry-derived NAME opens.
-
-    DEAD and relocated registry contexts contribute their terms just like ALIVE ones
-    (the whole point of FR5 — a context whose repo directory is absent no longer
-    silently loses its protection). Hidden directory entries (dotfiles) are skipped; a
-    missing ``repos/`` directory (e.g. the library repo run standalone) contributes no
-    directory-derived term, and a missing/empty/malformed registry (already swallowed
-    by :func:`container.load_registry_context_identities`, A5.4) contributes no
-    registry-derived term — the union degrades gracefully to whichever source is
-    healthy, never crashing the push hook.
-    """
-    identities = list(registry_identities)
-    own_name = next((name for name, slug in identities if slug == own_slug), None)
-    own_identities = {value for value in (own_slug, own_name) if value}
-
-    registry_terms = {value for name, slug in identities for value in (name, slug) if value}
-
-    repos_dir = workspace / "repos"
-    dir_terms: set[str] = set()
-    if repos_dir.is_dir():
-        dir_terms = {
-            entry.name
-            for entry in repos_dir.iterdir()
-            if entry.is_dir() and not entry.name.startswith(".")
-        }
-
-    return sorted((registry_terms | dir_terms) - own_identities)
+        return Path(build_git_client().git(Path.cwd(), "rev-parse", "--show-toplevel"))
+    except GitSyncError:
+        fail("not inside a git repository", act("agent", "run it inside a git repository"))
 
 
 def _no_canon_violations(paths: Iterable[str]) -> list[str]:
@@ -169,119 +50,220 @@ def _no_canon_violations(paths: Iterable[str]) -> list[str]:
     return []
 
 
-@app.command("push-gate-check")
-def push_gate_check() -> None:
-    """Pre-push gate: branch-name validation + the range-scoped denylist scan.
+def _gitflow(repo_root: Path) -> tuple[Gitflow, str | None, Path]:
+    """The gitflow through the one reader (committed first; an associated repo reads its
+    owner's main repo), its warning on the default, and the repo whose constitution answers for it."""
+    from dadaia_workspace.container import build_git_client
 
-    Branch model: `dd-gitflow-default` (Gitflow) + `dd-gitflow-default` — this docstring
-    states it nowhere else.
+    workspace = resolve_workspace_root_for_cli(repo_root)
+    owner = repo_owner(workspace, repo_root)
+    main = workspace / "repos" / owner[2] if owner and owner[1] != owner[2] else None
+    gitflow, warning = build_git_client().gitflow(repo_root, main)
+    return gitflow, warning, main or repo_root
 
-    Reads the pre-push ref lines from stdin (``<local-ref> <local-sha> <remote-ref>
-    <remote-sha>``). Every non-deletion ref (tags included) is then scanned for new
-    objects carrying a denylisted term (v0.9.0 FR1/FR2) — under v2 this feature push is
-    the first publication to ``origin``. Branch deletions are never scanned; tag pushes
-    are scanned but were never gated on branch policy. There is no security-verdict
-    check on this path (v0.4.4 A3.4) — it runs as a PR gate instead (FR4).
 
-    The object source, denylist terms, baseline patterns and foreign-slug set are ALL
-    built and passed here — the CLI is the sole composition point for the injected
-    ``GitObjectReader`` port (FR7); a production call site that failed to wire one
-    would be a defect, never a bypass (FR6 row 4). The foreign-slug set is now
-    REGISTRY-DERIVED (v0.11.0 FR5): it reaches the registry through the
-    ``container.load_registry_context_identities`` seam, never through a direct
-    ``infrastructure`` import (``cli-no-infrastructure``).
-    """
-    from dadaia_workspace.container import (
-        build_git_object_reader,
-        load_denylist_baseline_patterns,
-        load_denylist_terms,
-        load_registry_context_identities,
+def _gate_inputs(repo_root: Path, head: str) -> tuple[Gitflow, GateFixes]:
+    """The gitflow with one warning on the default, the fix inputs (the repo, the live
+    work branch by the ONE rule, and HEAD's branch)."""
+    gitflow, warning, source = _gitflow(repo_root)
+    if warning:
+        typer.echo(f"[pre-push] WARNING: {warning}", err=True)
+        typer.echo(spell_fix(gitflow_fix(source / "specs")), err=True)
+    try:
+        work = work_branch(repo_root, gitflow, source.name)
+    except SeveralWorkBranches as several:
+        typer.echo(f"[pre-push] WARNING: {several.message}\nhint: {several.fix}", err=True)
+        work = gitflow.work_prefix + several.keep
+    except DadaiaError as refused:
+        fail(f"[pre-push] BLOCKED: {refused.message}", fix=refused.fix)
+    fixes = GateFixes(repo=str(repo_root), work=work, head=head)
+    return gitflow, fixes
+
+
+def _denylist(
+    tag: str, repo: Path
+) -> tuple[tuple[tuple[str, str], ...], tuple[BaselinePatternLike, ...]]:
+    """The operator terms and the baseline patterns, the scan mode on stderr."""
+    from dadaia_workspace.container import load_denylist_baseline_patterns, load_denylist_terms
+
+    terms, patterns = load_denylist_terms(repo), load_denylist_baseline_patterns()
+    mode = (
+        "operator denylist + baseline"
+        if terms
+        else "baseline only (no operator denylist; private names go in "
+        "$DADAIA_PRIVACY_DENYLIST or .dadaia/states/privacy_denylist.json)"
     )
-    from dadaia_workspace.core.specs_version import CANONICAL_SPECS_VERSION, read_pattern_version
-    from dadaia_workspace.features.chokepoints import context_slug_for_path, push_gate_decision
-    from dadaia_workspace.features.chokepoints.branch_policy import parse_push_stdin
+    typer.echo(f"{tag} denylist scan mode: {mode}", err=True)
+    return terms, patterns
+
+
+def _canon_fn(repo_root: Path, sha: str, tag: str) -> Callable[[Sequence[str]], Sequence[str]]:
+    """The canon predicate for the specs/ tree commit *sha* holds: foreign/v6 carry no v6 canon."""
+    from dadaia_workspace.container import build_git_client
+    from dadaia_workspace.core.specs_version import state
     from dadaia_workspace.features.specs.canon import canon_violations
 
-    repo_root = _repo_root()
-    workspace = resolve_workspace_root_for_cli(repo_root)
+    git = build_git_client()
+    if not git.git(repo_root, "ls-tree", sha, "specs"):
+        return canon_violations
+    shown = git.git(repo_root, "ls-tree", "--name-only", sha, "specs/constitution.md")
+    kind, fix = state(repo_root / "specs", git.git(repo_root, "show", f"{sha}:{shown}") if shown else "")  # fmt: skip
+    if fix:
+        typer.echo(f"{tag} the pushed specs/ tree is {kind}\nhint: {fix}", err=True)
+    return _no_canon_violations if kind in ("foreign", "upgradable") else canon_violations
 
-    # Bug pre-push-canon-scan-not-range-scoped (operator ruling 2026-09-13): the v6
-    # canon is a property of a v6 tree. A specs/ tree still stamped below
-    # CANONICAL_SPECS_VERSION (pattern 5: Markdown backlog, `v`-prefixed release dirs,
-    # lowercase memory files) has NOTHING for the canon scan to enforce until
-    # `dadaia specs upgrade` migrates it — the doctor already reports that drift;
-    # the push gate must not lock every specs edit behind the migration.
-    specs_dir = repo_root / "specs"
-    specs_version = read_pattern_version(specs_dir)
-    canon_fn = canon_violations
-    if specs_dir.is_dir() and specs_version < CANONICAL_SPECS_VERSION:
-        # An unstamped (pre-framework) tree counts as below the canon too — ADR 0013.
-        typer.echo(
-            f"[pre-push] specs/ tree is stamped pattern {specs_version} "
-            f"(< {CANONICAL_SPECS_VERSION}): the v6 canon scan does not apply until "
-            "`dadaia specs upgrade` migrates it; the denylist scan still runs.",
-            err=True,
-        )
-        canon_fn = _no_canon_violations
 
-    denylist_terms = load_denylist_terms()
-    baseline_patterns = load_denylist_baseline_patterns()
-    own_slug = context_slug_for_path(workspace, _repo_identity_root(repo_root))
-    registry_result = load_registry_context_identities(workspace)
-    if registry_result.degraded:
-        # SPEC v0.4.2 FR8(2)/GRILL P13/A8.3: a malformed registry no longer shrinks the
-        # foreign-name layer silently — exactly one stderr note names the degradation,
-        # and the scan still proceeds against the repos/ directory-derived fallback.
-        typer.echo(
-            "[pre-push] context registry is malformed or unreadable — the "
-            "registry-derived foreign-name layer falls back to the repos/ "
-            "directory-derived set only; the scan still proceeds.",
-            err=True,
-        )
-    foreign_slugs = _foreign_repo_slugs(workspace, own_slug, registry_result.identities)
+def _gate_decision(repo_root: Path, read_refs: Callable[[], str]) -> Decision:
+    """The push gate's decision over the pre-push ref lines *read_refs* returns, from the
+    repo's gitflow, denylist and canon."""
+    from dadaia_workspace.container import build_git_client, build_git_object_reader
+    from dadaia_workspace.features.chokepoints import push_gate_decision
 
-    mode = (
-        "operator denylist + baseline" if denylist_terms else "baseline only (no operator denylist)"
-    )
-    typer.echo(f"[pre-push] denylist scan mode: {mode}", err=True)
-
-    stdin_text = sys.stdin.read() if not sys.stdin.isatty() else ""
-    refs, malformed = parse_push_stdin(stdin_text)
-    decision = push_gate_decision(
+    terms, patterns = _denylist("[pre-push]", repo_root)
+    refs, malformed = parse_push_stdin(read_refs())
+    sha = next((r.local_sha for r in refs if not r.is_deletion), "HEAD")
+    canon_fn = _canon_fn(repo_root, sha, "[pre-push]")
+    # `git push origin HEAD` names its source "HEAD": the branch checked out IS that ref.
+    branch = build_git_client().current_branch(repo_root)
+    refs = [
+        replace(r, local_ref=f"refs/heads/{branch}") if r.local_ref == "HEAD" and branch else r
+        for r in refs
+    ]
+    gitflow, fixes = _gate_inputs(repo_root, branch)
+    return push_gate_decision(
         refs,
         object_source=build_git_object_reader(),
         repo=repo_root,
         canon_violations_fn=canon_fn,
+        gitflow=gitflow,
+        fixes=fixes,
         malformed_lines=malformed,
-        denylist_terms=denylist_terms,
-        baseline_patterns=baseline_patterns,
-        foreign_slugs=foreign_slugs,
+        denylist_terms=terms,
+        baseline_patterns=patterns,
     )
+
+
+def _content_decision(repo: Path, held: str, tag: str) -> Decision:
+    """The push gate's content half over HEAD's branch published over *held*: what a branch no
+    push could carry, a task's, still holds."""
+    from dadaia_workspace.container import build_git_client, build_git_object_reader
+    from dadaia_workspace.features.chokepoints import content_decision
+
+    git = build_git_client()
+    branch = git.current_branch(repo)
+    ref = f"refs/heads/{branch or 'HEAD'}"
+    tip = git.git(repo, "rev-parse", "HEAD")
+    terms, patterns = _denylist(tag, repo)
+    return content_decision(
+        [PushRef(ref, tip, ref, held)],
+        object_source=build_git_object_reader(),
+        repo=repo,
+        canon_violations_fn=_canon_fn(repo, tip, tag),
+        fixes=GateFixes(repo=str(repo), head=branch or ""),
+        denylist_terms=terms,
+        baseline_patterns=patterns,
+        tag=tag,
+    )
+
+
+@app.command("push-gate-check")
+def push_gate_check(
+    repo: Path | None = typer.Option(
+        None, "--repo", help="Repo --onto judges. Default: cwd's repo."
+    ),
+    onto: str | None = typer.Option(
+        None,
+        "--onto",
+        help="Merge gate: judge the content of `<onto>..HEAD` of the repo, no branch policy.",
+    ),
+) -> None:
+    """Pre-push gate: branch policy by the project gitflow + the range-scoped denylist scan.
+
+    Branch model: the constitution's gitflow block (`dd-gitflow-default`).
+
+    Reads the pre-push ref lines from stdin (``<local-ref> <local-sha> <remote-ref>
+    <remote-sha>``). Every non-deletion ref (tags included) is scanned for new objects
+    carrying a denylisted term — a work-branch push is the first publication to ``origin``.
+    Branch deletions are never scanned; tag pushes are scanned but never gated on branch
+    policy.
+
+    The object source, denylist terms and baseline patterns are all built here and
+    injected; a call site that fails to wire the object reader is a defect, never a
+    bypass. No repo or context name is a term source.
+
+    The merge gate of a worktree judges the same content with --onto, on a branch of any name.
+    """
+    if onto is not None:
+        from dadaia_workspace.container import build_git_client
+
+        repo = repo or _repo_root()
+        base = build_git_client().git(repo, "rev-parse", "--verify", f"{onto}^{{commit}}")
+        decision = _content_decision(repo, base, "[merge]")
+    else:
+        decision = _gate_decision(
+            _repo_root(), lambda: "" if sys.stdin.isatty() else sys.stdin.read()
+        )
     if decision.warn:
         typer.echo(decision.warn, err=True)
-
     if not decision.allowed:
-        typer.secho(decision.message, fg=typer.colors.RED, err=True)
-        raise typer.Exit(1)
+        fail(decision.message)
 
 
-_SHA40_RE = re.compile(r"^[0-9a-fA-F]{40}$")
+@app.command("ref-gate-check")
+def ref_gate_check() -> None:
+    """Reference-transaction gate: a work-branch update must land on origin's sha.
+
+    Reads ``<old> <new> <ref>`` lines on stdin. The reference-transaction hook resolves a zero
+    old sha to the ref's current value before it calls this verb, so an existing ref's old sha
+    arrives resolved; a descendant move touching only ``specs/audits/**`` passes.
+    """
+    from dadaia_workspace.container import build_git_client
+
+    repo_root = _repo_root()
+    lines = [raw.split() for raw in sys.stdin.read().splitlines() if raw.strip()]
+    if any(len(parts) != 3 for parts in lines):
+        fail(
+            "[ref-gate] BLOCKED: a ref line is not `<old> <new> <ref>`",
+            act(
+                "agent",
+                "pipe one line per ref update, each holding the old sha, the new sha and the ref name",
+            ),
+        )
+    git = build_git_client()
+    gitflow = _gitflow(repo_root)[0]
+
+    def moved(old: str, new: str) -> tuple[bool, list[str]]:
+        # rev-list exits 0 either way, so only a real fault raises; --no-renames keeps both paths of a rename
+        behind = git.git(repo_root, "rev-list", "-n1", f"{new}..{old}")
+        paths = git.git(repo_root, "diff", "--no-renames", "--name-only", f"{old}..{new}")
+        anchor = Path(repo_root.anchor)
+        zones: list[str] = [
+            scope(anchor, anchor / "repos" / repo_root.name / p)[1] for p in paths.splitlines()
+        ]
+        return not behind, zones
+
+    for old, new, ref in lines:
+        tracking = f"refs/remotes/origin/{ref.removeprefix(HEADS_PREFIX)}"
+        held = git.git(repo_root, "for-each-ref", "--format=%(objectname)", tracking)
+        decision = check_ref_policy(
+            [f"{old} {new} {ref}"], gitflow, {ref: held}, repo_root.name, moved
+        )
+        if not decision.allowed:
+            fail(decision.message)
 
 
 @app.command("install-hook")
 def install_hook(
     force: bool = typer.Option(False, "--force", help="Overwrite existing git hooks."),
+    repo: Path | None = typer.Option(None, "--repo", help="Target repo. Default: cwd's repo."),
 ) -> None:
-    """Install the pre-push CI/security gate."""
-    try:
-        installed = install_git_hooks(_repo_root(), force=force)
-    except FileNotFoundError as exc:
-        raise typer.BadParameter(str(exc)) from None
-    except FileExistsError as exc:
-        typer.secho(
-            f"{Path(str(exc)).name} hook already exists at {exc}; use --force to overwrite.",
-            fg=typer.colors.YELLOW,
+    """Install the pre-push and reference-transaction gates."""
+    repo = repo or _repo_root()
+    installed = install_git_hooks(repo, force=force)
+    if not installed:
+        fail(
+            "pre-push hook already exists, not overwritten.",
+            fix_line(None, "ci", "install-hook", "--force", "--repo", str(repo)),
         )
-        raise typer.Exit(1) from None
     for target in installed:
-        typer.secho(f"Installed pre-push CI + security gate -> {target}", fg=typer.colors.GREEN)
+        typer.echo(f"Installed {target.name} hook -> {target}")

@@ -1,253 +1,143 @@
-"""Single source of truth for AI model identity, Codex mapping and tier —
-``core/model_registry.py``.
+"""Which model an agent gets — the one module: the tier-to-Codex map, the built-in
+agent-model templates and the operator overlay's resolution.
 
-``MODEL_MAP`` (``infrastructure/runtime_transforms/model_mapping.py``, Claude id ->
-Codex id, so Codex TOML never contains a ``claude-*`` string — ADR-5) is a derived
-view over :data:`REGISTRY`; adding a model is one entry here (bug
-``model-catalog-modelmap-pricing-drift-no-registry``).
-
-Layering: pure data, zero I/O, stdlib-only imports, so both ``infrastructure`` and
-``features`` may import it (import-linter ``core-no-os-primitives`` holds).
+Contract: templates name a tier by alias; a new model release needs no library change.
+Claude resolves the alias itself; :data:`TIER_CODEX` maps it to the Codex id. Pure data +
+pure functions, stdlib only (``core-no-os-primitives``).
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Literal
+from pathlib import Path
+from typing import Literal, get_args
 
-# Tier names. ``deep`` = deep-reasoning leaves (spec/QA/arch/audit/harness),
-# ``dispatch`` = dispatchers + gate leaves, ``fast`` = high-volume mechanical,
-# ``standard`` = the mid-cost general implementation tier.
-Tier = Literal["deep", "dispatch", "fast", "standard"]
+from dadaia_workspace.core.exceptions import DadaiaError
 
+#: Tier alias -> Codex model id (``codex_assets.codex_model`` reads it).
+TIER_CODEX: dict[str, str] = {
+    "opus": "gpt-5.6-sol",
+    "fable": "gpt-5.6-sol",
+    "sonnet": "gpt-5.6-terra",
+    "haiku": "gpt-5.3-codex-spark",
+}
 
-@dataclass(frozen=True)
-class ModelEntry:
-    """A single model's identity, Codex mapping, and tier.
-
-    Attributes:
-        claude_id: The canonical Claude model id as it appears in agent
-            frontmatter (e.g. ``"claude-sonnet-4-6"``).
-        codex_id: The Codex model id this maps to (Codex TOML must never contain
-            a ``claude-*`` string — ADR-5).
-        tier: The model's assignment tier.
-    """
-
-    claude_id: str
-    codex_id: str
-    tier: Tier = "dispatch"
-
-
-# ---------------------------------------------------------------------------
-# THE REGISTRY — single source of truth.
-#
-# Every Claude model id used anywhere in the fleet appears exactly once here.
-# MODEL_MAP is derived from this tuple; never maintain it by hand.
-# ---------------------------------------------------------------------------
-REGISTRY: tuple[ModelEntry, ...] = (
-    ModelEntry(
-        claude_id="claude-fable-5",
-        codex_id="gpt-5.6-sol",
-        tier="deep",
-    ),
-    ModelEntry(
-        claude_id="claude-fable-5-1",
-        codex_id="gpt-5.6-sol",
-        tier="deep",
-    ),
-    ModelEntry(
-        claude_id="claude-opus-4-7",
-        codex_id="gpt-5.6-sol",
-        tier="dispatch",
-    ),
-    ModelEntry(
-        claude_id="claude-opus-4-8",
-        codex_id="gpt-5.6-sol",
-        tier="dispatch",
-    ),
-    ModelEntry(
-        # Claude Opus 5 (operator remap). Shares the
-        # dispatch tier with 4.7/4.8, so it MUST carry their codex_id: a tier
-        # resolving to two Codex ids raises in ``_codex_id_for_tier``.
-        claude_id="claude-opus-5",
-        codex_id="gpt-5.6-sol",
-        tier="dispatch",
-    ),
-    ModelEntry(
-        # Claude Opus 5.5 — the current Opus (ADR 0022); dispatch tier, so opus-5's codex_id.
-        claude_id="claude-opus-5-5",
-        codex_id="gpt-5.6-sol",
-        tier="dispatch",
-    ),
-    ModelEntry(
-        claude_id="claude-sonnet-4-6",
-        codex_id="gpt-5.6-terra",
-        tier="standard",
-    ),
-    ModelEntry(
-        # v0.1.65 FR6/D-2: sonnet-5 shares sonnet-4-6's codex mapping.
-        # ``tier="standard"`` is a FORCED label (decoupled from
-        # dispatch-band/agent behavior — D-2 addendum, F-4); any other tier
-        # violates the _codex_id_for_tier / codex_tier_views invariants.
-        claude_id="claude-sonnet-5",
-        codex_id="gpt-5.6-terra",
-        tier="standard",
-    ),
-    ModelEntry(
-        claude_id="claude-haiku-4-5-20251001",
-        codex_id="gpt-5.3-codex-spark",
-        tier="fast",
-    ),
-)
-
-
-def registry_by_claude_id() -> dict[str, ModelEntry]:
-    """Return the registry indexed by ``claude_id`` (insertion order preserved).
-
-    Raises:
-        ValueError: on a duplicate ``claude_id`` (registry invariant violation).
-    """
-    index: dict[str, ModelEntry] = {}
-    for entry in REGISTRY:
-        if entry.claude_id in index:
-            raise ValueError(f"Duplicate claude_id in REGISTRY: {entry.claude_id!r}")
-        index[entry.claude_id] = entry
-    return index
-
-
-def fable_model_ids() -> frozenset[str]:
-    """The Fable family — every registered ``claude-fable-*`` id. The G-1 ruling
-    ("Fable is never assigned to dd-code-reviewer") is a FAMILY rule; both guards
-    (template import, policy-store parse) derive it from here, never from one literal
-    id that goes stale at the next Fable release (bug
-    g1-fable-guard-matches-only-claude-fable-5-so-fable-5-1-lands-on-security-reviewer)."""
-    return frozenset(e.claude_id for e in REGISTRY if e.claude_id.startswith("claude-fable-"))
-
-
-def is_fable_model(claude_id: str) -> bool:
-    return claude_id in fable_model_ids()
-
-
-#: The Kimi Code model id (the only model the Kimi CLI runs agents on today).
-#: Single source — the panel per-harness model view and any Kimi projection
-#: derive from this constant, never a scattered literal.
-KIMI_MODEL_ID = "moonshotai/kimi-k2.5"
-
-
-def harness_native_model_map() -> dict[str, dict[str, str]]:
-    """Map each canonical claude model id to its harness-NATIVE display id.
-
-    The overlay stores canonical claude ids; each harness projects them to its
-    own vocabulary (Codex TOML uses ``codex_id``; Kimi runs :data:`KIMI_MODEL_ID`).
-    The panel model picker uses this map so a codex/kimi toggle never shows a
-    ``claude-*`` id (bug agents-tab-model-picker-ignores-harness-runtime).
-    """
-    by_claude = registry_by_claude_id()
-    return {
-        "claude": {cid: cid for cid in by_claude},
-        "codex": {cid: entry.codex_id for cid, entry in by_claude.items()},
-        "kimi-code": {cid: KIMI_MODEL_ID for cid in by_claude},
-    }
-
-
-# ---------------------------------------------------------------------------
-# Per-runtime tier view (bug codex-personas-claude-model-tiering-leak).
-#
-# On Codex a tier's identity is the PAIR (model id, model_reasoning_effort).
-# ``deep`` and ``dispatch`` legitimately share the same Codex model id
-# (``gpt-5.5`` today); they are kept DISTINCT by their reasoning effort
-# (``deep`` -> high, ``dispatch`` -> medium). This view is the single source of
-# truth for both the Codex agent-TOML ``model_reasoning_effort`` field and the
-# per-runtime tier table rendered into Codex persona bodies, so neither is a
-# string-mapped shadow of the Anthropic-only registry.
-# ---------------------------------------------------------------------------
-
-# Codex reasoning effort. ``deep`` reasoning leaves run at ``high``; everything
-# else runs at ``medium`` (Codex's mid profile). This is the native Codex tiering
-# axis that the persona prose must teach instead of Anthropic tier names.
 CodexEffort = Literal["high", "medium", "low"]
 
-_CODEX_TIER_EFFORT: dict[Tier, CodexEffort] = {
-    "deep": "high",
-    "dispatch": "medium",
-    "standard": "medium",
-    "fast": "medium",
+#: Rendered Claude reasoning-effort vocabulary.
+ClaudeEffort = Literal["low", "medium", "high", "xhigh", "max"]
+CLAUDE_EFFORTS: tuple[ClaudeEffort, ...] = get_args(ClaudeEffort)
+
+#: Fixed clamp map: resolved Claude effort -> codex ``model_reasoning_effort``.
+_CODEX_EFFORT_CLAMP: dict[ClaudeEffort, CodexEffort] = {
+    "low": "low",
+    "medium": "medium",
+    "high": "high",
+    "xhigh": "high",
+    "max": "high",
 }
 
 
+def codex_effort_for_claude_effort(effort: ClaudeEffort) -> CodexEffort:
+    """Clamp a resolved Claude effort to the 3-valued codex effort axis."""
+    return _CODEX_EFFORT_CLAMP[effort]
+
+
+#: Schema identifier for the overlay document.
+_SCHEMA_VERSION = "agent-model-policy-v1"
+
+#: Where a resolved (model, effort) came from.
+ResolvedSource = Literal["template", "default"]
+
+
 @dataclass(frozen=True)
-class CodexTierView:
-    """The Codex-native rendering of a registry tier: a (model id, effort) PAIR.
+class AgentModelAssignment:
+    """One template cell: the (model alias, effort) assigned to one core agent."""
 
-    Two distinct registry tiers may share ``codex_id`` only when their
-    ``reasoning_effort`` differs — otherwise the tier distinction collapses and
-    projection must fail loudly (see :func:`codex_tier_views`).
+    model: str
+    effort: ClaudeEffort
+
+
+@dataclass(frozen=True)
+class AgentModelPolicyOverlay:
+    """Parsed, validated operator overlay."""
+
+    applied_template: str | None = None
+
+    def to_dict(self) -> dict[str, object]:
+        """Serialize back to the document shape (omit an absent template)."""
+        doc: dict[str, object] = {"schema_version": _SCHEMA_VERSION}
+        if self.applied_template is not None:
+            doc["applied_template"] = self.applied_template
+        return doc
+
+
+@dataclass(frozen=True)
+class ResolvedAgentModel:
+    """The resolver's answer for one agent: model, effort, and precedence source."""
+
+    model: str
+    effort: ClaudeEffort | None
+    source: ResolvedSource
+
+
+class AgentModelPolicyStoreError(DadaiaError):
+    """Actionable agent-model-policy overlay failure (missing != invalid).
+
+    *problem* is the finding; *fix* its one remedy (``""`` when none), joined into the
+    message the CLI boundary prints, like ``SchemaVersionError``.
     """
 
-    tier: Tier
-    codex_id: str
-    reasoning_effort: CodexEffort
+    def __init__(self, message: str, path: Path | None = None, fix: str = "") -> None:
+        super().__init__(message if path is None else f"{message}: {path}", fix)
 
 
-# Ordered tier presentation for the rendered Codex tier table (most → least
-# capable). Every registry ``Tier`` literal MUST appear exactly once.
-_CODEX_TIER_ORDER: tuple[Tier, ...] = ("deep", "dispatch", "standard", "fast")
+DEFAULT_TEMPLATE_ID = "balanced"
+
+#: The table: template id -> core agent -> (tier alias, effort); ``balanced`` is the default.
+TEMPLATES: dict[str, dict[str, AgentModelAssignment]] = {
+    "balanced": {
+        "dd-product-engineer": AgentModelAssignment("opus", "high"),
+        "dd-code-reviewer": AgentModelAssignment("opus", "high"),
+        "dd-sw-engineer-sr": AgentModelAssignment("sonnet", "medium"),
+        "dd-sw-engineer-jr": AgentModelAssignment("haiku", "medium"),
+        "dd-researcher": AgentModelAssignment("haiku", "medium"),
+    },
+    "max-quality": {
+        "dd-product-engineer": AgentModelAssignment("fable", "high"),
+        "dd-code-reviewer": AgentModelAssignment("opus", "xhigh"),
+        "dd-sw-engineer-sr": AgentModelAssignment("opus", "medium"),
+        "dd-sw-engineer-jr": AgentModelAssignment("sonnet", "medium"),
+        "dd-researcher": AgentModelAssignment("sonnet", "medium"),
+    },
+    "economy": {
+        "dd-product-engineer": AgentModelAssignment("sonnet", "medium"),
+        "dd-code-reviewer": AgentModelAssignment("sonnet", "high"),
+        "dd-sw-engineer-sr": AgentModelAssignment("sonnet", "medium"),
+        "dd-sw-engineer-jr": AgentModelAssignment("haiku", "low"),
+        "dd-researcher": AgentModelAssignment("haiku", "low"),
+    },
+}
+
+#: The core agents every template covers.
+CORE_AGENTS: tuple[str, ...] = tuple(TEMPLATES[DEFAULT_TEMPLATE_ID])
 
 
-def _codex_id_for_tier(tier: Tier) -> str:
-    """Return the Codex model id assigned to *tier* by the registry.
-
-    Resolves the tier's Codex id from the registry entries carrying that tier.
-
-    Raises:
-        ValueError: if no registry entry carries *tier*, or if entries carrying
-            *tier* disagree on their ``codex_id`` (an ambiguous tier → id map).
-    """
-    codex_ids = {entry.codex_id for entry in REGISTRY if entry.tier == tier}
-    if not codex_ids:
-        raise ValueError(f"No REGISTRY entry carries tier {tier!r}")
-    if len(codex_ids) > 1:
-        raise ValueError(
-            f"Tier {tier!r} maps to multiple Codex ids {sorted(codex_ids)!r}; "
-            "a tier must resolve to a single Codex model id"
-        )
-    return codex_ids.pop()
+def template_by_id(template_id: str) -> dict[str, AgentModelAssignment]:
+    """One template's assignments. Raises ``ValueError`` naming the valid ids."""
+    if template_id not in TEMPLATES:
+        valid = ", ".join(TEMPLATES)
+        raise ValueError(f"unknown agent-model template {template_id!r}; valid: {valid}")
+    return TEMPLATES[template_id]
 
 
-def codex_tier_views() -> tuple[CodexTierView, ...]:
-    """Return the per-runtime Codex tier views, in presentation order.
-
-    Each registry tier resolves to a :class:`CodexTierView` carrying its Codex
-    model id and reasoning effort. This is the single source of truth consumed
-    by both the agent-TOML ``model_reasoning_effort`` field and the persona tier
-    table.
-
-    Raises:
-        ValueError: if two DISTINCT tiers collapse to an IDENTICAL
-            (codex_id, reasoning_effort) PAIR — that erases the very distinction
-            the tier table exists to teach. The error names both colliding
-            tiers. (Also propagates the ambiguity errors of
-            :func:`_codex_id_for_tier`.)
-    """
-    views: list[CodexTierView] = []
-    seen: dict[tuple[str, CodexEffort], Tier] = {}
-    for tier in _CODEX_TIER_ORDER:
-        codex_id = _codex_id_for_tier(tier)
-        effort = _CODEX_TIER_EFFORT[tier]
-        key = (codex_id, effort)
-        if key in seen:
-            other = seen[key]
-            raise ValueError(
-                f"Codex tier collapse: tiers {other!r} and {tier!r} both resolve "
-                f"to the identical (model={codex_id!r}, "
-                f"model_reasoning_effort={effort!r}) pair; differentiate their "
-                "reasoning effort in _CODEX_TIER_EFFORT or their model id"
-            )
-        seen[key] = tier
-        views.append(CodexTierView(tier=tier, codex_id=codex_id, reasoning_effort=effort))
-    return tuple(views)
-
-
-def codex_effort_for_tier(tier: Tier) -> CodexEffort:
-    """Return the Codex ``model_reasoning_effort`` assigned to *tier*."""
-    return _CODEX_TIER_EFFORT[tier]
+def resolve_agent_model(
+    agent_name: str, overlay: AgentModelPolicyOverlay | None
+) -> ResolvedAgentModel:
+    """One agent's (model, effort, source): applied template > ``balanced`` default.
+    Raises ``ValueError`` for a non-core agent or an unknown ``applied_template``."""
+    if agent_name not in CORE_AGENTS:
+        raise ValueError(f"unknown agent {agent_name!r}: not a core agent")
+    applied = overlay.applied_template if overlay is not None else None
+    base = template_by_id(applied or DEFAULT_TEMPLATE_ID)[agent_name]
+    return ResolvedAgentModel(base.model, base.effort, "template" if applied else "default")

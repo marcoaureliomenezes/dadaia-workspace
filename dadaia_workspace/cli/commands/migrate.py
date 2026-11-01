@@ -1,28 +1,28 @@
 """CLI command group: ``dadaia migrate [subcommand]``.
 
-Bare ``dadaia migrate`` performs the state-file migration (spec_contexts.json v1 → v2).
+Bare ``dadaia migrate`` performs the state-file migration (spec_contexts.json to the current schema).
 
-Note: ``dadaia migrate memory-yaml`` was removed in memory-markdown-source-v1.
-      HTML → YAML migration is no longer needed (.md is the canonical source).
-Note: ``dadaia migrate tree-v2`` (specs/ directory tree layout, from R1) is RETIRED
-      (v0.5.1 T-051-16, K10) — it was the v0 -> v1 leg of the migration chain
-      ``features/migrate/registry.py`` deleted (see that module's docstring for why).
-      A tree still below canonical uses dadaia-workspace 0.4.x's ``migrate tree-v2``.
+Note: ``dadaia migrate memory-yaml`` is removed; ``.md`` is the canonical memory source.
+Note: ``dadaia migrate tree-v2`` is retired. A tree still below canonical uses
+      dadaia-workspace 0.4.x's ``migrate tree-v2``.
 """
 
 from __future__ import annotations
 
 import sys
-from pathlib import Path
 
 import typer
 
-from dadaia_workspace.cli._specs_resolution import resolve_specs_dir_for_cli
+from dadaia_workspace import container
+from dadaia_workspace.cli._fail import fail
+from dadaia_workspace.core.exceptions import SchemaVersionError, WorkspaceNotInitializedError
+from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.features.migrate.state_v2 import (
     MigrationPlan,
     execute_migration,
     plan_migration,
 )
+from dadaia_workspace.infrastructure.json_context_store import SCHEMA_VERSION
 
 app = typer.Typer(
     help="Migration helpers for dadaia workspace and spec trees.",
@@ -30,35 +30,11 @@ app = typer.Typer(
 )
 
 
-def _resolve_workspace_root() -> Path:
-    """The workspace root above cwd (core's one sentinel walk); cwd when uninitialized."""
-    from dadaia_workspace.core.exceptions import WorkspaceNotInitializedError
-    from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
-
-    try:
-        return resolve_workspace_root(Path.cwd())
-    except WorkspaceNotInitializedError:
-        return Path.cwd()
-
-
-def _resolve_specs_dir(specs_dir: str | None) -> Path:
-    """Resolve the target specs/ directory.
-
-    Priority:
-    1. Explicit ``--specs-dir`` argument.
-    2. Bound context session (``DADAIA_CONTEXT`` or ``DADAIA_SESSION_ID``).
-    3. ``<cwd>/specs`` fallback.
-    """
-    return resolve_specs_dir_for_cli(specs_dir)
-
-
 def _print_plan(plan: MigrationPlan) -> None:
     """Print a human-readable diff-like summary of what the migration will do."""
-    if plan.already_v2:
-        typer.echo("[ok] spec_contexts.json is already at schema_version 2 — nothing to do.")
-        return
-
-    typer.echo(f"[migrate] spec_contexts.json schema_version: {plan.schema_version_before!r} → '2'")
+    typer.echo(
+        f"[migrate] spec_contexts.json schema_version: {plan.schema_version_before!r} → '{SCHEMA_VERSION}'"
+    )
     typer.echo("")
     if plan.contexts_to_migrate:
         typer.echo("Context changes:")
@@ -93,7 +69,7 @@ def migrate_state(
         help="Skip interactive confirmation prompt.",
     ),
 ) -> None:
-    """Migrate spec_contexts.json from schema v1 to v2.
+    """Migrate spec_contexts.json to the current schema.
 
     Without any subcommand, performs the state-file migration.
     """
@@ -101,18 +77,15 @@ def migrate_state(
     if ctx.invoked_subcommand is not None:
         return
 
-    workspace_root = _resolve_workspace_root()
-    states_dir = workspace_root / ".dadaia" / "states"
-
-    # Compute plan
     try:
-        plan = plan_migration(states_dir)
-    except ValueError as exc:
-        typer.echo(f"[error] {exc}", err=True)
-        sys.exit(1)
+        workspace_root = resolve_workspace_root()
+        store = container.build_context_store(workspace_root)
+        plan = plan_migration(store)
+    except (ValueError, SchemaVersionError, WorkspaceNotInitializedError) as exc:
+        fail(exc)
 
     if plan.already_v2:
-        typer.echo("[ok] spec_contexts.json is already at schema_version 2 — nothing to do.")
+        typer.echo("[ok] spec_contexts.json is current — nothing to do.")
         sys.exit(0)
 
     # --dry-run: show plan and exit
@@ -130,10 +103,8 @@ def migrate_state(
             sys.exit(0)
 
     # Execute
-    try:
-        execute_migration(states_dir, workspace_root)
-    except ValueError as exc:
-        typer.echo(f"[error] {exc}", err=True)
-        sys.exit(1)
+    execute_migration(store, workspace_root)
 
-    typer.echo("[ok] Migration complete. spec_contexts.json is now at schema_version 2.")
+    typer.echo(
+        f"[ok] Migration complete. spec_contexts.json is now at schema_version {SCHEMA_VERSION}."
+    )

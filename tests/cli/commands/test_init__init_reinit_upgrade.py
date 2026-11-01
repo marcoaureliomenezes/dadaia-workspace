@@ -1,0 +1,203 @@
+"""Re-init is the upgrade: ``init <existing ws>`` compares the venv with the running version.
+
+The venv is fake (the conftest backstop no-ops the builder): its reported version is the
+``installed_build`` seam, and the running distribution is ``provider_build`` — the one
+``version_change`` decider reads both, for the install and for the report.
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+import pytest
+from typer.testing import CliRunner
+
+from dadaia_workspace.cli.commands import init as init_module
+from dadaia_workspace.cli.main import app
+from dadaia_workspace.core.cli_line import fix_line
+from dadaia_workspace.core.platform import PLATFORM, Capabilities, workspace_cli_path
+from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager, build_digest
+from tests.fixtures.provider_dist import install_fake_dist
+from tests.helpers.oslib import write_text
+
+_runner = CliRunner()
+
+
+@pytest.fixture()
+def workspace(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    install_fake_dist(monkeypatch, "0.4.8")  # born by the running version the tests pin
+    ws = tmp_path / "ws"
+    born = _runner.invoke(app, ["init", str(ws), "--harness", "claude"])
+    assert born.exit_code == 0, born.output
+    return ws
+
+
+def _bytes(tree: Path) -> dict[Path, bytes]:
+    return {p: p.read_bytes() for p in sorted(tree.rglob("*")) if p.is_file()}
+
+
+def _versions(monkeypatch: pytest.MonkeyPatch, ws: Path, venv: str, running: str) -> None:
+    workspace_cli_path(ws).parent.mkdir(parents=True, exist_ok=True)
+    venv_bin = ws / ".dadaia" / ".venv" / PLATFORM.venv_scripts_dir
+    write_text(workspace_cli_path(ws), f"#!{venv_bin / ('python' + PLATFORM.venv_exe_suffix)}")
+    built = f"{venv} {build_digest(None)}"
+    monkeypatch.setattr(VenvPythonEnvironmentManager, "installed_build", lambda self, ws: built)
+    install_fake_dist(monkeypatch, running)  # the running version, at its one boundary
+
+
+def test_equal_version_reports_already_at_without_harness(
+    workspace: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _versions(monkeypatch, workspace, "0.4.8", "0.4.8")
+    before = _bytes(workspace / ".dadaia")
+
+    result = _runner.invoke(app, ["init", str(workspace)])
+
+    assert result.exit_code == 0, result.output
+    assert _bytes(workspace / ".dadaia") == before
+    assert "already at 0.4.8" in result.output
+    assert "upgraded" not in result.output
+
+
+def test_newer_running_version_reconciles_and_reports_the_transition(
+    workspace: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _versions(monkeypatch, workspace, "0.4.7", "0.4.8")
+    reconciled: list[str] = []
+
+    def _reconcile(root: Path, *, expected_version: str, **_: object) -> object:
+        reconciled.append(expected_version)
+        return type("R", (), {"ok": True, "error": None})()
+
+    monkeypatch.setattr(init_module, "reconcile_workspace", _reconcile)
+    refreshed: list[Path] = []
+    monkeypatch.setattr(
+        init_module.container,
+        "build_spec_context_service",
+        lambda root: type("S", (), {"refresh_hooks": lambda _s: refreshed.append(root)})(),
+    )
+
+    result = _runner.invoke(app, ["init", str(workspace)])
+
+    assert result.exit_code == 0, result.output
+    assert "upgraded 0.4.7 -> 0.4.8" in result.output
+    assert reconciled == ["0.4.8"]
+    assert refreshed == [workspace.resolve()]
+
+
+def test_a_venv_whose_probe_fails_reports_the_repair_not_a_version(
+    workspace: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _versions(monkeypatch, workspace, "0.4.7", "0.4.8")
+    monkeypatch.setattr(VenvPythonEnvironmentManager, "installed_build", lambda self, ws: None)
+    monkeypatch.setattr(
+        init_module,
+        "reconcile_workspace",
+        lambda root, *, expected_version, **_: type("R", (), {"ok": True, "error": None})(),
+    )
+    monkeypatch.setattr(
+        init_module.container,
+        "build_spec_context_service",
+        lambda root: type("S", (), {"refresh_hooks": lambda _s: None})(),
+    )
+
+    result = _runner.invoke(app, ["init", str(workspace)])
+
+    assert result.exit_code == 0, result.output
+    assert "repaired -> 0.4.8" in result.output
+    assert "None" not in result.output
+
+
+def test_init_prints_the_repair_line_from_the_deciders_action(
+    workspace: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        VenvPythonEnvironmentManager,
+        "version_change",
+        lambda self, ws: ("0.4.7", "0.4.8", "repair"),
+    )
+    reconciled: list[str] = []
+    monkeypatch.setattr(
+        init_module,
+        "reconcile_workspace",
+        lambda root, *, expected_version, **_: (
+            reconciled.append(expected_version) or type("R", (), {"ok": True, "error": None})()
+        ),
+    )
+    monkeypatch.setattr(
+        init_module.container,
+        "build_spec_context_service",
+        lambda root: type("S", (), {"refresh_hooks": lambda _s: None})(),
+    )
+
+    result = _runner.invoke(app, ["init", str(workspace)])
+
+    assert result.exit_code == 0, result.output
+    assert "repaired -> 0.4.8" in result.output
+    assert "upgraded" not in result.output
+    assert reconciled == ["0.4.8"]
+
+
+def test_a_failed_reconcile_prints_the_windows_fix_line(
+    workspace: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The refusal's fix is built by ``fix_line`` — on Windows the CLI is
+    ``Scripts/dadaia.exe``, spelled with forward slashes."""
+    _versions(monkeypatch, workspace, "0.4.7", "0.4.8")
+
+    def _reconcile(root: Path, *, expected_version: str, **_: object) -> object:
+        # Windows from here on: only the refusal is rendered after the reconcile.
+        monkeypatch.setattr("dadaia_workspace.core.platform.PLATFORM", Capabilities.detect("win32"))
+        return type("R", (), {"ok": False, "error": "boom"})()
+
+    monkeypatch.setattr(init_module, "reconcile_workspace", _reconcile)
+
+    result = _runner.invoke(app, ["init", str(workspace)])
+
+    exe = workspace.resolve() / ".dadaia" / ".venv" / "Scripts" / "dadaia.exe"
+    assert result.exit_code == 1
+    assert f"fix: {exe.as_posix()} reconcile --expect-version 0.4.8" in result.output
+
+
+def test_older_running_version_exits_1_with_the_pinned_fix(
+    workspace: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _versions(monkeypatch, workspace, "0.4.9", "0.4.8")
+
+    before = sorted(p for p in workspace.rglob("*"))
+
+    result = _runner.invoke(app, ["init", str(workspace)])
+
+    assert result.exit_code == 1
+    root = workspace.resolve()
+    assert f"fix: {fix_line(root, 'init', str(root), '--harness', 'claude')}" in result.output
+    assert sorted(p for p in workspace.rglob("*")) == before
+
+
+def test_reinit_sees_an_editable_source_bump(
+    workspace: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An editable venv whose dist-info
+    is frozen at 0.1.4 over a 0.4.7 source, against a workspace at 0.1.4, is an upgrade
+    0.1.4 -> 0.4.7 — never 'already at'."""
+    source = tmp_path / "src"
+    source.mkdir()
+    write_text(source / "pyproject.toml", '[tool.poetry]\nversion = "0.4.7"\n')
+    _versions(monkeypatch, workspace, "0.1.4", "0.1.4")
+    install_fake_dist(monkeypatch, "0.1.4", editable_source=source)
+    reconciled: list[str] = []
+    monkeypatch.setattr(
+        init_module, "reconcile_workspace",
+        lambda root, *, expected_version, **_: reconciled.append(expected_version)
+        or type("R", (), {"ok": True, "error": None})(),
+    )  # fmt: skip
+    monkeypatch.setattr(
+        init_module.container, "build_spec_context_service",
+        lambda root: type("S", (), {"refresh_hooks": lambda _s: None})(),
+    )  # fmt: skip
+
+    result = _runner.invoke(app, ["init", str(workspace)])
+
+    assert "upgraded 0.1.4 -> 0.4.7" in result.output, result.output
+    assert reconciled == ["0.4.7"]
+    assert "already at" not in result.output

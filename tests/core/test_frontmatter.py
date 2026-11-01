@@ -1,0 +1,122 @@
+"""``core.frontmatter`` — the ONE frontmatter parser.
+
+Table-driven over :func:`parse`'s outcome shapes: valid, missing delimiter, invalid YAML
+(with the line number), and a present-but-non-dict block. The kind distinguishes "no block"
+from "block present, invalid YAML".
+Size: SMALL — pure-function unit tests, no I/O.
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+import pytest
+
+from dadaia_workspace.core.frontmatter import Frontmatter, FrontmatterError, parse
+from tests.helpers.oslib import read_text, write_text
+
+
+def test_valid_frontmatter_returns_data_and_body() -> None:
+    text = "---\nslug: x\ntitle: X\n---\n\n## Body\n\nHello.\n"
+
+    result = parse(text)
+
+    assert isinstance(result, Frontmatter)
+    assert result.data == {"slug": "x", "title": "X"}
+    assert result.body == "\n## Body\n\nHello.\n"
+
+
+def test_frontmatter_block_may_be_the_whole_file_no_trailing_newline() -> None:
+    text = "---\nslug: x\n---"
+
+    result = parse(text)
+
+    assert isinstance(result, Frontmatter)
+    assert result.data == {"slug": "x"}
+    assert result.body == ""
+
+
+def test_missing_delimiter_is_named_as_missing_delimiter_not_invalid_yaml() -> None:
+    text = "# Just a heading\n\nNo frontmatter block here.\n"
+
+    result = parse(text)
+
+    assert isinstance(result, FrontmatterError)
+    assert result.kind == "missing_delimiter"
+    assert "delimited block" in result.message
+
+
+def test_invalid_yaml_in_a_present_block_names_the_line_never_the_delimiter() -> None:
+    """An unquoted scalar containing ': ' breaks the YAML on line 2 of the block; the block itself
+    IS present, so the diagnostic must never claim it is missing."""
+    text = "---\nslug: x\ntldr: Two-tier memory: 17 principles\n---\n\nBody.\n"
+
+    result = parse(text)
+
+    assert isinstance(result, FrontmatterError)
+    assert result.kind == "invalid_yaml"
+    assert "delimited block" not in result.message
+    assert result.line == 2
+
+
+def test_non_mapping_frontmatter_is_named_not_a_mapping() -> None:
+    text = "---\n- just\n- a\n- list\n---\n\nBody.\n"
+
+    result = parse(text)
+
+    assert isinstance(result, FrontmatterError)
+    assert result.kind == "not_a_mapping"
+
+
+@pytest.mark.parametrize(
+    ("text", "expected_kind"),
+    [
+        pytest.param("no delimiter at all\n", "missing_delimiter", id="no-delimiter"),
+        pytest.param("---\nkey: [unterminated\n---\n", "invalid_yaml", id="bad-yaml"),
+        pytest.param("---\nscalar-not-a-mapping\n---\n", "not_a_mapping", id="scalar"),
+    ],
+)
+def test_parse_error_kinds_table(text: str, expected_kind: str) -> None:
+    result = parse(text)
+
+    assert isinstance(result, FrontmatterError)
+    assert result.kind == expected_kind
+
+
+@pytest.mark.parametrize("prefix", ["", "﻿"], ids=["crlf", "bom-crlf"])
+def test_a_crlf_or_bom_document_parses_like_its_lf_twin(prefix: str) -> None:
+    text = f'{prefix}---\r\nslug: x\r\ngitflow: {{"work": "feature/"}}\r\n---\r\n\r\nBody.\r\n'
+
+    result = parse(text)
+
+    assert isinstance(result, Frontmatter)
+    assert result.data == {"slug": "x", "gitflow": {"work": "feature/"}}
+    assert result.body == "\nBody.\n"
+
+
+def test_a_block_outside_the_subset_names_its_line() -> None:
+    result = parse("---\nslug: x\nflag: yes\n---\n")
+
+    assert isinstance(result, FrontmatterError)
+    assert (result.kind, result.line) == ("invalid_yaml", 2)
+
+
+def test_merging_into_a_bom_constitution_edits_its_block_instead_of_prepending_a_second(
+    tmp_path: Path,
+) -> None:
+    from dadaia_workspace.core.gitflow import merge_frontmatter
+
+    write_text(tmp_path / "constitution.md", "﻿---\nspecs_pattern_version: 6\n---\n\n# Law\n")
+
+    merge_frontmatter(tmp_path, specs_pattern_version=7)
+
+    assert read_text(tmp_path / "constitution.md") == (
+        "---\nspecs_pattern_version: 7\n---\n\n# Law\n"
+    )
+
+
+def test_a_refusal_message_quotes_the_offending_line() -> None:
+    result = parse("---\ngitflow: {principal: main\n---\n")
+
+    assert isinstance(result, FrontmatterError)
+    assert "gitflow: {principal: main" in result.message

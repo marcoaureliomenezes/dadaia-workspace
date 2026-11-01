@@ -1,17 +1,20 @@
 """WorkspaceService — bootstrap and management of the .dadaia/ template."""
 
 import json
+from collections.abc import Callable
 from pathlib import Path
 
+from dadaia_workspace.core import platform
+from dadaia_workspace.core.atomic_write import atomic_write, refuse_symlink
+from dadaia_workspace.core.cli_line import cli_words
 from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES
 from dadaia_workspace.core.models.harness_profile import HarnessProfile
-from dadaia_workspace.core.models.workspace import Workspace
-from dadaia_workspace.core.workspace_layout import provisioned_zones
+from dadaia_workspace.core.workspace_layout import LEVEL1_SEEDS, occupied, provisioned_zones
+from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
 from dadaia_workspace.infrastructure.json_harness_profile_store import JsonHarnessProfileStore
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
 
-_EMPTY_CONTEXTS = {"schema_version": "2", "contexts": []}
 _EMPTY_SERVER_REGISTRY = {
     "version": "1",
     "range": {"min_port": 3000, "max_port": 3999},
@@ -24,78 +27,82 @@ class WorkspaceService:
         self,
         public_assets: FileSystemPublicAssetManager,
         python_env: VenvPythonEnvironmentManager,
+        hold: Callable[[Path, Path, str], object] = lambda *_: None,
     ) -> None:
         self._public_assets = public_assets
         self._python_env = python_env
+        self._hold = hold
 
     def init(
         self,
         workspace_root: Path,
         harnesses: tuple[str, ...],
         skip_assets: bool = False,
-    ) -> tuple[Workspace, list[str]]:
-        """Bootstrap .dadaia/ template. Idempotent. Returns (workspace, installed_assets).
+        template: str | None = None,
+    ) -> list[str]:
+        """Bootstrap ``.dadaia/`` and return installed assets.
 
-        *harnesses* names the Layer-1 entry harnesses to scaffold (their projection
-        directories plus per-harness hook registration) and is REQUIRED — there is no
-        implied full set (0.4.7 FR1: `init` takes exactly one `--harness`). Only the
-        chosen harnesses' directories, hooks, and asset projections are created; the
-        selected set is persisted through the profile store (the source of truth for
-        profile-aware install/doctor scoping, v0.1.58 FR3).
+        Re-init merges required *harnesses* because init deletes no projection."""
+        states_dir = workspace_root / ".dadaia" / "states"
+        chosen_set = set(harnesses)
 
-        Bug init-harness-profile-silent-narrowing: init deletes no projection, so it must
-        never un-manage one — a re-init with a harness subset MERGES into the persisted
-        profile (canonical L1 order, unknown names appended sorted).
-        """
-        workspace = Workspace.from_root(workspace_root)
-        chosen = tuple(harnesses)
-        chosen_set = set(chosen)
-
-        # The venv manager owns `.dadaia/.venv` and runs before the zone pass: an empty
-        # pre-made `.venv` would read to it as an already-built venv.
+        # Run the venv manager before zone creation so an empty directory cannot look provisioned.
         self._python_env.ensure_workspace_venv(str(workspace_root))
         for zone in provisioned_zones():
-            (workspace.dadaia_dir / zone.name).mkdir(parents=True, exist_ok=True)
-        # The shared skills root is harness-independent — always created.
-        (workspace.root / ".agents" / "skills").mkdir(parents=True, exist_ok=True)
-        # Every harness directory is created by its own projection (the record's
-        # `directory`), never by a branch here.
+            (workspace_root / ".dadaia" / zone.name).mkdir(parents=True, exist_ok=True)
+        for name, seed in LEVEL1_SEEDS.items():  # written once; the operator owns it after
+            if not occupied(target := workspace_root / name):
+                platform.write_text(target, seed(workspace_root))
+        # Harness directories come from projections; only the shared skills root is eager.
+        (workspace_root / ".agents" / "skills").mkdir(parents=True, exist_ok=True)
 
-        # Initialize JSON state files (idempotent — never overwrite existing data)
-        self._init_json_file(workspace.states_dir / "spec_contexts.json", _EMPTY_CONTEXTS)
-        self._init_json_file(workspace.states_dir / "server_registry.json", _EMPTY_SERVER_REGISTRY)
+        JsonContextStore(states_dir).seed_if_absent()
+        server_registry = states_dir / "server_registry.json"
+        if not occupied(server_registry):
+            platform.write_text(server_registry, json.dumps(_EMPTY_SERVER_REGISTRY, indent=2))
+        self._migrate_denylist(workspace_root, states_dir / "privacy_denylist.json")
 
         store = JsonHarnessProfileStore()
-        persisted = store.read(workspace.states_dir)
+        persisted = store.read(states_dir)
         merged = chosen_set | (set(persisted.harnesses) if persisted is not None else set())
         ordered = tuple(h for h in L1_ENTRY_HARNESSES if h in merged) + tuple(
             sorted(merged - set(L1_ENTRY_HARNESSES))
         )
-        store.write(workspace.states_dir, HarnessProfile.of(ordered))
+        store.write(states_dir, HarnessProfile.of(ordered))
 
-        # Install public assets — only the chosen harness projections. Every hook wiring
-        # (.claude/settings.json, .codex/hooks.json, kimi user hooks) is install's output:
-        # `public install` is the ONE settings writer (bug
-        # init-skip-assets-writes-gateless-claude-settings — init's own gateless
-        # UserPromptSubmit-only writer was deleted). Skipping assets therefore leaves the
-        # workspace ungated, and that state must be loud, never silent.
-        installed: list[str] = []
+        # Public install owns every hook setting; skipping it must report an ungated workspace.
         if not skip_assets:
-            installed.extend(self._public_assets.stage(workspace_root))
-            # The roster install resolves the chosen-harness SUBSET on its own: it reads
-            # the profile persisted above to scope its harness targets (v0.1.58 FR3).
-            installed.extend(self._public_assets.install(workspace_root))
-        else:
-            installed.append(
-                "[warn] assets skipped — no hooks configured; the workspace is ungated "
-                "until 'dadaia public install' runs"
-            )
+            return self._public_assets.install(workspace_root, template=template)
+        return [
+            "[warn] assets skipped — no hooks configured; the workspace is ungated "
+            f"until '{platform.inline(*cli_words(workspace_root, 'public', 'install'))}' runs"
+        ]
 
-        return workspace, installed
+    def venv_change(self, workspace_root: Path) -> tuple[str | None, str | None, str]:
+        """``(before, after, action)`` of the venv against the running distribution."""
+        return self._python_env.version_change(str(workspace_root))
 
-    def is_initialized(self, workspace_root: Path) -> bool:
-        return (workspace_root / ".dadaia" / "states" / "spec_contexts.json").exists()
+    def harnesses(self, workspace_root: Path) -> tuple[str, ...]:
+        """The workspace's persisted harness profile — a re-init needs no ``--harness``."""
+        states_dir = workspace_root / ".dadaia" / "states"
+        return JsonHarnessProfileStore().resolve(states_dir, workspace_root).harnesses
 
-    def _init_json_file(self, path: Path, empty: dict) -> None:  # type: ignore[type-arg]
-        if not path.exists():
-            path.write_text(json.dumps(empty, indent=2), encoding="utf-8")
+    def _migrate_denylist(self, workspace_root: Path, path: Path) -> None:
+        """Rewrite the legacy string-pair list as the object form.
+
+        Stage before holding the original so failure never leaves the terms unreadable."""
+        staged = path.with_name(f"{path.name}.migrating")
+        try:
+            refuse_symlink(path)
+            raw = json.loads(platform.read_text(path))
+            pairs = [[e, ""] if isinstance(e, str) else e for e in raw]
+            if not isinstance(raw, list) or not all(
+                isinstance(p, list) and len(p) == 2 and all(isinstance(x, str) for x in p)
+                for p in pairs
+            ):
+                return
+            atomic_write(staged, json.dumps(dict(pairs), indent=2))
+            if self._hold(workspace_root, path, path.name):
+                platform.replace(staged, path)
+        except (OSError, ValueError, TypeError, platform.Undecodable):
+            return

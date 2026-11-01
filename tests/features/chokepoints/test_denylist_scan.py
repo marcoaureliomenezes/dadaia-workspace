@@ -1,0 +1,210 @@
+"""Pure push-range denylist matcher.
+
+Synthetic ``zz-`` terms only; baseline positives are composed at run time so this
+module's own blob never carries a value the push-range scan would flag.
+"""
+
+from __future__ import annotations
+
+import re
+from collections.abc import Iterator
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+
+import pytest
+
+from dadaia_workspace.core.models.doctor_report import DoctorStatus
+from dadaia_workspace.core.models.git_scan import ScannedObject
+from dadaia_workspace.features.chokepoints.denylist_scan import _first_match, scan_objects
+from dadaia_workspace.infrastructure.privacy_check import (
+    check_public_privacy,
+    load_baseline_patterns,
+)
+
+_TERM = "zz-secret-term"
+_TERMS = ((_TERM, "synthetic"),)
+_IPV4 = "198.18" + ".0.5"  # RFC 2544 benchmarking range
+_HOME_LONG = "/hom" + "e/synthzqwxyz"
+_HOME_SHORT = "/hom" + "e/synthzq"  # a substring of _HOME_LONG
+_BIG: dict[str, Any] = {"oversized": True, "size_bytes": 6_000_000, "scanned_bytes": 5_242_880}
+_NOTE = [("notes.md", 6_000_000, 5_242_880)]
+
+
+def _obj(
+    text: str, prior: str | None = None, *, path: str = "notes.md", **kw: Any
+) -> ScannedObject:
+    return ScannedObject(
+        path=path, sha="deadbeef", text=text, decodable=True, prior_text=prior, **kw
+    )
+
+
+def _binary(**kw: Any) -> ScannedObject:
+    return ScannedObject(path="b.bin", sha="d", text="", decodable=False, **kw)
+
+
+# fmt: off
+@pytest.mark.parametrize(("value", "mask"), [
+    pytest.param(_IPV4, "1…5", id="ipv4-A3.1"),
+    pytest.param("/hom" + "e/alice", None, id="home-path-A3.1"),
+    pytest.param("bastion" + ".local", None, id="dot-local-host"),
+    pytest.param("prod.workspace" + ".local", None, id="not-the-exact-workspace-local-carve-out"),
+    pytest.param("nas" + ".home", None, id="dot-home-host"),
+])
+# fmt: on
+def test_baseline_refuses_a_private_value_with_no_operator_terms(value: str, mask: str | None) -> None:
+    """The baseline layer alone refuses; the hit never carries the value."""
+    outcome = scan_objects([_obj(f"see {value} now\n")], terms=(), patterns=load_baseline_patterns())
+
+    assert [(h.path, h.line) for h in outcome.hits] == [("notes.md", 1)]
+    assert value not in outcome.hits[0].masked_term
+    assert mask in (None, outcome.hits[0].masked_term)
+
+
+_QUAD = ".".join(("0", "10", "9", "10"))
+_LOCKS = ("poetry.lock", "package-lock.json", "uv.lock", "Cargo.lock", "yarn.lock",
+          "pnpm-lock.yaml", "Pipfile.lock", "composer.lock", "Gemfile.lock", "packages.lock.json")  # fmt: skip
+
+
+def _hits(path: str, text: str) -> int:
+    return len(scan_objects([_obj(text, path=path)], terms=(), patterns=load_baseline_patterns()).hits)
+
+
+@pytest.mark.parametrize("path", [*_LOCKS, "sub/dir/poetry.lock"])
+@pytest.mark.parametrize("text", [f'version = "{_QUAD}"\n', f'py4j = ">={_QUAD},<{_QUAD}"\n'])
+def test_a_generated_lock_file_is_not_refused_for_a_four_part_version(path: str, text: str) -> None:
+    """A lock file's four-part version is not an address."""
+    assert _hits(path, text) == 0
+
+
+def test_a_lock_file_still_loses_only_the_ipv4_pattern() -> None:
+    """Another pattern still refuses inside a lock file."""
+    assert _hits("poetry.lock", "owner = " + "someone" + "@" + "acme-corp.io\n") == 1
+
+
+def test_an_address_as_a_folder_above_a_lock_file_is_refused() -> None:
+    """The lock-file skip covers file content only, never the path."""
+    assert _hits(f"hosts/{_QUAD}/poetry.lock", "x = 1\n") == 1
+
+
+@pytest.mark.parametrize("wrap", ["{}", "<td>{}</td>", "<{}>", ">>{}", "=>{}", "x=={}", "~{}", "^{}", "host>={}"])
+def test_the_same_quad_in_an_ordinary_file_is_refused(wrap: str) -> None:
+    """Outside the lock list the IPv4 pattern refuses in every context."""
+    assert _hits("notes.md", wrap.format(_QUAD) + "\n") == 1
+    assert _hits("poetry.lock.md", wrap.format(_QUAD) + "\n") == 1
+
+
+# fmt: off
+@pytest.mark.parametrize("text", [
+    pytest.param("loopback at 127.0.0.1\n", id="loopback"),
+    pytest.param("docs live at example.com\n", id="documentation-domain"),
+    pytest.param("runner home is /home/runner/work\n", id="placeholder-home"),
+    pytest.param("contact definition@dadaia.invalid\n", id="rfc2606-invalid-email"),
+    pytest.param("or try someone@sub.example.test\n", id="rfc2606-test-email"),
+    pytest.param("identity <dadaia@workspace.local>\n", id="product-synthetic-identity"),
+    pytest.param('    return pathlib.Path.home() / ".claude"\n', id="stdlib-path-home"),
+])
+# fmt: on
+def test_baseline_carve_out_never_refuses(text: str) -> None:
+    """``exclude_regex`` carve-outs apply (the refused neighbours are rows of the table above)."""
+    assert scan_objects([_obj(text)], terms=(), patterns=load_baseline_patterns()).hits == ()
+
+
+# fmt: off
+@pytest.mark.parametrize(("text", "prior", "terms", "hit_lines"), [
+    pytest.param(f"still {_TERM}\n", f"had {_TERM}\n", _TERMS, [], id="A1.1-same-path-published"),
+    pytest.param(f"here {_TERM}\n", None, _TERMS, [1], id="A1.2-new-path"),
+    pytest.param(f"now {_TERM}\n", "had zz-other\n", (*_TERMS, ("zz-other", "s")), [1], id="A1.3-new-value"),
+    pytest.param(f"still {_TERM}\n", f"HAD {_TERM.upper()}\n", _TERMS, [], id="A1.4-case-insensitive"),
+    pytest.param(f"at {_IPV4} still\n", f"at {_IPV4} first\n", None, [], id="baseline-layer-amnestied"),
+    pytest.param(f"now {_HOME_SHORT}/p\n", f"was {_HOME_LONG}/p\n", None, [1], id="superstring-prior-never-amnesties"),
+    pytest.param(f"at {_HOME_SHORT}/p\n", f"was {_HOME_SHORT}/p\n", None, [], id="equal-anchored-value-amnestied"),
+    pytest.param(f"{_TERM} one\nnew zz-brand\n", f"{_TERM}\n", (*_TERMS, ("zz-brand", "s")), [2], id="suppressed-line-continues"),
+])
+# fmt: on
+def test_amnesty_is_same_path_same_layer_equal_value(
+    text: str, prior: str | None, terms: tuple[tuple[str, str], ...] | None, hit_lines: list[int]
+) -> None:
+    """Suppressed iff the same layer re-run on the same path's prior text yields an equal value."""
+    patterns = load_baseline_patterns() if terms is None else ()
+    outcome = scan_objects([_obj(text, prior)], terms=terms or (), patterns=patterns)
+
+    assert [h.line for h in outcome.hits] == hit_lines
+    assert all(_TERM not in h.masked_term and _HOME_SHORT not in h.masked_term for h in outcome.hits)
+
+
+class _CountingRegex:
+    def __init__(self, inner: re.Pattern[str]) -> None:
+        self._inner = inner
+        self.calls = 0
+
+    def finditer(self, text: str) -> Iterator[re.Match[str]]:
+        self.calls += 1
+        return self._inner.finditer(text)
+
+
+@dataclass(frozen=True)
+class _CountingPattern:
+    regex: _CountingRegex
+    id: str = "zz-synthetic"
+    reason: str = "synthetic"
+    exclude: re.Pattern[str] | None = None
+    skip_paths: re.Pattern[str] | None = None
+
+
+def test_first_match_short_circuits_at_the_first_hit_line() -> None:
+    counting = _CountingRegex(re.compile(re.escape(_TERM)))
+    obj = _obj(f"line one has {_TERM}\n" + "noise line\n" * 500)
+
+    hit = _first_match(obj, terms=[], patterns=[_CountingPattern(counting)])  # type: ignore[list-item]
+
+    assert hit is not None and hit.line == 1
+    assert counting.calls == 1
+
+
+def test_unmasked_operator_term_absent_from_every_hit_field() -> None:
+    """No hit field carries the unmasked operator term."""
+    outcome = scan_objects([_obj(f"the value is {_TERM} here\n", path="secret.md")], terms=_TERMS, patterns=())
+
+    hit = outcome.hits[0]
+    assert all(_TERM not in v for v in (hit.path, hit.masked_term, hit.source_layer))
+    assert (hit.masked_term, hit.source_layer) == ("z…m", "operator denylist")
+
+
+# fmt: off
+@pytest.mark.parametrize(("obj", "hits", "binary", "notes"), [
+    pytest.param(_binary(), 0, 1, [], id="A6.2-binary-skipped-and-counted"),
+    pytest.param(_obj(f"x {_TERM}\n", **_BIG), 1, 0, _NOTE, id="A4.1-oversized-prefix-hit"),
+    pytest.param(_obj("clean\n", **_BIG), 0, 0, _NOTE, id="A4.4-note-without-hit"),
+    pytest.param(_binary(**_BIG), 0, 1, [], id="A4.6-undecodable-oversized-is-binary-only"),
+    pytest.param(_obj(f"x {_TERM}\n", "unrelated\n", **_BIG), 1, 0, _NOTE, id="oversized-with-prior-not-amnestied"),
+])
+# fmt: on
+def test_binary_and_oversized_objects(obj: ScannedObject, hits: int, binary: int, notes: list[tuple[str, int, int]]) -> None:
+    outcome = scan_objects([obj], terms=_TERMS, patterns=())
+
+    assert len(outcome.hits) == hits
+    assert outcome.skipped_binary_count == binary
+    assert [(n.path, n.size_bytes, n.scanned_bytes) for n in outcome.oversized_notes] == notes
+
+
+_HOST = "box" + ".local"
+
+
+@pytest.mark.parametrize(
+    "path",
+    ["package-lock.json", "sub/dir/package-lock.json", "notes.json", "poetry.lock", "sub/dir/uv.lock"],
+)
+def test_the_scan_and_the_public_doctor_exclude_the_same_paths(tmp_path: Path, path: str) -> None:
+    """One path, one verdict: a file holding an address and an internal host is refused by
+    the push-range scan exactly when the public doctor refuses it."""
+    text = f'{{"v": "{_IPV4}", "h": "{_HOST}"}}\n'
+    scan = scan_objects([_obj(text, path=path)], terms=(), patterns=load_baseline_patterns())
+
+    public = tmp_path / "lib" / "dadaia_workspace" / "public"
+    target = public / path
+    target.parent.mkdir(parents=True)
+    target.write_text(text, encoding="utf-8")
+    doctor = check_public_privacy(public, lambda d: [p for p in d.rglob("*") if p.is_file()])
+
+    assert any(line.status is DoctorStatus.ERROR for line in doctor) is bool(scan.hits)

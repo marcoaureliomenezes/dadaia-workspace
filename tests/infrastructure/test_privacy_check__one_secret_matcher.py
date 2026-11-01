@@ -1,0 +1,151 @@
+"""One secret matcher: the pre-push scan and the baseline publish preflight
+give the same verdict on every fixture, because both run ONE engine over ONE registry.
+
+The public doctor's text scan says the same, because it
+calls the pre-push matcher (``core.redaction.privacy_matches``).
+
+Every secret-shaped value is composed at run time (``tests/helpers/privacy_fixtures``
+doctrine): no tracked literal carries a shape the push scan or gitleaks matches.
+"""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+import pytest
+
+from dadaia_workspace.container import (
+    load_denylist_baseline_patterns,
+    load_denylist_terms,
+    scan_publish_candidates,
+)
+from dadaia_workspace.core.models.doctor_report import DoctorStatus
+from dadaia_workspace.core.models.git_scan import ScannedObject
+from dadaia_workspace.features.chokepoints.denylist_scan import scan_objects
+from dadaia_workspace.infrastructure.privacy_check import (
+    _PUBLIC_PRIVACY_TEXT_SUFFIXES,  # allow-private-import: which suffixes the doctor reads
+    check_public_privacy,
+)
+from tests.helpers.oslib import write_text
+
+_DASHES = "-" * 5
+_TERM = "zz" + "fixtureterm"
+_V = "hunter2" + "Xq9zL"
+
+#: (case, file name, content, expected verdict: True = refused). The expectation is
+#: the spec's expectation, never either engine's output.
+_MATRIX: list[tuple[str, str, str | bytes, bool]] = [
+    ("pem-block", "k.txt", _DASHES + "BEGIN RSA " + "PRIVATE KEY" + _DASHES + "\n", True),
+    ("key-file-suffix", "server.p12", b"\x00opaque\xff", True),
+    ("asia", "a.txt", "id=" + "AS" + "IA" + "Z" * 16 + "\n", True),
+    ("ghs", "g.txt", "t=" + "gh" + "s_" + "a" * 36 + "\n", True),
+    ("ghp-odd-length", "g2.txt", "t=" + "gh" + "p_" + "b" * 30 + "\n", True),
+    # Outside any *_key= assignment.
+    ("github-pat-env", ".env", "GH_TOKEN=" + "github" + "_pat_" + "A" * 40 + "\n", True),
+    (
+        "github-pat-header",
+        "h.txt",
+        "Authorization: token " + "github" + "_pat_" + "B" * 40 + "\n",
+        True,
+    ),
+    ("anthropic-key-yaml", "a.yml", "key: " + "sk" + "-ant-api03-" + "C" * 40 + "\n", True),
+    ("glpat", "gl.txt", "t=" + "gl" + "pat-" + "c" * 20 + "\n", True),
+    ("sk-live", "st.txt", "t=" + "sk" + "_live_" + "d" * 24 + "\n", True),
+    ("password", "p.txt", "pass" + "word=" + "hunter2hunter\n", True),
+    ("upper-api-key", "k2.txt", "API" + "_KEY=" + "e" * 30 + "\n", True),
+    ("short-value", "s.txt", "sec" + "ret=" + "f" * 10 + "\n", True),
+    ("email", "e.txt", "mail: zz.fixture" + "@" + "acme-fixture.com\n", True),
+    ("product-identity", "w.txt", "dadaia" + "@" + "workspace.local\n", False),
+    ("control-char-term", "c.txt", _TERM[:5] + "\x1b" + _TERM[5:] + "\n", True),
+    ("clean", "n.txt", "nothing to see here\n", False),
+    ("quoted-literal", "q.txt", "pass" + "word = '" + "g" * 8 + "'\n", True),
+    # Ordinary code names a secret without holding one — never refused.
+    ("kwarg-passthrough", "db.py", "driver.connect(user=user, pass" + "word=password)\n", False),
+    ("annotation", "cfg.py", "api" + "_key: Optional[str] = None\n", False),
+    ("call", "c1.py", "pass" + "word = get_password()\n", False),
+    ("attribute", "c2.py", "api" + "_key = settings.api_key\n", False),
+    ("call-arg", "c3.py", "private" + "_key = load_private_key(path)\n", False),
+    ("subscript", "c4.py", "access" + '_token = response.json()["t"]\n', False),
+    ("aws-runtime", "c5.py", "aws_secret" + '_access_key=runtime_value("x")\n', False),
+    ("terraform-attr", "m.tf", "CLIENT_" + "SECRET = some_resource.attr\n", False),
+    # Prefixed names, env/compose, base64, dotted and commented values.
+    ("env-prefixed", ".env", "DB_PASS" + "WORD=" + _V + "\n", True),
+    ("jwt-secret", ".env", "JWT_SEC" + "RET=" + _V + "\n", True),
+    ("openai-key", ".env", "OPENAI_API" + "_KEY=" + _V + "\n", True),
+    ("compose-map", "dc.yml", "      POSTGRES_PASS" + "WORD: " + _V + "\n", True),
+    ("compose-list", "dc2.yml", "  - POSTGRES_PASS" + "WORD=" + _V + "\n", True),
+    ("client-secret", "cs.py", "client_sec" + 'ret = "' + _V + '"\n', True),
+    ("base64-padded", "b.py", "sec" + 'ret = "' + _V + 'AAAA=="\n', True),
+    ("dotted-token", "t.py", "access" + '_token = "eyJhbGc.eyJzdWI.' + _V + '"\n', True),
+    ("trailing-comment", "y.yml", "pass" + "word: " + _V + "  # prod\n", True),
+    ("json-key", "j.json", '{"pass' + 'word": "' + _V + '"}\n', True),
+    ("dict-literal", "d.py", "cfg = {'pass" + "word': '" + _V + "'}\n", True),
+    ("env-template-quoted", "t1.yml", "pass" + 'word: "${DB_PASSWORD}"\n', False),
+    ("env-template-bare", "t2.yml", "pass" + "word: ${DB_PASSWORD}\n", False),
+    ("jinja-template", "t3.py", "api" + '_key = "{{ vault_key }}"\n', False),
+    ("angle-placeholder", "t4.env", "API" + "_KEY=<your-key-here>\n", False),
+    ("secret-name", "t5.py", "secret" + '_name = "database-credentials"\n', False),
+    ("json-template", "t6.json", '{"pass' + 'word": "${DB_PASSWORD}"}\n', False),
+    ("dict-variable", "t7.py", "cfg = {'pass" + "word': password}\n", False),
+    # A literal is a run free
+    # of code syntax whatever the key's case style; a comparison or a name is not one.
+    ("camel-case-key", "c.js", "const dbPass" + 'word = "' + _V + '"\n', True),
+    ("bare-specials", ".env", "DB_PASS" + "WORD=" + _V + "!@%\n", True),
+    ("quoted-dollar", ".env", "DB_PASS" + 'WORD="' + _V + '$x"\n', True),
+    ("unspaced-eq-assert", "t8.py", "assert api" + "_key==expected_value\n", False),
+    ("unspaced-eq-return", "t9.py", "return pass" + "word==stored_password\n", False),
+    ("kebab-secret-name", "m.py", "SECRET" + '_KEY = "infura-api-key"\n', False),
+    ("masked-value", "m.env", "API" + "_KEY=********\n", False),
+    # Private-key containers are refused on
+    # presence (.pem .key .p12 .pfx .jks .keystore .der); public certs (.crt .cer) pass.
+    ("der-private-key", "k.der", b"\x30\x82key\xff", True),
+    ("pem-private-key", "k.pem", b"\x00opaque\xff", True),
+    ("key-private-key", "server.key", b"\x00opaque\xff", True),
+    ("pfx-private-key", "bundle.pfx", b"\x00opaque\xff", True),
+    ("jks-private-key", "store.jks", b"\x00opaque\xff", True),
+    ("keystore-private-key", "app.keystore", b"\x00opaque\xff", True),
+    ("public-cert-crt", "ca.crt", b"\x00cert\xff", False),
+    ("public-cert-cer", "server.cer", b"\x00cert\xff", False),
+]
+
+
+@pytest.fixture(autouse=True)
+def _operator_term(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    denylist = tmp_path / "denylist.json"
+    write_text(denylist, json.dumps({_TERM: "fixture term"}))
+    monkeypatch.setenv("DADAIA_PRIVACY_DENYLIST", str(denylist))
+
+
+def _pre_push_refuses(name: str, content: str | bytes) -> bool:
+    """The pre-push side: the blob as the git object reader hands it over."""
+    if isinstance(content, bytes):
+        obj = ScannedObject(name, "0" * 7, "", decodable=False)
+    else:
+        obj = ScannedObject(name, "0" * 7, content, decodable=True)
+    outcome = scan_objects([obj], load_denylist_terms(), load_denylist_baseline_patterns())
+    return bool(outcome.hits)
+
+
+def _publish_refuses(root: Path, name: str, content: str | bytes) -> bool:
+    """The publish side: the in-process matcher ``context baseline`` runs over the same
+    file, untracked in its repo."""
+    target = root / name
+    target.write_bytes(content) if isinstance(content, bytes) else write_text(target, content)
+    return bool(scan_publish_candidates(root, [name]))
+
+
+@pytest.mark.parametrize(
+    ("case", "name", "content", "refused"), _MATRIX, ids=[m[0] for m in _MATRIX]
+)
+def test_pre_push_and_publish_preflight_agree(
+    tmp_path: Path, case: str, name: str, content: str | bytes, refused: bool
+) -> None:
+    verdicts = (_pre_push_refuses(name, content), _publish_refuses(tmp_path, name, content))
+    assert verdicts == (refused, refused), case
+    if isinstance(content, str) and Path(name).suffix in _PUBLIC_PRIVACY_TEXT_SUFFIXES:
+        public = tmp_path / "lib" / "dadaia_workspace" / "public"
+        public.mkdir(parents=True)
+        write_text(public / name, content)
+        lines = check_public_privacy(public, lambda d: d.iterdir())
+        assert any(line.status is DoctorStatus.ERROR for line in lines) is refused, case

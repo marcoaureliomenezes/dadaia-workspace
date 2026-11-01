@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """What a valid audit tree is: every FINDINGS.jsonl record against `finding-record-v1`,
-every archived line against `histo-record-v1` under this ledger's four-word subset.
+every archived line against `histo-record-v1` under this ledger's three-word subset.
 
 This is what `audit.py check` reports and what every write validates its own result
 against — one definition of valid, so the writer and the validator cannot disagree.
@@ -8,75 +8,82 @@ against — one definition of valid, so the writer and the validator cannot disa
 
 from __future__ import annotations
 
-import json
-import sys
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+import _findings
+import _ledger
+from _ledger import SPECS, load_schema, validate
+from _platform import act, read_text
 
-from _audit_schema import (  # noqa: E402
-    AUDITS,
-    CODE,
-    DISPOSITIONS,
-    FINDINGS,
-    HISTO,
-    load_schema,
-    validate,
-)
+CODE = "LEDGER-FINDINGS-SCHEMA"
+AUDITS = "audits"
+HISTO = "audits/_archive/audits_histo.jsonl"
+FINDINGS = "FINDINGS.jsonl"
+_VOCAB = load_schema("finding-record-v1")["properties"]
+#: The three pillars every audit reports counts for, in their fixed order.
+PILLARS = tuple(_VOCAB["pillar"]["enum"])
+#: A finding is born `open` and exits by exactly one of these three words.
+DISPOSITIONS = tuple(word for word in _VOCAB["disposition"]["enum"] if word != "open")
+#: The evidence each terminal word requires — the finding's governance triple is the
+#: only surviving record of how it was closed.
+REQUIRED_EVIDENCE = {
+    "resolved": "release", "superseded": "release", "rejected": "reason",
+}  # fmt: skip
+#: The three fields `disposition` rewrites; every other field is the immutable core.
+GOVERNANCE = ("disposition", "release", "reason")
 
 Finding = dict[str, Any]
 
 
-def _lines(text: str) -> list[tuple[int, str]]:
-    return [(n, line) for n, line in enumerate(text.split("\n"), start=1) if line.strip()]
+def _fix(rel: str, root: Path) -> Callable[[int], str]:
+    """The act that repairs a line of *rel*: a FINDINGS line is appended by file tools and
+    repaired in place; an archive line only `audit.py close` writes."""
+    law = "specs/audits/AGENTS.md"
+    if rel == HISTO:
+        return lambda line: _ledger.unwritten(root / rel, line, "`audit.py close`", law)
+    return lambda line: act(
+        "agent",
+        f"write line {line} of {root / rel} as one finding-record-v1 "
+        f"record — a bound session writes audit findings directly; a disposition moves "
+        f"only by `audit.py disposition` ({law})",
+    )
 
 
-def _record_findings(
-    text: str, rel: str, schema_name: str, terminal: tuple[str, ...]
-) -> list[Finding]:
-    schema = load_schema(schema_name)
-    out: list[Finding] = []
-    for number, line in _lines(text):
-        try:
-            record = json.loads(line)
-        except json.JSONDecodeError as exc:
-            out.append({"path": rel, "line": number, "message": f"not valid JSON ({exc.msg})"})
-            continue
-        for message in validate(record, schema, schema, schema_name):
-            out.append({"path": rel, "line": number, "message": message})
-        word = record.get("disposition") if isinstance(record, dict) else None
-        if isinstance(word, str) and word not in terminal and schema_name.startswith("histo"):
-            out.append({
-                "path": rel, "line": number,
-                "message": f"an audit exits as one of {list(terminal)}, not {word!r}",
-            })  # fmt: skip
-    return out
-
-
-def findings_findings(text: str, rel: str) -> list[Finding]:
-    """Findings against one audit's ``FINDINGS.jsonl`` text."""
-    out = _record_findings(text, rel, "finding-record-v1", ("open", *DISPOSITIONS))
+def live_findings(text: str, rel: str, root: Path = SPECS) -> list[Finding]:
+    """Findings against one audit's ``FINDINGS.jsonl`` text: the schema, and one id per line."""
+    schema = load_schema("finding-record-v1")
     seen: set[str] = set()
-    for number, line in _lines(text):
-        try:
-            identity = json.loads(line).get("id")
-        except (json.JSONDecodeError, AttributeError):
-            continue
+
+    def problems(record: Any) -> list[str]:
+        messages = list(validate(record, schema, schema, "finding-record-v1"))
+        identity = record.get("id") if isinstance(record, dict) else None
         if isinstance(identity, str) and identity in seen:
-            out.append(
-                {"path": rel, "line": number, "message": f"duplicate finding id {identity!r}"}
-            )
+            messages.append(f"duplicate finding id {identity!r}")
         elif isinstance(identity, str):
             seen.add(identity)
-    return out
+        return messages
+
+    return _findings.histo_findings(text, rel, CODE, problems, _fix(rel, root))
 
 
-def histo_findings(text: str) -> list[Finding]:
-    """Findings against the append-only ``audits_histo.jsonl`` text."""
-    return _record_findings(text, HISTO, "histo-record-v1", DISPOSITIONS)
+def archive_findings(text: str, root: Path = SPECS) -> list[Finding]:
+    """Findings against the append-only ``audits_histo.jsonl`` text: ``histo-record-v1``
+    under this ledger's subset of its dispositions."""
+    schema = load_schema("histo-record-v1")
+
+    def problems(record: Any) -> list[str]:
+        messages = list(validate(record, schema, schema, "histo-record-v1"))
+        word = record.get("disposition") if isinstance(record, dict) else None
+        if isinstance(word, str) and word not in DISPOSITIONS:
+            messages.append(f"an audit exits as one of {list(DISPOSITIONS)}, not {word!r}")
+        return messages
+
+    return _findings.histo_findings(text, HISTO, CODE, problems, _fix(HISTO, root))
 
 
+@_findings.decodable(CODE)
 def check(specs: Path) -> list[Finding]:
     """Every live audit's findings plus the archive, in path order."""
     audits = specs / AUDITS
@@ -86,19 +93,19 @@ def check(specs: Path) -> list[Finding]:
             continue
         path = directory / FINDINGS
         if not path.is_file():
-            out.append({
-                "path": f"{AUDITS}/{directory.name}", "line": 0,
-                "message": f"an audit directory carries {FINDINGS}; this one does not",
-            })  # fmt: skip
+            message = f"an audit directory carries {FINDINGS}; this one does not"
+            out.append(_findings.finding(CODE, f"{AUDITS}/{directory.name}", 0, message,
+                       act("agent", f"write {path.resolve()} with one finding-record-v1 line per "
+                       "finding of its AUDIT.md (specs/audits/AGENTS.md)")))  # fmt: skip
             continue
         out.extend(
-            findings_findings(
-                path.read_text(encoding="utf-8"), f"{AUDITS}/{directory.name}/{FINDINGS}"
+            live_findings(
+                read_text(path),
+                f"{AUDITS}/{directory.name}/{FINDINGS}",
+                specs.resolve(),
             )
         )
     archive = specs / HISTO
     if archive.is_file():
-        out.extend(histo_findings(archive.read_text(encoding="utf-8")))
-    for finding in out:
-        finding["code"] = CODE
+        out.extend(archive_findings(read_text(archive), specs.resolve()))
     return out

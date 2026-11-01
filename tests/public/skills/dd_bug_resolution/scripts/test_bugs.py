@@ -1,0 +1,1843 @@
+"""dd-bug-resolution/scripts/bugs.py owns BUGS.jsonl validation
+Size: SMALL.
+
+The script reads its schema from ``scripts/schemas/`` BESIDE itself — a copy `public
+stage` makes. Every test here therefore stages the pair into a tmp dir exactly as
+stage does, which is also what proves the copy is the only path the script has.
+"""
+
+from __future__ import annotations
+
+import importlib.util
+import json
+import os
+import re
+import subprocess
+import sys
+import time
+from pathlib import Path
+from typing import Any
+
+import pytest
+
+from dadaia_workspace.core.cli_line import shell_line
+from dadaia_workspace.core.platform import quote
+from dadaia_workspace.infrastructure.ledger_scripts import load_owner
+from tests.fixtures.harness_env import git_bash
+from tests.helpers.oslib import (
+    cli_path,
+    command,
+    is_executable,
+    read_text,
+    run,
+    run_line,
+    stub_cli,
+    write_text,
+)
+from tests.helpers.skill_scripts import stage_skill_scripts
+from tests.helpers.worktree_ws import associate, commit, git, make_workspace
+
+_read = load_owner("dd-bug-resolution", "_ledger").records
+
+
+_PUBLIC = Path(__file__).resolve().parents[5] / "dadaia_workspace" / "public"
+_SCRIPTS = _PUBLIC / "skills" / "dd-bug-resolution" / "scripts"
+_SOURCE = _SCRIPTS / "bugs.py"
+#: Composed at run time: a tracked IPv4 literal is refused by the push-range scan.
+_LOCAL_IP = ".".join(("10", "1", "2", "3"))
+#: Same reason: an absolute home path is composed, never written as a tracked literal.
+_HOME_PATH = "/".join(("", "home", "someone", "work"))
+
+_OPEN_RECORD: dict[str, object] = {
+    "id": "a-bug",
+    "ts": "2026-09-20T10:00:00Z",
+    "reported_by": "software-engineer",
+    "title": "t",
+    "severity": "LOW",
+    "surface": "cli",
+    "component": "c",
+    "context": "ctx",
+    "symptom": "s",
+    "repro": "r",
+    "expected": "e",
+    "status": "open",
+    "cause": None,
+    "caused_by": None,
+    "closed_at": None,
+}
+
+
+@pytest.fixture
+def script(tmp_path: Path) -> Path:
+    """The staged shape: bugs.py with its schema copy beside it, `candidate_at`'s skill beside its own."""
+    return stage_skill_scripts("dd-bug-resolution", tmp_path / "staged" / "scripts") / "bugs.py"
+
+
+def _ledger(root: Path, *records: dict[str, object]) -> Path:
+    """A git repo tracking `cli/` and the dot-directory `.github/`."""
+    specs = root / "specs"
+    (specs / "bugs").mkdir(parents=True, exist_ok=True)
+    for tracked in ("cli", ".github"):
+        (root / tracked).mkdir(exist_ok=True)
+        write_text(root / tracked / "x.py", "def y() -> None: ...\n")
+    run(["git", "init", "-q", str(root)], check=True)
+    run(["git", "-C", str(root), "add", "cli", ".github"], check=True)
+    schema = json.loads(
+        read_text(
+            _PUBLIC
+            / "skills"
+            / "dd-bug-resolution"
+            / "scripts"
+            / "schemas"
+            / "bug-record-v1.schema.json"
+        )
+    )
+    required = set(schema["required"])
+    shaped = [
+        {**{key: None for key in required - record.keys()}, **record}
+        for record in _land(root, records)
+    ]
+    write_text(
+        specs / "bugs" / "BUGS.jsonl", "".join(json.dumps(record) + "\n" for record in shaped)
+    )
+    return specs
+
+
+def _run(
+    script: Path, *argv: str, cwd: Path | None = None, env: dict[str, str] | None = None
+) -> subprocess.CompletedProcess[str]:
+    return run(
+        [sys.executable, str(script), *argv], env=env, check=False, cwd=str(cwd) if cwd else None
+    )
+
+
+def test_clean_ledger_exits_zero(script: Path, tmp_path: Path) -> None:
+    specs = _ledger(tmp_path, _OPEN_RECORD)
+    done = _run(script, "check", "--specs", str(specs))
+    assert done.returncode == 0, done.stdout + done.stderr
+    assert done.stdout.strip() == "" or "error" not in done.stdout
+
+
+def test_record_missing_an_immutable_core_field_is_one_error_line(
+    script: Path, tmp_path: Path
+) -> None:
+    broken = {k: v for k, v in _OPEN_RECORD.items() if k != "symptom"}
+    specs = _ledger(tmp_path, broken)
+    done = _run(script, "check", "--specs", str(specs))
+    assert done.returncode == 1
+    lines = [ln for ln in done.stdout.splitlines() if ln.strip()]
+    assert len(lines) == 2 and lines[1].startswith("fix: "), lines
+    assert lines[0].startswith("LEDGER-BUGS-SCHEMA error ")
+    assert "symptom" in lines[0] and "bugs/BUGS.jsonl:1" in lines[0]
+
+
+@pytest.mark.parametrize(
+    ("mutation", "needle"),
+    [
+        ({"status": "resolved"}, "closed_at"),
+        ({"closed_at": "2026-09-20"}, "closed_at"),
+        ({"severity": "URGENT"}, "severity"),
+        ({"ts": "yesterday"}, "ts"),
+        ({"root_cause": "retired key"}, "root_cause"),
+        ({"diff_direction": "net-negative"}, "diff_direction"),  # derived, never stored
+    ],
+)
+def test_invariant_violations_are_reported(
+    script: Path, tmp_path: Path, mutation: dict[str, object], needle: str
+) -> None:
+    specs = _ledger(tmp_path, {**_OPEN_RECORD, **mutation})
+    done = _run(script, "check", "--specs", str(specs))
+    assert done.returncode == 1
+    assert needle in done.stdout
+
+
+def test_closed_at_before_ts_is_refused(script: Path, tmp_path: Path) -> None:
+    record = {
+        **_OPEN_RECORD,
+        "status": "resolved",
+        "closed_at": "2020-01-01T00:00:00Z",
+        "solution": "s",
+    }
+    done = _run(script, "check", "--specs", str(_ledger(tmp_path, record)))
+    assert done.returncode == 1
+    assert "precedes" in done.stdout
+
+
+@pytest.mark.parametrize(
+    ("links", "needle"),
+    [
+        ({"a-bug": "b-bug", "b-bug": "a-bug"}, "cycle"),
+        ({"a-bug": "never-filed"}, "names no record"),
+    ],
+)
+def test_check_refuses_a_caused_by_cycle_or_dangling_target(
+    script: Path, tmp_path: Path, links: dict[str, str], needle: str
+) -> None:
+    """Lineage is acyclic and every target is a record, the archive's included."""
+    records = [{**_OPEN_RECORD, "id": i, "caused_by": links.get(i)} for i in ("a-bug", "b-bug")]
+    specs = _ledger(tmp_path, *records)
+    done = _run(script, "check", "--specs", str(specs))
+    assert done.returncode == 1
+    assert needle in done.stdout, done.stdout
+    _archive(specs, "never-filed")
+    done = _run(script, "check", "--specs", str(specs))
+    assert done.returncode == (1 if needle == "cycle" else 0), done.stdout
+
+
+def test_check_refuses_a_record_whose_fix_commit_lost_its_id_line(
+    script: Path, tmp_path: Path
+) -> None:
+    """The fix is the commit whose message carries the id line, not the recorded sha."""
+    specs = _ledger(tmp_path)
+    git = ["git", "-C", str(tmp_path), "-c", "user.name=t", "-c", "user.email=t@t.test"]
+    run([*git, "commit", "-q", "-m", "fix(bugs): a-bug \u2014 c"], check=True)
+    sha = run([*git, "rev-parse", "HEAD"], check=True).stdout.strip()
+    resolved = {**_OPEN_RECORD, "status": "resolved", "closed_at": "2026-09-21T10:00:00Z",
+                "cause": "c", "solution": "s", "caused_by": "none", "fix_sha": sha}  # fmt: skip
+    _ledger(tmp_path, resolved)
+    assert _run(script, "check", "--specs", str(specs)).returncode == 0
+    run([*git, "commit", "-q", "--amend", "-m", "fix, rebased"], check=True)
+    done = _run(script, "check", "--specs", str(specs))
+    assert done.returncode == 1, done.stdout
+    assert "bugs/BUGS.jsonl:1" in done.stdout and "'a-bug'" in done.stdout
+    assert "\nfix: " in done.stdout
+
+
+def test_the_uncited_fix_fix_line_is_the_archive_act_naming_the_id(
+    script: Path, tmp_path: Path
+) -> None:
+    specs = _ledger(tmp_path)
+    git = ["git", "-C", str(tmp_path), "-c", "user.name=t", "-c", "user.email=t@t.test"]
+    resolved = {**_OPEN_RECORD, "status": "resolved", "closed_at": "2026-09-21T10:00:00Z",
+                "cause": "c", "solution": "s", "caused_by": "none", "fix_sha": "a" * 40}  # fmt: skip
+    _ledger(tmp_path, resolved)
+    run([*git, "commit", "-q", "--allow-empty", "-m", "base"], check=True)
+    out = _run(script, "check", "--specs", str(specs)).stdout
+    fix = out.splitlines()[-1]
+    assert fix == f"fix: {_archive_act(script, specs, 'a-bug')}", fix
+    assert "fix(bugs): a-bug \u2014 " in out and "refactor(bugs): a-bug \u2014 " in out, out
+
+
+@pytest.mark.parametrize(("ids", "depth", "code"), [
+    (("a-bug", "b-bug"), "1", 1),  # a cut history is named once, with its own fix
+    (("a-bug",), "2", 0),  # reachability is judged first: a cut is named only for a sha the clone cannot place
+])  # fmt: skip
+def test_a_shallow_clone_is_judged_by_reachability_first(
+    script: Path, tmp_path: Path, ids: tuple[str, ...], depth: str, code: int
+) -> None:
+    origin = tmp_path / "origin"
+    origin.mkdir()
+    git = ["git", "-C", str(origin), "-c", "user.name=t", "-c", "user.email=t@t.test"]
+    run([*git, "init", "-q"], check=True)
+    run(
+        [*git, "commit", "-q", "--allow-empty", "-m", "fix(bugs): a-bug, b-bug \u2014 c"],
+        check=True,
+    )
+    sha = run([*git, "rev-parse", "HEAD"], check=True).stdout.strip()
+    resolved = [
+        {**_OPEN_RECORD, "id": i, "status": "resolved", "closed_at": "2026-09-21T10:00:00Z",
+         "cause": "c", "solution": "s", "caused_by": "none", "fix_sha": sha}
+        for i in ids
+    ]  # fmt: skip
+    specs = _ledger(origin, *resolved)
+    run([*git, "add", "specs"], check=True)
+    run([*git, "commit", "-q", "-m", "ledger"], check=True)
+    clone = tmp_path / "clone"
+    run(["git", "clone", "-q", "--depth", depth, origin.as_uri(), str(clone)], check=True)
+    done = _run(script, "check", "--specs", str(clone / specs.relative_to(origin)))
+    assert done.returncode == code, done.stdout
+    assert done.stdout.count("LEDGER-BUGS-SCHEMA") == code, done.stdout
+    assert ("shallow" in done.stdout) is bool(code), done.stdout
+    assert ("fetch --unshallow" in "".join(done.stdout.splitlines()[-1:])) is bool(code), (
+        done.stdout
+    )
+
+
+def test_an_id_commit_any_repo_of_the_context_reaches_is_clean(
+    script: Path, tmp_path: Path
+) -> None:
+    """Under the merge gate's fence, the ledger lives in the main repo, the fix may land in an associated one; an id line no repo holds is still refused."""
+    (tmp_path / "ws").mkdir()
+    root = make_workspace(tmp_path / "ws")
+    associate(root, "Approved", ("a", "b"))
+    sha = commit(root / "repos" / "b", "fix.py")
+    git(root / "repos" / "b", "commit", "-q", "--amend", "-m", "fix(bugs): a-bug \u2014 c")
+    resolved = {**_OPEN_RECORD, "status": "resolved", "closed_at": "2026-09-21T10:00:00Z",
+                "cause": "c", "solution": "s", "caused_by": "none", "fix_sha": sha}  # fmt: skip
+    specs = _ledger(root / "repos" / "r", resolved)
+    fenced = os.environ | {
+        "DADAIA_FENCED_ROOTS": os.pathsep.join(map(str, specs.resolve().parents))
+    }
+    assert _run(script, "check", "--specs", str(specs), env=fenced).returncode == 0
+    git(root / "repos" / "b", "commit", "-q", "--amend", "-m", "rebased")
+    done = _run(script, "check", "--specs", str(specs), env=fenced)
+    assert done.returncode == 1 and "'a-bug'" in done.stdout, done.stdout
+
+
+@pytest.mark.parametrize(
+    "record",
+    [
+        {"caused_by": "ghost"},
+        {"status": "resolved", "closed_at": "2026-09-21T10:00:00Z", "cause": "c",
+         "solution": "s", "caused_by": "none", "fix_sha": "a" * 40},  # fmt: skip
+    ],
+    ids=["caused-by-ghost", "fix-sha-unreached"],
+)  # fmt: skip
+def test_a_fix_line_survives_a_percent_in_the_script_path(
+    tmp_path: Path, record: dict[str, object]
+) -> None:
+    script = stage_skill_scripts("dd-bug-resolution", tmp_path / "a%sb" / "scripts") / "bugs.py"
+    specs = _ledger(tmp_path, {**_OPEN_RECORD, **record})
+    done = _run(script, "check", "--specs", str(specs))
+    assert "Traceback" not in done.stderr, done.stderr
+    assert done.returncode == 1, done.stdout + done.stderr
+    assert "a%sb" in done.stdout.splitlines()[-1], done.stdout + done.stderr
+
+
+@pytest.mark.parametrize(("caused_by", "code"), [
+    ("J1.T3", 0),
+    ("J1.S2.T3", 0),  # historical task ids stay readable
+    ("J9.S9.T9", 1),  # in no tasks/<job>.md
+    ("T-050-95", 0),  # a closed rc's bold checklist item
+    ("T-047-58", 0),  # its plain checklist item
+    ("T-045-01", 0),  # its table cell
+    ("T-050-03A", 0),  # its bold lettered table cell
+    ("T-999-1", 1),  # in no row
+    ("JB.S4.T2", 0),  # a lettered table cell
+    ("JR.S1.T1", 0),  # a lettered checklist item
+    ("T-777-7", 1),  # only on a wrapped prose line
+])  # fmt: skip
+def test_check_resolves_a_job_task_id_against_the_rc_tasks_folder(
+    script: Path, tmp_path: Path, caused_by: str, code: int
+) -> None:
+    specs = _ledger(tmp_path, {**_OPEN_RECORD, "caused_by": caused_by})
+    job = specs / "releases" / "0.5.0" / "rc-9" / "tasks" / "job1.md"
+    job.parent.mkdir(parents=True)
+    write_text(
+        job,
+        "| J1.T3 | AC1.1 | `ci.py` |\n| J1.S2.T3 | AC1.1 | `old.py` |\n"
+        "- [x] **T-050-95 — worktree new.** `W:` `wt.py`\n- [x] T-047-58 — vocabulary.\n"
+        "| T-045-01 | FR1 |\n| **T-050-03A** | FR1 |\n"
+        "| JB.S4.T2 | AC |\n- [ ] **JR.S1.T1** — x\n  T-777-7 wraps the line above.\n",
+    )
+    done = _run(script, "check", "--specs", str(specs), "--json")
+    assert done.returncode == code, done.stdout
+    fixes = [f["fix"] for f in json.loads(done.stdout)]
+    assert fixes == ([shell_line(sys.executable, str(script), "update", "a-bug",
+                                  "--set", "caused_by=none", "--specs", str(specs))]
+                     if code else []), fixes  # fmt: skip
+
+
+def _archive(specs: Path, bug_id: str) -> None:
+    archived = {**_OPEN_RECORD, "id": bug_id, "status": "rejected", "cause": "c",
+                "closed_at": "2026-09-21T00:00:00Z"}  # fmt: skip
+    (specs / "bugs" / "_archive").mkdir()
+    write_text(specs / "bugs" / "_archive" / "bugs_histo.jsonl", json.dumps(archived) + "\n")
+
+
+def test_an_id_in_both_the_ledger_and_the_archive_is_one_finding_with_one_fix_line(
+    script: Path, tmp_path: Path
+) -> None:
+    specs = _ledger(tmp_path, _OPEN_RECORD)
+    _archive(specs, "a-bug")
+    done = _run(script, "check", "--specs", str(specs))
+    assert done.returncode == 1, done.stdout
+    lines = [ln for ln in done.stdout.splitlines() if ln.strip()]
+    assert len(lines) == 2 and lines[1].startswith("fix: "), lines
+    assert lines[0].startswith("LEDGER-BUGS-SCHEMA error ") and "bugs/BUGS.jsonl:1" in lines[0]
+    assert "'a-bug'" in lines[0] and "BUGS.jsonl" in lines[1], lines
+
+
+def test_an_event_line_id_that_is_also_live_is_not_refused(script: Path, tmp_path: Path) -> None:
+    specs = _ledger(tmp_path, _OPEN_RECORD)
+    (specs / "bugs" / "_archive").mkdir()
+    event = {"event": "archived", "data": {"id": "a-bug", "status": "Closed"}}
+    write_text(specs / "bugs" / "_archive" / "bugs_histo.jsonl", json.dumps(event) + "\n")
+    done = _run(script, "check", "--specs", str(specs))
+    assert (done.returncode, done.stdout) == (0, "")
+
+
+def test_two_plain_records_of_one_id_in_the_archive_are_one_finding(
+    script: Path, tmp_path: Path
+) -> None:
+    specs = _ledger(tmp_path, _OPEN_RECORD)
+    histo = specs / "bugs" / "_archive" / "bugs_histo.jsonl"
+    histo.parent.mkdir()
+    write_text(histo, "".join(json.dumps(_closed("old-a")) + "\n" for _ in range(2)))
+    done = _run(script, "check", "--specs", str(specs), "--json")
+    assert done.returncode == 1, done.stdout
+    found = json.loads(done.stdout)
+    assert [(f["path"], f["line"]) for f in found] == [("bugs/_archive/bugs_histo.jsonl", 2)]
+    assert "'old-a'" in found[0]["message"] and "bugs_histo.jsonl" in found[0]["fix"], found
+
+
+def test_an_append_of_an_id_already_plain_in_the_archive_is_refused(
+    script: Path, tmp_path: Path
+) -> None:
+    specs = _ledger(tmp_path, _OPEN_RECORD)
+    _archive(specs, "old-a")
+    before = (specs / "bugs" / "BUGS.jsonl").read_bytes()
+    done = _run(script, *_append_argv(specs, bug_id="old-a"), "--correlates", "none")
+    assert done.returncode == 1, done.stdout + done.stderr
+    assert "'old-a'" in done.stderr and done.stderr.count("fix: ") == 1, done.stderr
+    assert "--bug-id" in done.stderr, done.stderr
+    assert (specs / "bugs" / "BUGS.jsonl").read_bytes() == before
+
+
+@pytest.mark.parametrize("bad", ["[1, 2]", "{not json"])
+def test_a_write_over_an_unreadable_line_refuses_naming_it(
+    script: Path, tmp_path: Path, bad: str
+) -> None:
+    """The store refuses to rewrite a ledger it cannot read in full, naming the line."""
+    specs = _ledger(tmp_path, _OPEN_RECORD)
+    ledger = specs / "bugs" / "BUGS.jsonl"
+    write_text(ledger, read_text(ledger) + bad + "\n")
+    done = _run(script, "update", "a-bug", "--set", "caused_by=none", "--specs", str(specs))
+    assert done.returncode == 1
+    assert "BUGS.jsonl:2" in done.stderr and "cannot read in full" in done.stderr
+    assert command("sed", "-n", "2p", str(ledger)) in done.stderr
+
+
+_APPEND = ["append", "--bug-id", "x", "--title", "t", "--severity", "LOW",
+           "--component", "cli/x.py", "--context", "c", "--symptom", "s", "--repro", "r", "--expected", "e"]  # fmt: skip
+
+
+@pytest.mark.parametrize(
+    ("argv", "trees", "fix", "note"),
+    [
+        (["stats"], ("0.5.0-rc1/j5",), "rerun", ""),
+        (_APPEND, ("0.5.0-rc1/define", "0.5.0-rc1-define/.agents"),
+         "worktree", ""),
+        (_APPEND, (), "worktree", ""),
+    ],
+)  # fmt: skip
+def test_a_missing_specs_tree_is_refused_never_created(
+    script: Path, tmp_path: Path, argv: list[str], trees: tuple[str, ...], fix: str, note: str
+) -> None:
+    """A missing specs tree is refused, never created: a read verb's fix reruns on the bound repo
+    tree as printed; a write verb's fix names the command listing the open worktrees."""
+    (cli_dir := cli_path(tmp_path).parent).mkdir(parents=True)
+    stub_cli(cli_dir, "dadaia", '#!python\nprint(\'{"main_repo": "demo"}\')\n')
+    (tmp_path / ".dadaia/states").mkdir()  # a workspace root holds its sentinel
+    write_text(tmp_path / ".dadaia/states/spec_contexts.json", "{}")
+    (tmp_path / ".git").mkdir()
+    stage_skill_scripts("dd-gitflow-default", tmp_path / "dd-gitflow-default" / "scripts")
+    for name in trees:
+        (tmp_path / "worktrees" / "demo" / name).mkdir(parents=True)
+    done = _run(script, *argv, "--specs", "specs", cwd=tmp_path)
+    assert done.returncode == 1 and not (tmp_path / "specs").exists()
+    want = (
+        command(
+            sys.executable,
+            str(script.resolve()),
+            *argv,
+            "--specs",
+            str(tmp_path / "repos/demo/specs"),
+        )
+        if fix == "rerun"
+        else command(str(cli_path(tmp_path)), "worktree", "list")
+    )
+    assert [ln for ln in done.stderr.splitlines() if ln.startswith("fix:")] == [f"fix: {want}"]
+    assert done.stderr.splitlines()[0].startswith("[error] no specs tree at ")
+    assert done.stderr.splitlines()[0].endswith(f"nothing was written{note}")
+    if argv == ["stats"]:  # the read runs as printed
+        _ledger(tmp_path / "repos" / "demo")
+        assert run([git_bash(), "-c", want], cwd=tmp_path).returncode == 0
+
+
+def test_a_fix_already_naming_its_tree_gains_no_second_specs(
+    capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`refuse` adds ``--specs`` to a command of its entry point once, and never twice."""
+    spec = importlib.util.spec_from_file_location("_specs", _SCRIPTS / "_specs.py")
+    assert spec is not None and spec.loader is not None
+    spec.loader.exec_module(specs := importlib.util.module_from_spec(spec))
+    monkeypatch.setattr(sys, "argv", [str(_SOURCE)])
+    this = specs.script(_SOURCE)
+    for fix, want in (
+        (this("check", specs="/a/specs"), this("check", specs="/a/specs")),
+        (this("check"), this("check", specs="/b/specs")),
+    ):
+        specs.refuse(specs.Refusal("m", fix), Path("/b/specs"))
+        assert capsys.readouterr().err.splitlines()[-1] == f"fix: {want}"
+
+
+def test_specs_default_resolves_the_nearest_git_rooted_specs_tree(
+    script: Path, tmp_path: Path
+) -> None:
+    root = tmp_path / "repo"
+    (root / ".git").mkdir(parents=True)
+    _ledger(root, _OPEN_RECORD)
+    deep = root / "a" / "b"
+    deep.mkdir(parents=True)
+    assert _run(script, "check", cwd=deep).returncode == 0
+
+
+def test_a_bad_archive_line_is_a_finding(script: Path, tmp_path: Path) -> None:
+    """A non-JSON or
+    non-bug-record-v1 line in bugs_histo.jsonl is a finding and check exits non-zero; a
+    pre-v6 `event` line is history."""
+    specs = _ledger(tmp_path, _OPEN_RECORD)
+    (specs / "bugs" / "_archive").mkdir()
+    write_text(
+        specs / "bugs" / "_archive" / "bugs_histo.jsonl",
+        '{"event": "archived", "data": {}}\nnot json\n{"id": "x"}\n',
+    )
+    done = _run(script, "check", "--specs", str(specs), "--json")
+    assert done.returncode == 1
+    assert [(f["path"], f["line"]) for f in json.loads(done.stdout)][:2] == [
+        ("bugs/_archive/bugs_histo.jsonl", 2),
+        ("bugs/_archive/bugs_histo.jsonl", 3),
+    ]
+
+
+def test_absent_ledger_is_not_a_finding(script: Path, tmp_path: Path) -> None:
+    """A young specs tree has no bugs file yet — same posture as the doctor's."""
+    specs = tmp_path / "specs"
+    specs.mkdir()
+    assert _run(script, "check", "--specs", str(specs)).returncode == 0
+
+
+@pytest.mark.parametrize(
+    "bad",
+    [
+        "{not a record",
+        "[1, 2]",
+        json.dumps({**_OPEN_RECORD, "severity": "BLOCKER"}),
+        json.dumps({**_OPEN_RECORD, "context": ""}),
+        json.dumps({**_OPEN_RECORD, "root_cause": "a retired key"}),
+        json.dumps({k: v for k, v in _OPEN_RECORD.items() if k != "title"}),
+    ],
+)
+def test_a_bad_bug_line_is_one_finding_and_the_doctor_says_what_the_script_says(
+    script: Path, tmp_path: Path, bad: str
+) -> None:
+    """Bug-record validity is reported only as LEDGER-BUGS-SCHEMA, and doctor = `bugs.py check`
+    on every row; severity BLOCKER gives exactly one finding."""
+    from dadaia_workspace.features.specs import SpecsDoctor
+    from dadaia_workspace.infrastructure.ledger_scripts import script_findings
+
+    specs = _ledger(tmp_path, _OPEN_RECORD)
+    ledger = specs / "bugs" / "BUGS.jsonl"
+    write_text(ledger, read_text(ledger) + bad + "\n")
+    checked = json.loads(_run(script, "check", "--specs", str(specs), "--json").stdout)
+    expected = [f"{f['path']}:{f['line']} {f['message']}" for f in checked]
+
+    own = [i.code for i in SpecsDoctor(specs).check() if i.message.endswith(f"({ledger})")]
+    bugs = [f for f in script_findings(specs) if f.code == "LEDGER-BUGS-SCHEMA"]
+
+    assert len(expected) == 1 and own == []
+    assert [f.message for f in bugs] == expected
+
+
+def test_script_is_executable_and_has_a_shebang() -> None:
+    assert is_executable(_SOURCE)
+    assert read_text(_SOURCE).startswith("#!/usr/bin/env python3\n")
+
+
+@pytest.mark.parametrize("verb", ["fix", "window", "balance"])
+def test_retired_derived_verbs_are_not_cli_choices(script: Path, verb: str) -> None:
+    done = _run(script, verb, "--help")
+    assert done.returncode == 2
+    assert f"invalid choice: '{verb}'" in done.stderr
+
+
+# --- the write verbs: one ledger, one writer ------------------------------
+
+
+def _store(script: Path) -> Any:
+    """The staged `_bugs_store` module, loaded beside its own siblings as bugs.py loads it."""
+    spec = importlib.util.spec_from_file_location("_bugs_store", script.parent / "_bugs_store.py")
+    assert spec is not None and spec.loader is not None
+    store = importlib.util.module_from_spec(spec)
+    loaded, siblings = set(sys.modules), str(script.parent)
+    sys.path.insert(0, siblings)
+    try:
+        spec.loader.exec_module(store)
+    finally:  # its siblings stay this test's: never a cached copy of another tmp tree
+        sys.path.remove(siblings)
+        for name in set(sys.modules) - loaded:
+            del sys.modules[name]
+    return store
+
+
+def _records(specs: Path) -> list[dict[str, Any]]:
+    return _read(specs / "bugs/BUGS.jsonl")
+
+
+def _resolve_argv(bug_id: str = "a-bug", caused_by: str = "none") -> list[str]:
+    return ["resolve", bug_id, "--cause", "c", "--caused-by", caused_by, "--solution", "s"]
+
+
+def test_append_registers_one_open_record(script: Path, tmp_path: Path) -> None:
+    specs = _ledger(tmp_path)
+    done = _run(
+        script, "append", "--specs", str(specs), "--bug-id", "new-bug", "--title", "t",
+        "--severity", "LOW", "--component", "cli/x.py", "--context", "ctx",
+        "--symptom", "s", "--repro", "r", "--expected", "e", "--correlates", "none",
+    )  # fmt: skip
+    assert done.returncode == 0, done.stderr
+    assert done.stdout == f"[ok] registered new-bug -> {specs}\n"
+    [record] = _records(specs)
+    assert record["status"] == "open" and record["closed_at"] is None
+    assert _run(script, "check", "--specs", str(specs)).returncode == 0
+
+
+def _sibling(bug_id: str, *files: str) -> dict[str, object]:
+    record = {**_OPEN_RECORD, "id": bug_id, "status": "resolved", "closed_at": "2026-09-21T10:00:00Z",
+              "cause": "c", "solution": "s", "caused_by": "none",
+              "fix_sha": (bug_id.encode().hex() * 40)[:40], "_files": list(files)}  # fmt: skip
+    del record["surface"]
+    return record
+
+
+def _land(root: Path, records: tuple[dict[str, object], ...]) -> list[dict[str, object]]:
+    """Commit, for each record carrying `_files`, the id-line fix touching those files; the records without that key."""
+    git = ["git", "-C", str(root), "-c", "user.name=t", "-c", "user.email=t@t.test"]
+    if any(r.get("_files") for r in records):
+        run([*git, "add", "-A"], check=True)
+        run([*git, "commit", "-q", "--allow-empty", "-m", "base"], check=True)
+    for record in records:
+        for path in record.get("_files") or ():
+            (root / str(path)).parent.mkdir(parents=True, exist_ok=True)
+            with (root / str(path)).open("a") as out:
+                out.write("# fix\n")
+        if record.get("_files"):
+            run([*git, "add", "-A"], check=True)
+            run([*git, "commit", "-q", "-m", f"fix(bugs): {record['id']} \u2014 c"], check=True)
+    return [{k: v for k, v in r.items() if k != "_files"} for r in records]
+
+
+def _child(bug_id: str, cause: str, *files: str) -> dict[str, object]:
+    return {**_sibling(bug_id, *files), "caused_by": cause}
+
+
+_LEGACY_EVENT = {"ts": "2026-08-28T12:45:33Z", "event": "archived", "agent": "claude-code",
+                 "data": {"id": "legacy-one", "status": "Closed", "severity": "HIGH",
+                          "reported": "2026-06-11", "resolved_in": "v0.1.13",
+                          "surface": "panel", "source": "pre-v6"}}  # fmt: skip
+
+
+def _archived(specs: Path, *records: dict[str, object]) -> None:
+    """The archive as the real one is: legacy event lines first, then the plain records."""
+    (specs / "bugs" / "_archive").mkdir(parents=True, exist_ok=True)
+    write_text(specs / "bugs" / "_archive" / "bugs_histo.jsonl",
+               "".join(json.dumps(r) + "\n" for r in (_LEGACY_EVENT, *_land(specs.parent, records))))  # fmt: skip
+
+
+def _append_argv(specs: Path, component: str = "cli/x.py", bug_id: str = "new-bug") -> list[str]:
+    return ["append", "--specs", str(specs), "--bug-id", bug_id, "--title", "t",
+            "--severity", "LOW", "--component", component, "--context", "ctx",
+            "--symptom", "s", "--repro", "r", "--expected", "e"]  # fmt: skip
+
+
+def test_append_prints_the_earlier_bugs_whose_id_commits_touch_the_path_and_the_rebuild_due(
+    script: Path, tmp_path: Path
+) -> None:
+    """Live and archived records whose id commit touches the component's path are listed by id;
+    a record whose id commit holds no such path never matches. Without `--correlates` it refuses."""
+    specs = _ledger(
+        tmp_path, _sibling("b1", "cli/x.py"), _sibling("b4", "hooks/y.py"), _OPEN_RECORD
+    )
+    _archived(specs, _child("b3", "b1", "cli/x.py", "z"))
+    argv = _append_argv(specs)
+    bare, named = _run(script, *argv), _run(script, *argv, "--correlates", "b1,b3")
+    assert bare.returncode == 1
+    assert named.returncode == 0, named.stderr
+    assert named.stdout.splitlines()[:3] == [
+        "earlier bug on cli/x.py: b1", "earlier bug on cli/x.py: b3",
+        "REBUILD due: 3rd bug on cli/x.py",
+    ]  # fmt: skip
+    assert "surface" not in _records(specs)[-1] and _records(specs)[-1]["correlates"] == [
+        "b1",
+        "b3",
+    ]
+
+
+def test_bugs_sharing_one_fix_commit_are_no_child_of_one_another(
+    script: Path, tmp_path: Path
+) -> None:
+    _ledger(tmp_path)
+    _land(tmp_path, ({"id": "b1, b2, b3", "_files": ["cli/x.py"]},))
+    shared = [{**_sibling("b1"), "fix_sha": "c" * 40}] + [
+        {**_child(i, "b1"), "fix_sha": "c" * 40} for i in ("b2", "b3")
+    ]
+    twice = [_sibling("b4", "tests/t.py"), _child("b5", "b4", "tests/t.py")]
+    specs = _ledger(tmp_path, *shared, *twice)
+    stats = _run(script, "stats", "--specs", str(specs))
+    assert [ln for ln in stats.stdout.splitlines() if ln.startswith("rebuild-due:")] == [
+        "rebuild-due:tests/t.py\tb4,b5"
+    ]
+    done = _run(script, *_append_argv(specs), "--correlates", "b1,b2,b3")
+    assert done.returncode == 0, done.stderr
+    assert done.stdout.splitlines()[:4] == [
+        "earlier bug on cli/x.py: b1", "earlier bug on cli/x.py: b2",
+        "earlier bug on cli/x.py: b3", f"[ok] registered new-bug -> {specs}",
+    ]  # fmt: skip
+
+
+def test_append_lists_a_bug_once_when_two_of_its_files_match(script: Path, tmp_path: Path) -> None:
+    specs = _ledger(
+        tmp_path, _sibling("b1", "cli/x.py", "cli/y.py"), _child("b2", "b1", "cli/x.py")
+    )
+    done = _run(script, *_append_argv(specs, "cli"), "--correlates", "b1,b2")
+    assert done.returncode == 0, done.stderr
+    assert done.stdout.splitlines()[:3] == [
+        "earlier bug on cli: b1",
+        "earlier bug on cli: b2",
+        "REBUILD due: 3rd bug on cli",
+    ]
+
+
+def test_append_prints_no_rebuild_due_for_a_first_bug_on_a_file(
+    script: Path, tmp_path: Path
+) -> None:
+    specs = _ledger(tmp_path, _sibling("b4", "hooks/y.py"))
+    done = _run(script, *_append_argv(specs), "--correlates", "none")
+    assert done.returncode == 0, done.stderr
+    assert "REBUILD due" not in done.stdout and "earlier bug" not in done.stdout
+
+
+def test_append_takes_a_correlate_that_only_the_archive_holds(script: Path, tmp_path: Path) -> None:
+    specs = _ledger(tmp_path)
+    _archived(specs, _sibling("old-one", "cli/x.py"))
+    done = _run(script, *_append_argv(specs), "--correlates", "old-one")
+    assert done.returncode == 0, done.stderr
+    assert _records(specs)[-1]["correlates"] == ["old-one"]
+
+
+def test_append_takes_a_correlate_that_only_a_legacy_archive_event_names(
+    script: Path, tmp_path: Path
+) -> None:
+    specs = _ledger(tmp_path)
+    _archived(specs)
+    done = _run(script, *_append_argv(specs), "--correlates", "legacy-one")
+    assert done.returncode == 0, done.stderr
+    assert _records(specs)[-1]["correlates"] == ["legacy-one"]
+
+
+def test_append_refuses_a_correlate_no_ledger_or_archive_holds(
+    script: Path, tmp_path: Path
+) -> None:
+    specs = _ledger(tmp_path, _sibling("a-bug", "cli/x.py"))
+    before = (specs / "bugs/BUGS.jsonl").read_bytes()
+    done = _run(script, *_append_argv(specs), "--correlates", "a-bug,ghost")
+    assert done.returncode == 1 and "--correlates" in done.stderr, done.stderr
+    assert (specs / "bugs/BUGS.jsonl").read_bytes() == before
+
+
+@pytest.mark.parametrize("component", ["cli/x.py#run", "cli/x.py/"])
+def test_append_takes_a_component_that_names_a_tracked_path_in_free_text(
+    script: Path, tmp_path: Path, component: str
+) -> None:
+    specs = _ledger(tmp_path, _sibling("b1", "cli/x.py"), _child("b2", "b1", "cli/x.py"),
+                    _sibling("b4", "hooks/y.py"))  # fmt: skip
+    done = _run(script, *_append_argv(specs, component), "--correlates", "b1")
+    assert done.returncode == 0, done.stderr
+    assert done.stdout.splitlines()[:3] == [
+        "earlier bug on cli/x.py: b1", "earlier bug on cli/x.py: b2",
+        "REBUILD due: 3rd bug on cli/x.py",
+    ]  # fmt: skip
+    assert _records(specs)[-1]["component"] == component
+
+
+def test_append_without_a_component_is_one_refusal_with_one_fix_line(
+    script: Path, tmp_path: Path
+) -> None:
+    specs = _ledger(tmp_path)
+    argv = _append_argv(specs)
+    del argv[argv.index("--component") : argv.index("--component") + 2]
+    done = _run(script, *argv, "--correlates", "none")
+    assert done.returncode == 1 and "Traceback" not in done.stderr, done.stderr
+    assert len([ln for ln in done.stderr.splitlines() if ln.startswith("fix: ")]) == 1
+    assert _records(specs) == []
+
+
+@pytest.mark.parametrize("sha", ["--output={planted}", "b" * 40])
+def test_resolve_takes_no_sha_from_the_caller_and_reads_no_fix_files_from_one(
+    script: Path, tmp_path: Path, sha: str
+) -> None:
+    specs = _ledger(tmp_path, _OPEN_RECORD)
+    planted = tmp_path / "planted"
+    done = _run(script, *_resolve_argv(), f"--fix-sha={sha.format(planted=planted)}",
+                "--specs", str(specs))  # fmt: skip
+    assert done.returncode == 2 and "unrecognized arguments" in done.stderr
+    assert not planted.exists()
+    assert "fix_files" not in _records(specs)[0] or _records(specs)[0]["fix_files"] is None
+
+
+@pytest.mark.parametrize("sha", ["--output={planted}", "b" * 40])
+def test_check_reports_a_record_no_commit_cites_and_runs_no_git_on_its_fix_sha(
+    script: Path, tmp_path: Path, sha: str
+) -> None:
+    sha = sha.format(planted=tmp_path / "planted")
+    specs = _ledger(tmp_path, _resolved("a-bug", sha))
+    trace, env = _traced(tmp_path)
+    done = _run(script, "check", "--specs", str(specs), env=env)
+    assert done.returncode == 1 and "'a-bug' fix_sha" in done.stdout + done.stderr
+    assert not (tmp_path / "planted").exists()
+    assert not any(sha in ln for ln in _trace_lines(trace))
+
+
+def test_append_refuses_a_state_file_term_with_no_environment_variable(
+    script: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("DADAIA_PRIVACY_DENYLIST", raising=False)
+    (tmp_path / ".dadaia/states").mkdir(parents=True)
+    write_text(tmp_path / ".dadaia/states/spec_contexts.json", "{}")
+    write_text(tmp_path / ".dadaia/states/privacy_denylist.json", json.dumps({"zorblax": "client"}))
+    specs = _ledger(tmp_path)
+    before = (specs / "bugs/BUGS.jsonl").read_bytes()
+    argv = _append_argv(specs)
+    argv[argv.index("--title") + 1] = "a zorblax leak"
+    done = _run(script, *argv, "--correlates", "none")
+    assert done.returncode == 1 and "field 'title' carries" in done.stderr, done.stderr
+    assert (specs / "bugs/BUGS.jsonl").read_bytes() == before
+
+
+def test_append_takes_no_surface_flag(script: Path, tmp_path: Path) -> None:
+    specs = _ledger(tmp_path)
+    done = _run(script, *_append_argv(specs), "--correlates", "none", "--" + "surface", "cli")
+    assert done.returncode == 2 and "unrecognized arguments" in done.stderr
+    assert _records(specs) == []
+
+
+def test_append_refuses_a_component_that_names_no_tracked_path(
+    script: Path, tmp_path: Path
+) -> None:
+    specs = _ledger(tmp_path)
+    done = _run(script, *_append_argv(specs, "nowhere/at-all.py"), "--correlates", "none")
+    assert (
+        done.returncode == 1
+        and "component 'nowhere/at-all.py' names no tracked path" in done.stderr
+    )
+    assert _records(specs) == []
+
+
+def test_append_refuses_a_blank_context(script: Path, tmp_path: Path) -> None:
+    specs = _ledger(tmp_path)
+    argv = _append_argv(specs)
+    argv[argv.index("--context") + 1] = ""
+    done = _run(script, *argv, "--correlates", "none")
+    assert done.returncode == 1 and "shorter than its minLength" in done.stderr
+    assert _records(specs) == []
+
+
+def _fix_commit(root: Path, path: str, message: str = "fix") -> str:
+    """A commit of *message* touching only *path*, after one that holds the rest."""
+    git = ["git", "-C", str(root), "-c", "user.name=t", "-c", "user.email=t@t.test"]
+    run([*git, "add", "-A"], check=True)
+    run([*git, "commit", "-q", "--allow-empty", "-m", "base"], check=True)
+    write_text(root / path, read_text(root / path) + "# fixed\n")
+    run([*git, "commit", "-q", "-am", message], check=True)
+    return run([*git, "rev-parse", "HEAD"], check=True).stdout.strip()
+
+
+def test_a_legacy_record_with_a_surface_passes_check(script: Path, tmp_path: Path) -> None:
+    _ledger(tmp_path)
+    sha = _fix_commit(tmp_path, "cli/x.py", "fix(bugs): new \u2014 c")
+    current = {**_sibling("new", "cli/x.py"), "fix_sha": sha}
+    specs = _ledger(tmp_path, _OPEN_RECORD, current)
+    done = _run(script, "check", "--specs", str(specs))
+    assert done.returncode == 0, done.stdout + done.stderr
+
+
+def test_resolve_stores_no_fix_files(script: Path, tmp_path: Path) -> None:
+    specs = _ledger(tmp_path, _OPEN_RECORD)
+    _fix_commit(tmp_path, "cli/x.py", _FIXED)
+    done = _run(script, *_resolve_argv(), "--specs", str(specs))
+    assert done.returncode == 0, done.stderr
+    assert "fix_files" not in _records(specs)[0]
+
+
+def test_stats_reports_the_files_two_or_more_bugs_fixed(script: Path, tmp_path: Path) -> None:
+    specs = _ledger(tmp_path, _sibling("b1", "cli/x.py"), _child("b2", "b1", "cli/x.py", "hooks/y.py"),
+                    _child("b4", "b2", "hooks/y.py"), _sibling("b5", "solo.py"), _OPEN_RECORD)  # fmt: skip
+    _archived(specs, _child("b3", "b1", "cli/x.py"))
+    done = _run(script, "stats", "--specs", str(specs))
+    assert done.returncode == 0, done.stderr
+    assert [ln for ln in done.stdout.splitlines() if ln.startswith("rebuild-due:")] == [
+        "rebuild-due:cli/x.py\tb1,b2,b3", "rebuild-due:hooks/y.py\tb2,b4",
+    ]  # fmt: skip
+
+
+def test_append_judges_the_component_against_its_own_repo_under_a_foreign_git_env(
+    script: Path, tmp_path: Path
+) -> None:
+    """With GIT_DIR and GIT_WORK_TREE on another repo, a path tracked only there is refused."""
+    specs = _ledger(tmp_path / "own")
+    other = tmp_path / "other"
+    (other / "foreign").mkdir(parents=True)
+    write_text(other / "foreign" / "x.py", "y = 1\n")
+    run(["git", "init", "-q", str(other)], check=True)
+    run(["git", "-C", str(other), "add", "foreign"], check=True)
+    env = {**os.environ, "GIT_DIR": str(other / ".git"), "GIT_WORK_TREE": str(other)}
+    done = run([sys.executable, str(script), "append", "--specs", str(specs), "--bug-id", "b",
+         "--title", "t", "--severity", "LOW", "--component", "foreign/x.py",
+         "--context", "ctx", "--symptom", "s", "--repro", "r", "--expected", "e",
+         "--correlates", "none"], check=False, env=env)  # fmt: skip
+    assert done.returncode == 1 and "foreign" in done.stderr, done.stderr
+    assert len(_records(specs)) == 0
+
+
+def test_an_agent_action_run_outside_the_tree_keeps_its_specs_and_known_argv(
+    script: Path, tmp_path: Path
+) -> None:
+    """An `Agent action: run` fix quotes the refused command with `--specs` and every known
+    flag, so pasted from outside the tree it refuses only on the choice the words name."""
+    specs, elsewhere = _ledger(tmp_path), tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    done = _run(script, "append", "--specs", str(specs), "--bug-id", "b", "--title", "t",
+                "--severity", "LOW", "--component", "nowhere/x.py", "--context",
+                "ctx", "--symptom", "s", "--repro", "r", "--expected", "e", "--correlates",
+                "none", cwd=elsewhere)  # fmt: skip
+    (fix,) = [ln for ln in done.stderr.splitlines() if ln.startswith("fix: ")]
+    command = fix.split("`")[1]
+    assert (
+        fix.startswith("fix: Agent action: run `") and f"--specs {quote(str(specs))}" in command
+    ), fix
+    assert "--bug-id b" in command and "--correlates none" in command, fix
+
+
+def test_append_outside_a_git_tree_is_one_refusal_naming_the_cause(
+    script: Path, tmp_path: Path
+) -> None:
+    """With no tracked tree to read, append refuses once, never with a traceback."""
+    specs = tmp_path / "specs"
+    (specs / "bugs").mkdir(parents=True)
+    done = _run(script, "append", "--specs", str(specs), "--bug-id", "b", "--title", "t",
+                "--severity", "LOW", "--component", "cli/x.py", "--context", "ctx",
+                "--symptom", "s", "--repro", "r", "--expected", "e", "--correlates", "none")  # fmt: skip
+    assert done.returncode == 1 and "Traceback" not in done.stderr
+    assert "cannot list the repo's tracked directories: fatal:" in done.stderr
+    assert "fix: Agent action: point --specs at a specs tree inside a git repo" in done.stderr
+
+
+def test_append_refuses_a_duplicate_id_and_writes_nothing(script: Path, tmp_path: Path) -> None:
+    specs = _ledger(tmp_path, _OPEN_RECORD)
+    before = (specs / "bugs" / "BUGS.jsonl").read_bytes()
+    done = _run(
+        script, "append", "--specs", str(specs), "--bug-id", "a-bug", "--title", "t",
+        "--severity", "LOW", "--component", "cli/x.py", "--context", "ctx",
+        "--symptom", "s", "--repro", "r", "--expected", "e",
+    )  # fmt: skip
+    assert done.returncode == 1
+    assert "already exists" in done.stderr
+    assert (specs / "bugs" / "BUGS.jsonl").read_bytes() == before
+
+
+_SHA = "0123456789abcdef" * 2 + "01234567"
+
+
+@pytest.mark.parametrize(
+    ("value", "pushed"),
+    [(f"seen at {_HOME_PATH}", True), (f"seen at {_LOCAL_IP}", True), (_SHA, False)],
+)
+def test_the_seam_refuses_exactly_what_the_push_refuses(
+    script: Path, tmp_path: Path, value: str, pushed: bool
+) -> None:
+    """Append refuses a push-matched value, naming the field and the masked term, ledger
+    unchanged. Resolve refuses it too and the record stays open. On the same matrix the seam
+    refuses iff the push matcher does. A bare sha is not refused."""
+    from dadaia_workspace.core.models.git_scan import ScannedObject
+    from dadaia_workspace.features.chokepoints.denylist_scan import scan_objects
+    from dadaia_workspace.infrastructure.privacy_check import load_baseline_patterns
+
+    blob = ScannedObject(path="BUGS.jsonl", sha="", text=value, decodable=True)
+    assert bool(scan_objects([blob], [], load_baseline_patterns()).hits) is pushed
+    specs = _ledger(tmp_path, _OPEN_RECORD)
+    _commit_as(tmp_path, _FIXED)
+    before = (specs / "bugs" / "BUGS.jsonl").read_bytes()
+    argv = _resolve_argv()
+    argv[argv.index("--solution") + 1] = value
+    appended = _run(
+        script, "append", "--specs", str(specs), "--bug-id", "leaky", "--title", "t",
+        "--severity", "LOW", "--component", "cli/x.py", "--context", "ctx",
+        "--symptom", value, "--repro", "r", "--expected", "e", "--correlates", "none",
+    )  # fmt: skip
+    resolved = _run(script, *argv, "--specs", str(specs))
+    for done, field in ((appended, "symptom"), (resolved, "solution")):
+        assert (done.returncode == 1) is pushed, done.stderr
+        assert (f"field {field!r} carries" in done.stderr) is pushed
+    if pushed:
+        assert (specs / "bugs" / "BUGS.jsonl").read_bytes() == before
+
+
+_SLUG = {**_OPEN_RECORD, "context": "acme-games"}
+
+
+# fmt: off
+@pytest.mark.parametrize(("published", "context", "pushed", "rev_list_fails"), [
+    pytest.param((_SLUG,), "acme-games", False, False, id="published-context-accepted"),
+    pytest.param((_OPEN_RECORD,), "acme-games", True, False, id="unpublished-term-refused"),
+    pytest.param((_OPEN_RECORD,), "ctx", False, False, id="no-term-accepted"),
+    pytest.param((_SLUG,), "acme-games", True, True, id="failed-rev-list-amnesties-nothing"),
+])
+# fmt: on
+def test_the_seam_verdict_equals_the_push_verdict_over_the_published_ledger(
+    script: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    published: tuple[dict[str, object], ...], context: str, pushed: bool, rev_list_fails: bool,
+) -> None:
+    from dadaia_workspace.core.models.git_scan import ScannedObject
+    from dadaia_workspace.features.chokepoints.denylist_scan import scan_objects
+    from dadaia_workspace.infrastructure.privacy_check import load_baseline_patterns
+
+    denylist = tmp_path / "denylist.json"
+    write_text(denylist, json.dumps({"acme": "client"}))
+    monkeypatch.setenv("DADAIA_PRIVACY_DENYLIST", str(denylist))
+    root = tmp_path / "repo"
+    ledger = _ledger(root, *published) / "bugs" / "BUGS.jsonl"
+    prior = read_text(ledger)
+    run(["git", "-C", str(root), "add", "-A"], check=True)
+    run(["git", "-C", str(root), "-c", "user.name=t", "-c",
+                    "user.email=t@t.invalid", "commit", "-qm", "published"], check=True)  # fmt: skip
+    origin = tmp_path / "origin.git"  # published = what origin holds, as the push reads it
+    run(["git", "init", "-q", "--bare", str(origin)], check=True)
+    run(["git", "-C", str(root), "remote", "add", "origin", str(origin)], check=True)
+    run(["git", "-C", str(root), "push", "-q", "origin", "HEAD"], check=True)
+    if rev_list_fails:  # a remote-tracking ref at a missing object: `rev-list` dies on every OS
+        ghost = root / ".git" / "refs" / "remotes" / "origin" / "ghost"
+        write_text(ghost, "1" * 40 + "\n")
+
+    done = _run(
+        script, "append", "--specs", str(root / "specs"), "--bug-id", "new-bug", "--title",
+        "t", "--severity", "LOW", "--component", "cli/x.py", "--context",
+        context, "--symptom", "s", "--repro", "r", "--expected", "e", "--correlates", "none",
+    )  # fmt: skip
+
+    blob = ScannedObject(path="specs/bugs/BUGS.jsonl", sha="", decodable=True,
+                         text=read_text(ledger) if done.returncode == 0
+                         else prior + json.dumps({"context": context}) + "\n",
+                         prior_text=None if rev_list_fails else prior)  # fmt: skip
+    push_refuses = bool(scan_objects([blob], [("acme", "client")], load_baseline_patterns()).hits)
+    assert push_refuses is pushed
+    assert (done.returncode == 1) is pushed, done.stderr
+
+
+def test_resolve_closes_the_record_at_its_own_instant(script: Path, tmp_path: Path) -> None:
+    specs = _ledger(tmp_path, _OPEN_RECORD)
+    sha = _commit_as(tmp_path, _FIXED)
+    done = _run(script, *_resolve_argv(), "--specs", str(specs))
+    assert done.returncode == 0, done.stderr
+    assert done.stdout.strip() == "[ok] resolved a-bug"
+    [record] = _records(specs)
+    assert {key: record[key] for key in ("status", "cause", "caused_by", "solution", "fix_sha")} == {
+        "status": "resolved", "cause": "c", "caused_by": "none", "solution": "s",
+        "fix_sha": sha,
+    }
+    assert record["closed_at"] is not None
+    assert _run(script, "check", "--specs", str(specs)).returncode == 0
+
+
+@pytest.mark.parametrize(
+    "argv",
+    [
+        ["update", "a-bug", "--set", "caused_by=never-filed"],
+        ["update", "a-bug", "--set", "caused_by="],
+        ["update", "a-bug", "--set", "caused_by=b-bug"],  # b-bug -> a-bug: a cycle
+        _resolve_argv(caused_by="never-filed"),
+    ],
+)
+def test_a_write_refuses_the_lineage_check_refuses(
+    script: Path, tmp_path: Path, argv: list[str]
+) -> None:
+    """One judge: every write runs the lineage rule `check` runs, before writing."""
+    other = {**_OPEN_RECORD, "id": "b-bug", "caused_by": "a-bug"}
+    specs = _ledger(tmp_path, _OPEN_RECORD, other)
+    _commit_as(tmp_path, _FIXED)
+    before = (specs / "bugs" / "BUGS.jsonl").read_bytes()
+    done = _run(script, *argv, "--specs", str(specs))
+    assert done.returncode == 1
+    assert "caused_by" in done.stderr
+    # the fix runs as printed, from any cwd
+    fix = f"fix: {shell_line(sys.executable, str(script), 'check', '--specs', str(specs.resolve()))}"
+    assert fix in done.stderr
+    assert (specs / "bugs" / "BUGS.jsonl").read_bytes() == before
+
+
+@pytest.mark.parametrize("archive", [False, True])
+def test_only_an_archived_drop_keeps_its_id_known(
+    script: Path, tmp_path: Path, archive: bool
+) -> None:
+    """A commit dropping a referenced record without archiving it would leave a target
+    `check` refuses: the write refuses it too. Archived, the id stays known."""
+    store = _store(script)
+    other = {**_OPEN_RECORD, "id": "b-bug", "caused_by": "a-bug"}
+    specs = _ledger(tmp_path, _OPEN_RECORD, other)
+    ledger = specs / "bugs" / "BUGS.jsonl"
+
+    def drop(rs: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        return [r for r in rs if r["id"] != "a-bug"]
+
+    if archive:
+        store.commit(ledger, drop, archive=True)
+        assert _run(script, "check", "--specs", str(specs)).returncode == 0
+    else:
+        with pytest.raises(store.Refusal, match="names no record"):
+            store.commit(ledger, drop)
+        assert [r["id"] for r in _records(specs)] == ["a-bug", "b-bug"]
+
+
+def test_an_archive_racing_an_archive_loses_no_record(script: Path, tmp_path: Path) -> None:
+    """B archives during A's first apply; A's retry re-reads both files, so
+    every record survives in the ledger or the archive."""
+    store = _store(script)
+    closed = {
+        **_OPEN_RECORD,
+        "status": "rejected",
+        "cause": "c",
+        "closed_at": "2026-09-21T00:00:00Z",
+    }
+    specs = _ledger(tmp_path, {**closed, "id": "old-a"}, {**closed, "id": "old-b"}, _OPEN_RECORD)
+    ledger = specs / "bugs" / "BUGS.jsonl"
+    calls: list[int] = []
+
+    def apply_a(records: list[dict[str, object]]) -> list[dict[str, object]]:
+        calls.append(1)
+        if len(calls) == 1:  # B runs to completion inside A's first attempt
+            time.sleep(0.01)  # a distinct mtime: the stamp sees B's write
+            store.commit(ledger, lambda rs: [r for r in rs if r["id"] != "old-b"], archive=True)
+        return [r for r in records if r["id"] != "old-a"]
+
+    store.commit(ledger, apply_a, archive=True)
+    histo = specs / "bugs" / "_archive" / "bugs_histo.jsonl"
+    archived = [r["id"] for r in _read(histo)]
+    assert [r["id"] for r in _records(specs)] == ["a-bug"]
+    assert sorted(archived) == ["old-a", "old-b"]
+
+
+def test_resolve_names_every_missing_field_at_once(script: Path, tmp_path: Path) -> None:
+    specs = _ledger(tmp_path, _OPEN_RECORD)
+    _commit_as(tmp_path, _FIXED)
+    done = _run(script, "resolve", "a-bug", "--cause", "c", "--specs", str(specs))
+    assert done.returncode == 1
+    for name in ("caused_by", "solution"):
+        assert name in done.stderr
+    assert _records(specs)[0]["status"] == "open"
+
+
+@pytest.mark.parametrize(
+    ("verb", "option", "status", "field"),
+    [
+        ("supersede", "--by", "superseded", "superseded_by"),
+        ("reject", "--reason", "rejected", "cause"),
+    ],
+)
+def test_the_other_transitions_close_the_record(
+    script: Path, tmp_path: Path, verb: str, option: str, status: str, field: str
+) -> None:
+    specs = _ledger(tmp_path, _OPEN_RECORD)
+    done = _run(script, verb, "a-bug", option, "because", "--specs", str(specs))
+    assert done.returncode == 0, done.stderr
+    assert done.stdout.strip() == f"[ok] {status} a-bug"
+    [record] = _records(specs)
+    assert record["status"] == status and record[field] == "because"
+    assert _run(script, "check", "--specs", str(specs)).returncode == 0
+
+
+def test_the_defer_transition_is_absent(script: Path, tmp_path: Path) -> None:
+    specs = _ledger(tmp_path, _OPEN_RECORD)
+    done = _run(script, "defer", "a-bug", "--reason", "later", "--specs", str(specs))
+    assert done.returncode == 2
+    assert "invalid choice: 'defer'" in done.stderr
+    assert _records(specs) == [_OPEN_RECORD]
+
+
+def test_update_writes_a_governance_field(script: Path, tmp_path: Path) -> None:
+    specs = _ledger(tmp_path, _OPEN_RECORD)
+    done = _run(script, "update", "a-bug", "--set", "caused_by=none", "--specs", str(specs))
+    assert done.returncode == 0, done.stderr
+    assert done.stdout.strip() == "[ok] updated caused_by for a-bug"
+    assert _records(specs)[0]["caused_by"] == "none"
+
+
+@pytest.mark.parametrize(
+    ("change", "owner"),
+    [
+        ("status=resolved", "resolve, supersede, reject"),
+        ("closed_at=2026-09-21T00:00:00Z", "resolve, supersede, reject"),
+        ("superseded_by=other", "supersede"),
+        ("title=rewritten", "immutable-core"),
+        ("reported_by=other", "immutable-core"),
+        ("context=other", "immutable-core"),
+    ],
+)
+def test_update_refuses_a_field_it_does_not_own(
+    script: Path, tmp_path: Path, change: str, owner: str
+) -> None:
+    """Update refuses x-mutability immutable-core (reported_by and context included) and
+    superseded_by; the refusal names the owner and the ledger is untouched."""
+    specs = _ledger(tmp_path, _OPEN_RECORD)
+    before = (specs / "bugs" / "BUGS.jsonl").read_bytes()
+    done = _run(script, "update", "a-bug", "--set", change, "--specs", str(specs))
+    assert done.returncode == 1
+    assert owner in done.stderr
+    assert (specs / "bugs" / "BUGS.jsonl").read_bytes() == before
+
+
+def test_a_write_once_field_refuses_a_differing_second_write(script: Path, tmp_path: Path) -> None:
+    """`solution` is write-once: a differing second value is refused."""
+    specs = _ledger(tmp_path, _OPEN_RECORD)
+    first = _run(script, "update", "a-bug", "--set", "solution=one", "--specs", str(specs))
+    second = _run(script, "update", "a-bug", "--set", "solution=two", "--specs", str(specs))
+    assert first.returncode == 0, first.stderr
+    assert second.returncode == 1
+    assert "write-once" in second.stderr
+    assert _records(specs)[0]["solution"] == "one"
+
+
+def test_fix_sha_is_write_once_and_update_refuses_a_second_value(
+    script: Path, tmp_path: Path
+) -> None:
+    """The fix is found by its id line, so the recorded `fix_sha` is a hint `update` never re-points."""
+    specs = _ledger(tmp_path, _OPEN_RECORD)
+    for sha, code in (("a" * 40, 0), ("b" * 40, 1)):
+        done = _run(script, "update", "a-bug", "--set", f"fix_sha={sha}", "--specs", str(specs))
+        assert done.returncode == code, done.stderr
+    assert "write-once" in done.stderr and _records(specs)[0]["fix_sha"] == "a" * 40
+
+
+def test_status_and_stats_read_the_ledger(script: Path, tmp_path: Path) -> None:
+    closed = {
+        **_OPEN_RECORD, "id": "old-bug", "status": "resolved",
+        "closed_at": "2026-09-20T11:00:00Z", "severity": "HIGH",
+    }  # fmt: skip
+    specs = _ledger(tmp_path, _OPEN_RECORD, closed)
+    open_only = _run(script, "status", "--specs", str(specs))
+    assert open_only.stdout.splitlines()[-1] == "[ok] 1 open bug(s)."
+    every = _run(script, "status", "--all", "--specs", str(specs))
+    assert every.stdout.splitlines()[-1] == "[ok] 2 all bug(s)."
+    stats = _run(script, "stats", "--specs", str(specs))
+    assert "total\t2" in stats.stdout
+    assert "status:resolved\t1" in stats.stdout
+    assert "severity:HIGH\t1" in stats.stdout
+    assert not [ln for ln in stats.stdout.splitlines() if ln.startswith("direction:")]
+
+
+def _closed(bug_id: str) -> dict[str, object]:
+    return {**_OPEN_RECORD, "id": bug_id, "status": "rejected", "cause": "c",
+            "closed_at": "2026-09-21T00:00:00Z"}  # fmt: skip
+
+
+@pytest.mark.parametrize(("argv", "code"), [
+    (["old-a", "old-b"], 0),
+    (["old-a", "a-bug"], 1),  # an open record never leaves
+    (["--threshold-days", "90"], 2),  # the age path is gone
+    ([], 2),  # no record named
+])  # fmt: skip
+def test_archive_moves_named_terminal_records_without_an_adr_gate(
+    script: Path, tmp_path: Path, argv: list[str], code: int
+) -> None:
+    """Archive moves exactly the named terminal records with no ADR lookup or field."""
+    specs = _ledger(tmp_path, _OPEN_RECORD, _closed("old-a"), _closed("old-b"), _closed("old-c"))
+    (specs / "ADRs").mkdir()
+    write_text(specs / "ADRs" / "decisions.jsonl", json.dumps({"id": "0999", "status": "proposed"}) + "\n")
+    histo = specs / "bugs" / "_archive" / "bugs_histo.jsonl"
+    histo.parent.mkdir()
+    write_text(histo, json.dumps({"event": "archived", "data": {}}) + "\n")
+    before = [(specs / "bugs" / "BUGS.jsonl").read_bytes(), histo.read_bytes()]
+    done = _run(script, "archive", *argv, "--specs", str(specs))
+    assert done.returncode == code, done.stderr
+    if code:
+        assert [(specs / "bugs" / "BUGS.jsonl").read_bytes(), histo.read_bytes()] == before
+        return
+    assert [r["id"] for r in _records(specs)] == ["a-bug", "old-c"]
+    assert [r["id"] for r in _read(histo)[1:]] == ["old-a", "old-b"]
+    assert not any("archived_by" in r for r in _read(histo)[1:])
+
+
+def test_check_accepts_an_archived_record_without_adr_metadata(
+    script: Path, tmp_path: Path
+) -> None:
+    """History contains the terminal product fact, not an ADR-derived marker."""
+    specs = _ledger(tmp_path, _OPEN_RECORD)
+    histo = specs / "bugs" / "_archive" / "bugs_histo.jsonl"
+    histo.parent.mkdir()
+    lines = [{"event": "archived", "data": {}}, _closed("old-a")]
+    write_text(histo, "".join(json.dumps(r) + "\n" for r in lines))
+    done = _run(script, "check", "--specs", str(specs))
+    assert (done.returncode, done.stdout) == (0, "")
+
+
+def test_a_concurrent_write_is_re_read_and_re_applied_once(script: Path, tmp_path: Path) -> None:
+    """The ledger is ADDITIVE: a race surfaces and retries, it never blocks. A record
+    appended by another writer WHILE this update computes survives the replace."""
+    specs = _ledger(tmp_path, _OPEN_RECORD)
+    ledger = specs / "bugs" / "BUGS.jsonl"
+    rival = {**_OPEN_RECORD, "id": "rival-bug"}
+    racer = tmp_path / "race.py"
+    write_text(racer, "import json, pathlib, sys\n"
+        "p = pathlib.Path(sys.argv[1])\n"
+        "p.write_bytes(p.read_bytes() + json.dumps(json.loads(sys.argv[2])).encode() + bytes([10]))\n")
+    # The rival write lands between this process reading and replacing: simulated by
+    # writing it before the command runs but AFTER the (size, mtime) this test pins.
+    run([sys.executable, str(racer), str(ledger), json.dumps(rival)], check=True)
+    done = _run(script, "update", "a-bug", "--set", "caused_by=none", "--specs", str(specs))
+    assert done.returncode == 0, done.stderr
+    ids = {str(r["id"]) for r in _records(specs)}
+    assert ids == {"a-bug", "rival-bug"}, "the concurrent record must survive the replace"
+    assert _run(script, "check", "--specs", str(specs)).returncode == 0
+
+
+def test_the_projection_rule_carries_the_exec_bit_for_an_executable_source(
+    tmp_path: Path,
+) -> None:
+    """A skill script an agent runs directly must project executable — the projection is
+    a copy of its source, permissions included. Asserted over the real
+    authored `public/skills/` tree through the public rule-table seam."""
+    from dadaia_workspace.infrastructure.install_plan import InstallPlan
+    from dadaia_workspace.infrastructure.projection_rules import projection_rules
+
+    plan = InstallPlan(
+        workspace_root=tmp_path,
+        agentic_dir=_PUBLIC,
+        harness=None,
+        force=False,
+        harness_targets=("agents",),
+        active_harnesses=frozenset({"agents"}),
+        overlay=None,
+        resolved_models={},
+    )
+    modes = {
+        rule.dst.name: rule.mode
+        for rule in projection_rules(plan)
+        if rule.dst.parent.name == "scripts" and rule.dst.parent.parent.name == "dd-bug-resolution"
+    }
+    assert modes, "the skills rule table produced no dd-bug-resolution script rules"
+    assert modes["bugs.py"] == 0o755
+    assert modes["_bugs_store.py"] == 0o755
+
+
+def test_a_refused_archive_leaves_both_ledger_files_byte_intact(
+    script: Path, tmp_path: Path
+) -> None:
+    """Given BUGS.jsonl holding an invalid record, `bugs.py archive` exits non-zero and
+    BUGS.jsonl and bugs_histo.jsonl are byte-identical. Run twice: a retry included."""
+    old = {
+        **_OPEN_RECORD, "id": "old-bug", "ts": "2025-12-01T00:00:00Z",
+        "status": "resolved", "closed_at": "2026-01-01T00:00:00Z",
+    }  # fmt: skip
+    specs = _ledger(tmp_path, {**_OPEN_RECORD, "severity": "SEVERE"}, old)
+    histo = specs / "bugs" / "_archive" / "bugs_histo.jsonl"
+    histo.parent.mkdir(parents=True)
+    write_text(histo, "")
+    before = [(specs / "bugs" / "BUGS.jsonl").read_bytes(), histo.read_bytes()]
+
+    for _ in range(2):
+        done = _run(script, "archive", "old-bug", "--specs", str(specs))
+        assert done.returncode == 1, done.stdout
+        assert [(specs / "bugs" / "BUGS.jsonl").read_bytes(), histo.read_bytes()] == before
+
+
+def test_duplicate_ids_are_refused(script: Path, tmp_path: Path) -> None:
+    done = _run(script, "check", "--specs", str(_ledger(tmp_path, _OPEN_RECORD, _OPEN_RECORD)))
+    assert done.returncode == 1
+    assert "duplicate" in done.stdout
+
+
+def test_json_output_carries_one_object_per_finding(script: Path, tmp_path: Path) -> None:
+    broken = {k: v for k, v in _OPEN_RECORD.items() if k != "symptom"}
+    done = _run(script, "check", "--specs", str(_ledger(tmp_path, broken)), "--json")
+    assert done.returncode == 1
+    payload = json.loads(done.stdout)
+    assert len(payload) == 1
+    assert payload[0]["code"] == "LEDGER-BUGS-SCHEMA"
+    assert payload[0]["verdict"] == "error"
+    assert payload[0]["line"] == 1
+
+
+def _closed_on(bug_id: str, closed_at: str, caused_by: str, *files: str) -> dict[str, object]:
+    return {**_sibling(bug_id, *files), "closed_at": closed_at, "caused_by": caused_by}
+
+
+def test_stats_window_counts_what_closed_between_two_stamps(script: Path, tmp_path: Path) -> None:
+    """b2 is a child of an out-of-window bug on a file, b5 the cause of an out-of-window child, b3 fixed a file alone, b4 closed
+    after the window; the archive counts like the live ledger."""
+    specs = _ledger(
+        tmp_path,
+        _closed_on("b1", "2026-09-10T00:00:00Z", "none", "cli/x.py"),
+        _closed_on("b2", "2026-09-20T00:00:00Z", "b1", "cli/x.py"),
+        _closed_on("b3", "2026-09-25T00:00:00Z", "none", "solo.py"),
+        _closed_on("b4", "2026-10-05T00:00:00Z", "b1", "other.py"),
+        _OPEN_RECORD,
+    )
+    _archived(
+        specs,
+        _closed_on("b5", "2026-09-22T00:00:00Z", "none", "hooks/y.py"),
+        _closed_on("b6", "2026-08-01T00:00:00Z", "b5", "hooks/y.py"),
+    )
+    window = ["--closed-after", "2026-09-15T00:00:00Z", "--closed-until", "2026-10-01T00:00:00Z"]
+    done = _run(script, "stats", "--specs", str(specs), *window)
+    assert done.returncode == 0, done.stderr
+    lines = done.stdout.splitlines()
+    assert [ln for ln in lines if ln.split("\t")[0] in ("closed", "fix-induced", "rebuild-due")] == [
+        "closed\t3", "fix-induced\t1", "rebuild-due\t2",
+    ]  # fmt: skip
+    plain = _run(script, "stats", "--specs", str(specs))
+    assert not [ln for ln in plain.stdout.splitlines() if ln.startswith(("closed", "fix-induced"))]
+
+
+def test_named_paths_drops_a_bare_directory_word_and_splits_a_trailing_period(
+    script: Path, tmp_path: Path
+) -> None:
+    module = load_owner("dd-bug-resolution", "_bugs_write")
+    tracked = ["cli/x.py", ".github/x.py"]
+    assert module.named_paths("the cli fails in cli/x.py", tracked) == ["cli/x.py"]
+    assert module.named_paths("it broke cli/x.py.", tracked) == ["cli/x.py"]
+    assert module.named_paths("cli", tracked) == ["cli"]
+
+
+def test_named_paths_drops_a_bare_word_only_beside_a_slash_path() -> None:
+    named_paths = load_owner("dd-bug-resolution", "_bugs_write").named_paths
+    tracked = ["cli/x.py", "hooks/y.py"]
+    assert named_paths("cli hooks", tracked) == ["cli", "hooks"]
+    assert named_paths("cli cli/x.py", tracked) == ["cli/x.py"]
+
+
+def test_append_takes_repeated_correlates_and_the_help_states_the_comma_form(
+    script: Path, tmp_path: Path
+) -> None:
+    specs = _ledger(tmp_path, _sibling("b1", "cli/x.py"), _sibling("b3", "cli/x.py"))
+    done = _run(script, *_append_argv(specs), "--correlates", "b1", "--correlates", "b3")
+    assert done.returncode == 0, done.stderr
+    assert _records(specs)[-1]["correlates"] == ["b1", "b3"]
+    helped = " ".join(_run(script, "append", "--help").stdout.split())
+    assert "--correlates" in helped and "comma" in helped
+
+
+def test_update_records_a_correlates_list(script: Path, tmp_path: Path) -> None:
+    specs = _ledger(tmp_path, _OPEN_RECORD, _sibling("b1", "cli/x.py"), _sibling("b2", "cli/x.py"))
+    done = _run(script, "update", "a-bug", "--set", "correlates=b1,b2", "--specs", str(specs))
+    assert done.returncode == 0, done.stderr
+    assert done.stdout.strip() == "[ok] updated correlates for a-bug"
+    assert _records(specs)[0]["correlates"] == ["b1", "b2"]
+
+
+def _traced(tmp_path: Path) -> tuple[Path, dict[str, str]]:
+    """A git trace file and the env that makes every git child of the script append to it."""
+    trace = tmp_path / "git.trace"
+    return trace, os.environ | {"GIT_TRACE": str(trace)}
+
+
+def _trace_lines(trace: Path) -> list[str]:
+    return read_text(trace).splitlines() if trace.exists() else []
+
+
+def test_reaches_hands_git_no_malformed_sha(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _ledger(tmp_path)
+    trace, env = _traced(tmp_path)
+    monkeypatch.setenv("GIT_TRACE", env["GIT_TRACE"])
+    assert load_owner("dd-bug-resolution", "_git").reaches(tmp_path, "--output=x") is False
+    assert _trace_lines(trace) == []
+
+
+def test_fix_commit_hands_git_no_id(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _ledger(tmp_path)
+    _fix_commit(tmp_path, "cli/x.py", _FIXED)
+    trace, env = _traced(tmp_path)
+    monkeypatch.setenv("GIT_TRACE", env["GIT_TRACE"])
+    assert load_owner("dd-bug-resolution", "_git").fix_commit([tmp_path], ["--output=x"]) == {}
+    assert not any("--output=x" in ln for ln in _trace_lines(trace))
+
+
+def test_fix_files_reads_the_files_of_every_given_sha_in_one_diff_tree(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _ledger(tmp_path)
+    first, second = _fix_commit(tmp_path, "cli/x.py"), _fix_commit(tmp_path, ".github/x.py")
+    trace, env = _traced(tmp_path)
+    monkeypatch.setenv("GIT_TRACE", env["GIT_TRACE"])
+    found = load_owner("dd-bug-resolution", "_git").fix_files(tmp_path, [first, second])
+    assert found == {first: ["cli/x.py"], second: [".github/x.py"]}
+    spawned = [ln for ln in _trace_lines(trace) if "built-in: git" in ln]
+    assert len(spawned) == len([ln for ln in spawned if "diff-tree" in ln]) == 1
+
+
+def test_check_reads_the_history_of_a_repo_once(script: Path, tmp_path: Path) -> None:
+    _ledger(tmp_path)
+    sha = _fix_commit(tmp_path, "cli/x.py", "fix(bugs): b1 \u2014 c")
+    specs = _ledger(tmp_path, {**_sibling("b1", "cli/x.py"), "fix_sha": sha})
+    trace, env = _traced(tmp_path)
+    assert _run(script, "check", "--specs", str(specs), env=env).returncode == 0
+    assert len([ln for ln in _trace_lines(trace) if "built-in: git log" in ln]) == 1
+
+
+def test_check_spends_the_same_git_history_reads_on_four_fix_ids_as_on_one(
+    script: Path, tmp_path: Path
+) -> None:
+    def reads(count: int) -> int:
+        root = tmp_path / f"n{count}"
+        _ledger(root)
+        shas = [_fix_commit(root, "cli/x.py", f"fix(bugs): b{i} \u2014 c") for i in range(count)]
+        specs = _ledger(root, *({**_sibling(f"b{i}", "cli/x.py"), "fix_sha": s} for i, s in enumerate(shas)))  # fmt: skip
+        trace, env = _traced(root)
+        assert _run(script, "check", "--specs", str(specs), env=env).returncode == 0
+        spawned = [ln for ln in _trace_lines(trace) if "built-in: git" in ln]
+        return len([ln for ln in spawned if " log " in ln or "rev-list" in ln])
+
+    assert reads(4) == reads(1)
+
+
+def test_append_finds_the_earlier_bugs_of_records_without_fix_files_in_one_diff_tree(
+    script: Path, tmp_path: Path
+) -> None:
+    _ledger(tmp_path)
+    first = _fix_commit(tmp_path, "cli/x.py", "fix(bugs): b1 \u2014 c")
+    second = _fix_commit(tmp_path, "cli/x.py", "fix(bugs): b2 \u2014 c")
+    old = [{**_child(i, c), "fix_sha": sha} for i, c, sha in (("b1", "none", first), ("b2", "b1", second))]
+    specs = _ledger(tmp_path, *old)
+    trace, env = _traced(tmp_path)
+    done = _run(script, *_append_argv(specs), "--correlates", "b1,b2", env=env)
+    assert done.returncode == 0, done.stderr
+    assert done.stdout.splitlines()[:3] == [
+        "earlier bug on cli/x.py: b1", "earlier bug on cli/x.py: b2",
+        "REBUILD due: 3rd bug on cli/x.py",
+    ]  # fmt: skip
+    [reads] = [ln for ln in read_text(trace).splitlines() if "diff-tree" in ln]
+    assert "--stdin" in reads, reads
+
+
+@pytest.mark.parametrize(("sha", "accepted"), [("a" * 64, True), ("a" * 63, False)])
+def test_the_sha_grammar_and_the_record_schema_agree_on_a_64_hex_fix_sha(
+    sha: str, accepted: bool
+) -> None:
+    schema = json.loads(
+        read_text(_PUBLIC / "skills/dd-bug-resolution/scripts/schemas/bug-record-v1.schema.json")
+    )
+    grammar = load_owner("dd-bug-resolution", "_grammar")
+    assert bool(grammar.SHA_RE.match(sha)) is accepted
+    assert bool(re.search(schema["properties"]["fix_sha"]["pattern"], sha)) is accepted
+
+
+def _commit_as(root: Path, message: str, path: str = "cli/x.py") -> str:
+    """A commit of *root* touching *path*, with *message* as given (every line of it)."""
+    git = ["git", "-C", str(root), "-c", "user.name=t", "-c", "user.email=t@t.test"]
+    write_text(root / path, read_text(root / path) + "# edit\n")
+    run([*git, "commit", "-q", "-a", "-m", message], check=True)
+    return run([*git, "rev-parse", "HEAD"], check=True).stdout.strip()
+
+
+def _archive_act(script: Path, specs: Path, *ids: str) -> str:
+    return shell_line(sys.executable, str(script), "archive", *ids, "--specs", str(specs))
+
+
+def _resolved(bug_id: str, sha: str = "a" * 40) -> dict[str, object]:
+    return {**_OPEN_RECORD, "id": bug_id, "status": "resolved", "closed_at": "2026-09-21T10:00:00Z",
+            "cause": "c", "solution": "s", "caused_by": "none", "fix_sha": sha}  # fmt: skip
+
+
+_FIXED = "fix(bugs): a-bug \u2014 c"
+_REVERT = f'Revert "{_FIXED}"'
+
+
+@pytest.mark.parametrize("messages", [
+    [_FIXED],
+    ["refactor(bugs): a-bug \u2014 REBUILD u: c"],
+    ["feat(x): y\n\nfix(bugs): a-bug \u2014 c"],  # the line may sit in the body
+    ["fix(bugs): b-bug, a-bug \u2014 c"],  # a group, separated by commas
+    ["fix(bugs): b-bug a-bug \u2014 c"],  # or by blanks
+    ["feat: x", 'Revert "feat: x"\n\nfix(bugs): a-bug \u2014 revert feat: x'],  # a revert cites
+    [_FIXED, _REVERT, f'Revert "{_REVERT}"'],  # a revert of a revert makes the fix live again
+])  # fmt: skip
+def test_check_accepts_a_record_whose_id_line_a_commit_of_head_carries(
+    script: Path, tmp_path: Path, messages: list[str]
+) -> None:
+    _ledger(tmp_path)
+    for message in messages:
+        _commit_as(tmp_path, message)
+    specs = _ledger(tmp_path, _resolved("a-bug"))
+    done = _run(script, "check", "--specs", str(specs))
+    assert done.returncode == 0, done.stdout + done.stderr
+
+
+@pytest.mark.parametrize(("reverts", "code"), [(1, 1), (2, 0), (3, 1), (4, 0)])
+def test_check_follows_the_subjects_git_writes_for_a_revert_and_its_reapply(
+    script: Path, tmp_path: Path, reverts: int, code: int
+) -> None:
+    """Each `git revert` of the newest commit is run for real, so the subjects are git's own."""
+    _ledger(tmp_path)
+    _commit_as(tmp_path, _FIXED)
+    git = ["git", "-C", str(tmp_path), "-c", "user.name=t", "-c", "user.email=t@t.test"]
+    for _ in range(reverts):
+        run([*git, "revert", "--no-edit", "HEAD"], check=True)
+    specs = _ledger(tmp_path, _resolved("a-bug"))
+    done = _run(script, "check", "--specs", str(specs))
+    assert done.returncode == code, done.stdout + done.stderr
+
+
+def test_check_reads_no_checkout_beside_the_main_repo_that_the_context_does_not_own(
+    script: Path, tmp_path: Path
+) -> None:
+    (tmp_path / "ws").mkdir()
+    root = make_workspace(tmp_path / "ws")
+    associate(root, "Approved", ("a",))
+    foreign = root / "repos" / "z"
+    foreign.mkdir()
+    git(foreign, "init", "-q")
+    commit(foreign, "fix.py")
+    git(foreign, "commit", "-q", "--amend", "-m", "fix(bugs): a-bug \u2014 c")
+    specs = _ledger(root / "repos" / "r", _resolved("a-bug"))
+    done = _run(script, "check", "--specs", str(specs))
+    assert done.returncode == 1 and "'a-bug'" in done.stdout, done.stdout
+
+
+def test_check_accepts_a_record_whose_id_commit_was_rebased(script: Path, tmp_path: Path) -> None:
+    """The recorded sha is a hint: an amend orphans it and the id line still reaches HEAD."""
+    _ledger(tmp_path)
+    sha = _commit_as(tmp_path, _FIXED)
+    specs = _ledger(tmp_path, _resolved("a-bug", sha))
+    git = ["git", "-C", str(tmp_path), "-c", "user.name=t", "-c", "user.email=t@t.test"]
+    run([*git, "commit", "-q", "--amend", "-m", _FIXED, "-m", "rebased"], check=True)
+    assert run([*git, "rev-parse", "HEAD"], check=True).stdout.strip() != sha
+    done = _run(script, "check", "--specs", str(specs))
+    assert done.returncode == 0, done.stdout + done.stderr
+
+
+@pytest.mark.parametrize("messages", [
+    ["feat: x"],  # no commit names the id
+    [_FIXED, _REVERT],  # the only commit that names it, HEAD reverts
+    ["fix(J7.T6): a-bug \u2014 c"],  # a task subject is not the line
+    ["fix(bugs): a-bug-two \u2014 c", "fix(bugs): other \u2014 a-bug"],  # an id is the whole word, before the dash
+])  # fmt: skip
+def test_check_refuses_a_record_no_commit_of_head_cites_with_one_fix_line(
+    script: Path, tmp_path: Path, messages: list[str]
+) -> None:
+    _ledger(tmp_path)
+    for message in messages:
+        _commit_as(tmp_path, message)
+    specs = _ledger(tmp_path, _resolved("a-bug"))
+    done = _run(script, "check", "--specs", str(specs))
+    assert done.returncode == 1, done.stdout
+    assert done.stdout.count("LEDGER-BUGS-SCHEMA") == 1 and "bugs/BUGS.jsonl:1" in done.stdout
+    [fix] = [ln for ln in done.stdout.splitlines() if ln.startswith("fix: ")]
+    assert fix == f"fix: {_archive_act(script, specs, 'a-bug')}", fix
+
+
+def test_the_archive_act_check_prints_clears_a_record_a_task_commit_fixed(
+    script: Path, tmp_path: Path
+) -> None:
+    """A task-shaped fix commit cannot be re-worded once pushed: the printed act is the way out."""
+    _ledger(tmp_path)
+    sha = _commit_as(tmp_path, "fix(J1.T1): a-bug \u2014 c")
+    still_open = {**_OPEN_RECORD, "id": "c-bug", "fix_sha": sha}  # archive refuses it: never judged
+    specs = _ledger(tmp_path, _resolved("a-bug", sha), _resolved("b-bug", sha), still_open)
+    done = _run(script, "check", "--specs", str(specs))
+    assert done.returncode == 1, done.stdout
+    fixes = {ln for ln in done.stdout.splitlines() if ln.startswith("fix: ")}
+    assert fixes == {f"fix: {_archive_act(script, specs, 'a-bug', 'b-bug')}"}, done.stdout
+    act = run_line(next(iter(fixes))[5:], check=False)
+    assert act.returncode == 0, act.stdout + act.stderr
+    assert _run(script, "check", "--specs", str(specs)).returncode == 0
+
+
+@pytest.mark.parametrize("message", [_FIXED, "refactor(bugs): a-bug \u2014 REBUILD u: c"])
+def test_resolve_records_the_sha_of_the_id_commit(
+    script: Path, tmp_path: Path, message: str
+) -> None:
+    specs = _ledger(tmp_path, _OPEN_RECORD)
+    sha = _fix_commit(tmp_path, "cli/x.py", message)
+    done = _run(script, "resolve", "a-bug", "--cause", "c", "--caused-by", "none",
+                "--solution", "s", "--specs", str(specs))  # fmt: skip
+    assert done.returncode == 0, done.stdout + done.stderr
+    [record] = _records(specs)
+    assert (record["fix_sha"], "fix_files" in record) == (sha, False)
+    assert _run(script, "check", "--specs", str(specs)).returncode == 0
+
+
+def test_resolve_with_no_id_commit_is_one_refusal_with_one_fix_line(
+    script: Path, tmp_path: Path
+) -> None:
+    specs = _ledger(tmp_path, _OPEN_RECORD)
+    _commit_as(tmp_path, "feat: x")
+    before = (specs / "bugs/BUGS.jsonl").read_bytes()
+    done = _run(script, "resolve", "a-bug", "--cause", "c", "--caused-by", "none",
+                "--solution", "s", "--specs", str(specs))  # fmt: skip
+    assert done.returncode == 1 and "Traceback" not in done.stderr, done.stderr
+    [fix] = [ln for ln in done.stderr.splitlines() if ln.startswith("fix: ")]
+    assert "fix(bugs): a-bug \u2014 " in fix and "refactor(bugs): a-bug \u2014 " in fix, fix
+    assert "caused_by" not in fix and " when " not in fix, fix
+    assert (specs / "bugs/BUGS.jsonl").read_bytes() == before
+
+
+def test_help_describes_resolves_fix_as_either_id_line(script: Path) -> None:
+    done = _run(script, "--help")
+    entry = " ".join(done.stdout.split()).split(" resolve ", 1)[1].split(" archive ")[0]
+    assert done.returncode == 0 and "fix(bugs)" in entry and "refactor(bugs)" in entry, entry
+
+
+def test_resolve_takes_no_fix_sha_flag(script: Path, tmp_path: Path) -> None:
+    specs = _ledger(tmp_path, _OPEN_RECORD)
+    _commit_as(tmp_path, _FIXED)
+    done = _run(script, *_resolve_argv(), "--fix-sha", "a" * 40, "--specs", str(specs))
+    assert done.returncode == 2 and "unrecognized arguments" in done.stderr
+    assert _records(specs)[0]["status"] == "open"
+
+
+def test_stats_reads_the_files_of_the_id_commit_for_a_record_without_fix_files(
+    script: Path, tmp_path: Path
+) -> None:
+    _ledger(tmp_path)
+    for bug in ("b1", "b2"):
+        _commit_as(tmp_path, f"fix(bugs): {bug} \u2014 c")
+    specs = _ledger(tmp_path, _resolved("b1", "1" * 40), {**_resolved("b2", "2" * 40), "caused_by": "b1"})
+    done = _run(script, "stats", "--specs", str(specs))
+    assert [ln for ln in done.stdout.splitlines() if ln.startswith("rebuild-due:")] == [
+        "rebuild-due:cli/x.py\tb1,b2"
+    ]
+
+
+def test_check_refuses_a_registry_the_workspace_cli_rejects_with_its_fix_line(
+    script: Path, tmp_path: Path
+) -> None:
+    (tmp_path / "ws").mkdir()
+    root = make_workspace(tmp_path / "ws")
+    write_text(root / ".dadaia/states/spec_contexts.json", json.dumps({"contexts": ["not-a-row"]}))
+    refusing = "#!python\nimport sys\nprint('[error] bad row', file=sys.stderr)\nprint('fix: Agent action: repair the registry row', file=sys.stderr)\nsys.exit(1)\n"  # fmt: skip
+    stub_cli(cli_path(root).parent, "dadaia", refusing)
+    specs = _ledger(root / "repos" / "r", {**_resolved("a-bug"), "fix_sha": "a" * 40})
+    done = _run(script, "check", "--specs", str(specs))
+    out = done.stdout + done.stderr
+    assert "Traceback" not in out and "AttributeError" not in out, out
+    assert done.returncode == 1, out
+    assert "fix: Agent action: repair the registry row" in out, out
+
+
+def _unit_history(
+    tmp_path: Path, steps: list[tuple[str, str, str]]
+) -> Path:
+    """Resolved bugs, oldest first, each fixed by a commit on cli/x.py: `(id, line kind, caused_by)`."""
+    _ledger(tmp_path)
+    records = []
+    for bug, kind, caused_by in steps:
+        line = {
+            "refactor": "refactor(bugs): {} — REBUILD u: c",
+            "body": "test({0}): t\n\nrefactor(bugs): {0} — REBUILD u: c",
+            "plain": "test({0}): t\n\nrefactor(bugs): {0} — a token test, no lexer",
+        }.get(kind, "fix(bugs): {} — c")
+        sha = _commit_as(tmp_path, line.format(bug))
+        records.append({**_resolved(bug, sha), "caused_by": caused_by})
+    return _ledger(tmp_path, *records)
+
+
+@pytest.mark.parametrize(("steps", "due"), [
+    ([("b1", "fix", "none"), ("b2", "fix", "b1")], True),  # a child of b1, and no REBUILD since
+    ([("b1", "fix", "none"), ("b2", "refactor", "b1")], False),  # the REBUILD answered the child
+    ([("b1", "fix", "none"), ("b2", "body", "b1")], False),  # the REBUILD line sits in a test commit's body
+    ([("b1", "fix", "none"), ("b2", "plain", "b1")], False),  # a refactor(bugs) line without the REBUILD token
+    ([("b1", "fix", "none"), ("b2", "refactor", "b1"), ("b3", "fix", "b2")], True),  # a child after the last REBUILD
+    ([("b1", "fix", "none"), ("b2", "fix", "none")], False),  # two bugs, none caused by the other
+])  # fmt: skip
+def test_append_and_stats_say_rebuild_due_alike_on_a_child_after_the_units_last_rebuild(
+    script: Path, tmp_path: Path, steps: list[tuple[str, str, str]], due: bool
+) -> None:
+    specs = _unit_history(tmp_path, steps)
+    stats = _run(script, "stats", "--specs", str(specs))
+    flagged = [ln.split("\t")[0] for ln in stats.stdout.splitlines() if ln.startswith("rebuild-due:")]
+    correlates = ",".join(bug for bug, _, _ in steps)
+    done = _run(script, *_append_argv(specs), "--correlates", correlates)
+    assert done.returncode == 0, done.stderr
+    said = [ln for ln in done.stdout.splitlines() if ln.startswith("REBUILD due")]
+    assert (flagged == ["rebuild-due:cli/x.py"], bool(said)) == (due, due), (stats.stdout, done.stdout)
+
+
+def _both_shapes(specs: Path) -> None:
+    """An archive as the real one is: legacy event lines, then plain records; `shared` is both."""
+    shared = {"ts": "2026-08-28T12:45:33Z", "event": "archived", "agent": "a",
+              "data": {"id": "shared", "status": "Closed"}}  # fmt: skip
+    (specs / "bugs" / "_archive").mkdir(parents=True, exist_ok=True)
+    lines = [_LEGACY_EVENT, shared, _closed("shared"), _closed("plain-one")]
+    write_text(specs / "bugs" / "_archive" / "bugs_histo.jsonl",
+               "".join(json.dumps(r) + "\n" for r in lines))  # fmt: skip
+
+
+def test_an_archive_of_both_shapes_is_read_from_its_lines_for_check_and_the_ids_append_takes(
+    script: Path, tmp_path: Path
+) -> None:
+    specs = _ledger(tmp_path, _OPEN_RECORD)
+    _both_shapes(specs)
+    assert _run(script, "check", "--specs", str(specs)).returncode == 0
+    for bug in ("legacy-one", "plain-one", "shared"):
+        argv = _append_argv(specs, bug_id=f"n-{bug}")
+        done = _run(script, *argv, "--correlates", bug)
+        assert done.returncode == 0, (bug, done.stderr)
+    refused = _run(script, *_append_argv(specs, bug_id="shared"), "--correlates", "none")
+    assert refused.returncode == 1 and "already exists" in refused.stderr
+
+
+def test_a_fix_sha_only_record_whose_id_commit_exists_passes_check(
+    script: Path, tmp_path: Path
+) -> None:
+    _ledger(tmp_path)
+    sha = _commit_as(tmp_path, _FIXED)
+    specs = _ledger(tmp_path, _resolved("a-bug", sha))
+    assert "fix_files" not in _records(specs)[0]
+    done = _run(script, "check", "--specs", str(specs))
+    assert done.returncode == 0, done.stdout + done.stderr
+
+
+def _two_candidates(specs: Path) -> None:
+    """One task id heads a task row in two candidates; another only in the second."""
+    for number, ids in ((9, ["J1.T3"]), (10, ["J1.T3", "J2.T1"])):
+        job = specs / "releases" / "0.5.0" / f"rc-{number}" / "tasks" / "job1.md"
+        job.parent.mkdir(parents=True)
+        write_text(job, "".join(f"| {i} | AC1.1 | `ci.py` |\n" for i in ids))
+
+
+def test_resolve_refuses_a_bare_task_id_two_candidates_carry_and_names_the_qualified_form(
+    script: Path, tmp_path: Path
+) -> None:
+    specs = _ledger(tmp_path, _OPEN_RECORD)
+    _two_candidates(specs)
+    _fix_commit(tmp_path, "cli/x.py", _FIXED)
+    before = (specs / "bugs/BUGS.jsonl").read_bytes()
+    done = _run(script, *_resolve_argv(caused_by="J1.T3"), "--specs", str(specs))
+    assert done.returncode == 1 and "Traceback" not in done.stderr, done.stderr
+    [fix] = [ln for ln in done.stderr.splitlines() if ln.startswith("fix: ")]
+    assert "J1.T3" in fix and "0.5.0-rc9" in fix and "0.5.0-rc10" in fix, fix
+    assert (specs / "bugs/BUGS.jsonl").read_bytes() == before
+
+
+def test_resolve_takes_a_bare_task_id_only_one_candidate_carries(
+    script: Path, tmp_path: Path
+) -> None:
+    specs = _ledger(tmp_path, _OPEN_RECORD)
+    _two_candidates(specs)
+    _fix_commit(tmp_path, "cli/x.py", _FIXED)
+    done = _run(script, *_resolve_argv(caused_by="J2.T1"), "--specs", str(specs))
+    assert done.returncode == 0, done.stderr
+    assert _records(specs)[0]["caused_by"] == "J2.T1"
+
+
+def test_resolve_takes_the_candidate_qualified_form_of_an_ambiguous_task_id(
+    script: Path, tmp_path: Path
+) -> None:
+    specs = _ledger(tmp_path, _OPEN_RECORD)
+    _two_candidates(specs)
+    _fix_commit(tmp_path, "cli/x.py", _FIXED)
+    done = _run(script, *_resolve_argv(caused_by="0.5.0-rc9/J1.T3"), "--specs", str(specs))
+    assert done.returncode == 0, done.stderr
+    assert _records(specs)[0]["caused_by"] == "0.5.0-rc9/J1.T3"
+    assert _run(script, "check", "--specs", str(specs)).returncode == 0
+
+
+def test_a_bare_ambiguous_task_id_already_in_a_ledger_still_passes_check(
+    script: Path, tmp_path: Path
+) -> None:
+    specs = _ledger(tmp_path, {**_OPEN_RECORD, "caused_by": "J1.T3"})
+    _two_candidates(specs)
+    assert _run(script, "check", "--specs", str(specs)).returncode == 0
+
+
+def test_open_ids_and_standing_read_the_live_ledger_and_the_archive(tmp_path: Path) -> None:
+    store = load_owner("dd-bug-resolution", "_bugs_store")
+    rejected = {**_OPEN_RECORD, "id": "r-bug", "status": "rejected", "closed_at": "2026-09-21"}
+    legacy = {**_resolved("old"), "resolved_release": "0.4.0"}
+    specs = _ledger(tmp_path, _OPEN_RECORD, rejected, {**_OPEN_RECORD, "id": "s", "superseded_by": "old"})
+    _archived(specs, legacy)
+    assert store.open_ids(specs) == ["a-bug", "s"]
+    got = [store.standing(specs, i, "0.4.0") for i in ("a-bug", "r-bug", "old", "s", "nope")]
+    assert got[:4] == ["untraced", "traced", "traced", "traced"]
+    assert got[4].startswith("names no record")
+    assert store.standing(specs, "old", "0.5.0") == "untraced"

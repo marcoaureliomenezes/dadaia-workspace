@@ -1,141 +1,419 @@
 #!/usr/bin/env python3
-"""The release ledger's vocabulary and the JSON-Schema subset its documents are read
-with — `release.py`'s one validation primitive.
-"""
+"""The release ledger's vocabulary; schema reading and validation are `_ledger`'s."""
 
 from __future__ import annotations
 
 import datetime as _dt
-import json
+import functools
 import re
-import sys
-from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
+import _git
+from _grammar import (
+    APPROVED,
+    STATE,
+    TASK_ID_RE,
+    candidate_dir,
+    candidate_number,
+    extract_status,
+    sole_live,
+)
+from _jsonl import parse_object
+from _ledger import load_schema
+from _platform import act, read_text
+from _refusal import Refusal
+from _specs import script
+
+State = dict[str, Any]
+SCRIPT = script(Path(__file__).parent / "release.py")
 CODE = "LEDGER-RELEASE-SCHEMA"
-RELEASES = "releases"
-STATE = "_RELEASE.json"
 HISTO = "releases/_archive/releases_histo.jsonl"
-#: The closed-scope candidate trio that lives at the release root; the next candidate's
-#: `new`-seeded SPEC overwrites it, and git holds the closed one at its CLOSURE commit.
-TRIO = ("SPEC.md", "PLAN.md", "TASKS.md")
-#: Every artifact `new` refuses to mint over (CWE-73): a release directory is one unit.
-ARTIFACTS = (*TRIO, STATE)
-#: The four canonical lifecycle phases — pinned equal to the schema's enum by `check`.
-PHASES = ("DEFINITION", "IMPLEMENTATION", "CLOSURE", "ARCHIVED")
-#: The phases in which the trio is REQUIRED at the release root; DEFINITION sits
-#: between candidates, when the next trio is still being authored.
-TRIO_PHASES = frozenset({"IMPLEMENTATION", "CLOSURE"})
+#: One candidate's documents, born in its own `rc-<N>/` and never rewritten after closure; its
+#: tasks live in one job file per job, `rc-<N>/tasks/job<n>.md` (a closed rc keeps `TASKS.md`).
+CANDIDATE_DOCS = ("SPEC.md", "PLAN.md")
+#: The lifecycle phases, read from the `release-state-v1` enum; a shipped release moves whole to `_archive/<v>/`.
+PHASES = tuple(load_schema("release-state-v1")["properties"]["phase"]["enum"])
+#: The phases in which the live candidate's SPEC, PLAN and job files are REQUIRED; the first, DEFINITION, is authoring it.
+DEFINITION, IMPLEMENTATION, CLOSURE = PHASES
+TRIO_PHASES = frozenset(PHASES[1:])
+#: What a task's error says when its `W:` names the memory tree: a CLOSURE candidate's is history.
+MEMORY_WRITE = "writes specs/memory"
 #: A release ships `delivered` — the one histo disposition this ledger writes.
 DELIVERED = "delivered"
-APPROVED = "Approved"
-SEMVER_RE = re.compile(r"^\d+\.\d+\.\d+$")
-#: A shipped commit sha as a human pastes it from a merge: short (7) to full (40).
-SHA_RE = re.compile(r"^[0-9a-f]{7,40}$")
-#: Task markers that mean the candidate is NOT closed: open ``[ ]`` or reserved ``[-]``.
-UNFINISHED_RE = re.compile(r"^\s*-\s\[( |-)\]\s.*$", re.MULTILINE)
-_STATUS_RE = re.compile(r"^\*\*Status:\*\*\s*(.+?)\s*$", re.MULTILINE)
-_JSON_TYPES: dict[str, Any] = {
-    "string": str, "object": dict, "array": list, "boolean": bool,
-    "null": type(None), "integer": int, "number": (int, float),
-}  # fmt: skip
+#: The Origin clause kinds, each at most once on the line.
+ORIGIN_KINDS = ("backlog", "bugs", "findings")
+_ORIGIN_RE = re.compile(r"^\*\*Origin:\*\*[ \t]*(.*?)[ \t]*$", re.MULTILINE)
+_ORIGIN_GRAMMAR = "operator-demand | backlog:<ids>; bugs:<ids>; findings:<ids>, each kind once"
 
 
-_SCHEMAS = Path(__file__).resolve().parent / "schemas"
-#: Source-tree fallback, before `public stage` copies the schema in.
-_SHIPPED = Path(__file__).resolve().parents[3] / "schemas"
+#: The closure summary grammar: `delivered: …; carried: …; backlog exits: …`.
+SUMMARY = re.compile(
+    r"delivered: (?P<delivered>.+?); carried: (?P<carried>.+?); backlog exits: (?P<exits>.+)"
+)
 
 
-def load_schema(name: str) -> dict[str, Any]:
-    own = _SCHEMAS / f"{name}.schema.json"
-    path = own if own.is_file() else next(_SHIPPED.rglob(own.name), own)
-    schema: dict[str, Any] = json.loads(path.read_text("utf-8"))
-    return schema
+def closure_summary(state: dict[str, Any]) -> dict[str, str]:
+    """The live candidate's closure summary as ``delivered``, ``carried`` and ``exits``: the
+    last `kind: summary` entry at or after ``defined.ts``, past DEFINITION; empty when none
+    or malformed; the word ``none`` reads as an empty field."""
+    since = str((state.get("defined") or {}).get("ts") or "")
+    if state.get("phase") == "DEFINITION":
+        return {}
+    for entry in reversed(state.get("log") or []):
+        if entry.get("kind") == "summary" and str(entry.get("ts")) >= since:
+            found = SUMMARY.fullmatch(str(entry.get("text", "")))
+            fields = found.groupdict() if found else {}
+            return {name: "" if text == "none" else text for name, text in fields.items()}
+    return {}
 
 
-def utc_now() -> str:
-    return _dt.datetime.now(_dt.UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+class ShallowClone(ValueError):
+    """*specs* sits in a shallow clone: no instant can be placed in its cut history."""
 
 
-def semver_key(release_id: str) -> tuple[int, ...]:
-    return tuple(int(part) for part in release_id.split("."))
+class UnreadableRelease(ValueError):
+    """A release state or the history `candidate_at` reads is unreadable; ``args[1]`` is the act."""
 
 
-def extract_status(text: str) -> str | None:
-    """The ``**Status:**`` token a trio document carries, or ``None``."""
-    match = _STATUS_RE.search(text)
-    return match.group(1) if match else None
+def live_id(specs: Path) -> str:
+    """The ONE live release id; none live raises :class:`UnreadableRelease`, several the kernel
+    ``Refusal``, each with its act."""
+    from _specs import choice, script  # the entry point's bootstrap resolves it
+
+    release = script(Path(__file__).resolve().parent / "release.py")
+    if (live := sole_live(specs)) is None:
+        raise choice(UnreadableRelease("no live release under specs/releases/ — nothing to operate on",
+                                release("new")), "with the release version you choose")  # fmt: skip
+    return live
 
 
-def unfinished_tasks(release_dir: Path) -> list[str]:
-    """The ``[ ]``/``[-]`` lines TASKS.md still carries — the LINES, so a refusal names
-    the task that blocks it. A missing TASKS.md carries none: its absence is the trio
-    rule's business, not this one's."""
-    tasks = release_dir / "TASKS.md"
-    if not tasks.is_file():
+def utc(ts: str) -> _dt.datetime:
+    """An instant in UTC: an offset converts, `Z` is UTC, and none is UTC, never the host's zone."""
+    at = _dt.datetime.fromisoformat(ts.replace("Z", "+00:00"))
+    return at.replace(tzinfo=_dt.UTC) if at.tzinfo is None else at.astimezone(_dt.UTC)
+
+
+def read_state(path: Path) -> State:
+    """The one reader of a state document, refusing anything this script cannot read in full."""
+    fix = act("agent", f"repair {path} until `{SCRIPT.inline('check')}` passes")
+    try:
+        text = read_text(path)
+    except OSError as exc:
+        raise Refusal(f"{path.name} cannot be read ({exc})", fix) from exc
+    return parse_object(text, fix)
+
+
+@functools.cache
+def releases(specs: Path) -> dict[str, tuple[_dt.datetime, _dt.datetime | None]]:
+    """Each release id, live or archived -> its span: first `log` ts, `shipped.ts` or None."""
+    spans: dict[str, tuple[_dt.datetime, _dt.datetime | None]] = {}
+    for path in [*(specs / "releases").glob(f"*/{STATE}"), *(specs / "releases/_archive").glob(f"*/{STATE}")]:  # fmt: skip
+        try:
+            state = read_state(path)
+            shipped = (state.get("shipped") or {}).get("ts")
+            spans[path.parent.name] = (
+                utc(state["log"][0]["ts"]),
+                utc(shipped) if shipped else None,
+            )
+        except (Refusal, ValueError, LookupError, TypeError, AttributeError) as exc:
+            raise UnreadableRelease(f"{path} has no readable first log ts and shipped ts ({exc})",
+                             act("agent", f"repair {path} until `release.py check` passes")) from None  # fmt: skip
+    return spans
+
+
+@functools.cache
+def candidate_adds(specs: Path) -> list[tuple[_dt.datetime, str, str]]:
+    """Each candidate's birth as (instant, release, rc): a commit adding exactly one
+    rc-<N>/SPEC.md whose status reads non-Approved; a shallow history is refused."""
+    if _git.shallow(specs):
+        raise ShallowClone(f"{specs} is in a shallow clone: a release candidate read from a cut history "
+                           "would be stamped wrong for good")  # fmt: skip
+    try:
+        _git.git(specs, "rev-parse", "-q", "--verify", "HEAD")
+    except RuntimeError:  # a repo with no commit yet holds no birth
         return []
-    text = tasks.read_text(encoding="utf-8")
-    return [match.group(0).strip() for match in UNFINISHED_RE.finditer(text)]
+    try:
+        log = _git.git(specs, "log", "--diff-filter=A", "--name-only", "--format=%x00%H %cI", "--",
+                       ":(glob)releases/**/rc-*/SPEC.md")  # fmt: skip
+    except RuntimeError as exc:
+        from _platform import git_line  # the entry point's bootstrap resolves it
+
+        raise UnreadableRelease(
+            f"cannot read the history of {specs}: {exc}", git_line(specs, "fsck")
+        ) from None
+    adds = []
+    for commit in log.split("\0")[1:]:
+        sha, *paths = commit.split()
+        if len(paths) != 2:  # the instant, then exactly one added SPEC.md
+            continue
+        if extract_status(_git.git(specs, "show", f"{sha}:{paths[1]}", check=False)) != APPROVED:
+            parts = paths[1].split("/")
+            adds.append((utc(paths[0]), parts[-3], parts[-2]))
+    return adds
 
 
-def find_specs(start: Path) -> Path:
-    """The nearest ``specs/`` at or above *start* whose parent holds ``.git``."""
-    for candidate in (start, *start.parents):
-        if (candidate / "specs").is_dir() and (candidate / ".git").exists():
-            return candidate / "specs"
-    print(f"error: no git-rooted specs/ at or above {start}", file=sys.stderr)
-    print("fix: run this script again with --specs <path-to-specs>", file=sys.stderr)
-    raise SystemExit(1)
+def candidate_at(specs: Path, instant: str) -> dict[str, str]:
+    """The ONE answer to "which candidate held *instant*": the release whose half-open span
+    holds it, the rc born last before it in that release, else ``unknown``; raises
+    :class:`ShallowClone`, :class:`UnreadableRelease`, or ``ValueError`` for a bad *instant*."""
+    when = utc(instant)
+    adds = candidate_adds(specs)
+    held = (r for r, (start, end) in releases(specs).items() if start <= when and (end is None or when < end))  # fmt: skip
+    release = next(held, "unknown")
+    born = [(t, rc) for t, r, rc in adds if r == release and t <= when]
+    return {"release": release, "rc": max(born)[1] if born else "unknown"}
 
 
-def _scalar_errors(where: str, value: object, spec: dict[str, Any]) -> Iterator[str]:
-    const = spec.get("const")
-    if const is not None and value != const:
-        yield f"{where} must be {const!r}, got {value!r}"
-    if isinstance(value, int) and not isinstance(value, bool):
-        minimum = spec.get("minimum")
-        if minimum is not None and value < minimum:
-            yield f"{where} is below its minimum of {minimum}"
-    if not isinstance(value, str):
-        return
-    enum = spec.get("enum")
-    if enum and value not in enum:
-        yield f"{where} must be one of {sorted(enum)}, got {value!r}"
-    pattern = spec.get("pattern")
-    if pattern is not None and re.search(pattern, value) is None:
-        yield f"{where} value {value!r} does not match {pattern}"
-    minimum_length = spec.get("minLength")
-    if minimum_length is not None and len(value) < minimum_length:
-        yield f"{where} is shorter than its minLength of {minimum_length}"
+def origin(text: str) -> dict[str, list[str]]:
+    """The ids the first ``**Origin:**`` line carries, by kind; ``{}`` for operator-demand.
+    The ONE Origin parser: raises ``ValueError`` saying what is wrong."""
+    match = _ORIGIN_RE.search(text)
+    if match is None:
+        raise ValueError(f"has no `**Origin:**` line ({_ORIGIN_GRAMMAR})")
+    carried: dict[str, list[str]] = {}
+    for clause in [] if match.group(1) == "operator-demand" else match.group(1).split(";"):
+        kind, _, ids = clause.strip().partition(":")
+        cited = [i.strip() for i in ids.split(",") if i.strip()]
+        if kind not in ORIGIN_KINDS or kind in carried or not cited:
+            raise ValueError(f"Origin {match.group(1)!r} is not canonical: {_ORIGIN_GRAMMAR}")
+        carried[kind] = cited
+    return carried
 
 
-def validate(
-    value: object, spec: dict[str, Any], root: dict[str, Any], where: str
-) -> Iterator[str]:
-    """The JSON-Schema subset these documents use: ``$ref`` into ``$defs``, type, const,
-    enum, pattern, minLength, minimum, required, ``additionalProperties: false``, items."""
-    ref = spec.get("$ref")
-    if ref is not None:
-        spec = root["$defs"][ref.rsplit("/", 1)[-1]]
-    declared = spec.get("type")
-    allowed = declared if isinstance(declared, list) else [declared] if declared else []
-    if allowed and not any(isinstance(value, _JSON_TYPES[name]) for name in allowed):
-        yield f"{where} must be of type {declared}"
-        return
-    yield from _scalar_errors(where, value, spec)
-    if isinstance(value, list) and "items" in spec:
-        for index, item in enumerate(value):
-            yield from validate(item, spec["items"], root, f"{where}[{index}]")
-    if not isinstance(value, dict):
-        return
-    properties: dict[str, Any] = spec.get("properties", {})
-    for key in spec.get("required", ()):
-        if key not in value:
-            yield f"{where} is missing required field {key!r}"
-    if spec.get("additionalProperties") is False:
-        for key in sorted(set(value) - set(properties)):
-            yield f"{where} carries field {key!r}, which the schema does not allow"
-    for key, child in value.items():
-        if key in properties:
-            yield from validate(child, properties[key], root, f"{where}.{key}")
+def origin_line(text: str) -> int:
+    """The 1-based line :func:`origin` reads, 1 when there is none."""
+    match = _ORIGIN_RE.search(text)
+    return text.count("\n", 0, match.start()) + 1 if match else 1
+
+
+def _milestone_rc(state: dict[str, Any]) -> int:
+    """The number of the last ``milestone`` entry's candidate; 0 when the log has none."""
+    entries = state.get("log") or []
+    names = [str(e.get("candidate")) for e in entries if e.get("kind") == "milestone"]
+    return candidate_number(names)
+
+
+def _last_rc(release_dir: Path, state: dict[str, Any] | None) -> int:
+    """The ONE rule for "the last candidate": the last ``milestone`` entry's, else the highest
+    ``rc-<N>`` folder, else 1 for a live release's legacy flat trio, else 0. With no state the
+    trio is not counted: that call places it (the upgrade fold)."""
+    if last := _milestone_rc(state or {}):
+        return last
+    folders = candidate_number(d.name for d in release_dir.iterdir() if d.is_dir()) if release_dir.is_dir() else 0  # fmt: skip
+    return folders or int(state is not None and (release_dir / "SPEC.md").is_file())
+
+
+def current_candidate(release_dir: Path, state: dict[str, Any]) -> Path | None:
+    """The ``rc-<N>/`` the release is working: the last candidate in IMPLEMENTATION or CLOSURE,
+    the one past a milestone's in DEFINITION; ``None`` for a legacy flat release, which has no folder."""
+    if last := _milestone_rc(state):
+        return release_dir / f"rc-{last + (state.get('phase') == DEFINITION)}"
+    return candidate_dir(release_dir)
+
+
+def next_candidate(release_dir: Path, state: dict[str, Any] | None) -> Path:
+    """The ``rc-<N+1>/`` a candidate is born in: past the last candidate, so a drafted folder
+    there is adopted."""
+    return release_dir / f"rc-{_last_rc(release_dir, state) + 1}"
+
+
+def writes(line: str) -> list[str]:
+    """The backticked paths a task line's `W:` writes, up to the first ``·``; a path in a
+    parenthesized span (nesting counted) is named, not written."""
+    field, depth, kept = line.partition("`W:`")[2].split("·")[0], 0, ""
+    for char in field:
+        depth = max(0, depth + (char == "(") - (char == ")"))
+        kept += char if depth == 0 and char != ")" else ""
+    return re.findall(r"`([^`]+)`", kept)
+
+
+def stage_writes(body: str) -> list[list[str]]:
+    """Each task line's `W:` paths in one stage *body*: a bullet's `W:` field, or a table
+    row's cell under its header's `W:` column."""
+    tasks, column = [], None
+    for line in body.splitlines():
+        cells = [c.strip() for c in line.split("|")] if line.lstrip().startswith("|") else []
+        if "`W:`" in cells:
+            column = cells.index("`W:`")
+            continue
+        column = column if cells else None
+        if paths := writes("`W:` " + cells[column] if column and column < len(cells) else line):
+            tasks.append(paths)
+    return tasks
+
+
+def _cells(line: str) -> list[str]:
+    """The cells of one Markdown table line, without its optional edge pipes."""
+    return [cell.strip() for cell in line.strip().strip("|").split("|")]
+
+
+def _table_rows(
+    lines: list[str], header_at: int, headers: list[str], missing_separator: str
+) -> tuple[list[str], list[str]]:
+    """A Markdown table's data rows, after its canonical separator."""
+    separator_at = header_at + 1
+    if separator_at >= len(lines):
+        return [], [missing_separator]
+    separator = _cells(lines[separator_at])
+    if len(separator) != len(headers) or any(
+        re.fullmatch(r":?-{3,}:?", cell) is None for cell in separator
+    ):
+        return [], [missing_separator]
+    return [line for line in lines[separator_at + 1 :] if line.lstrip().startswith("|")], []
+
+
+def current_job_writes(text: str, rel: str) -> tuple[set[str] | None, list[str]]:
+    """A current job table's authoritative write union and errors; ``None`` marks history."""
+    if re.search(r"^## Stage ", text, re.MULTILINE):
+        return None, []
+    lines = text.splitlines()
+    header_at = next((n for n, line in enumerate(lines) if line.lstrip().startswith("|")), None)
+    if header_at is None:
+        return set(), [f"{rel} has no canonical task table"]
+    headers = _cells(lines[header_at])
+    required = ("task", "AC", "`W:`")
+    if any(headers.count(name) != 1 for name in required):
+        return set(), [f"{rel} task table must carry canonical task, AC and `W:` columns"]
+    rows, errors = _table_rows(
+        lines, header_at, headers, f"{rel} task table has no canonical separator row"
+    )
+    if errors:
+        return set(), errors
+    task_at, ac_at, writes_at = (headers.index(name) for name in required)
+    found: set[str] = set()
+    authority: set[str] = set()
+    if not rows:
+        return set(), [f"{rel} has no task carrying id, AC and exact `W:` set"]
+    for line in rows:
+        cells = _cells(line)
+        if len(cells) != len(headers):
+            errors.append(f"{rel} has a malformed task row")
+            continue
+        task_id = cells[task_at]
+        if not TASK_ID_RE.fullmatch(task_id):
+            errors.append(f"{rel} has an empty or malformed task id")
+            continue
+        if task_id in found:
+            errors.append(f"{rel} repeats task {task_id}")
+            continue
+        found.add(task_id)
+        if not re.search(r"\bAC\d", cells[ac_at]):
+            errors.append(f"{rel} task {task_id} has no AC")
+        paths = writes(f"`W:` {cells[writes_at]}")
+        if not paths:
+            errors.append(f"{rel} task {task_id} has no exact `W:` set")
+        if any(p.split("/")[:2] == ["specs", "memory"] for p in paths):
+            errors.append(
+                f"{rel} task {task_id} {MEMORY_WRITE} — memory is closure procedure (RC-FLOW step 4)"
+            )
+        authority.update(paths)
+    return authority, errors
+
+
+def job_errors(text: str, rel: str) -> list[str]:
+    """Why a current task table or historical stage-shaped job file is malformed."""
+    stages = re.split(r"^## Stage ", text, flags=re.MULTILINE)[1:]
+    if not stages:
+        return current_job_writes(text, rel)[1]
+    task_rows: list[tuple[str, str, list[str]]] = []
+    for line in text.splitlines():
+        cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
+        if len(cells) >= 3 and TASK_ID_RE.fullmatch(cells[0]):
+            task_rows.append((cells[0], cells[1], writes(f"`W:` {cells[2]}")))
+            continue
+        match = re.match(r"^[-*+]\s+(J\d+(?:\.S\d+)?\.T\d+)\s+", line)
+        if match:
+            task_rows.append((match.group(1), line.partition("—")[2], writes(line)))
+    errors = [
+        f"{rel} task {task_id} has no AC"
+        for task_id, ac, _ in task_rows
+        if not re.search(r"\bAC\d", ac)
+    ]
+    errors += [
+        f"{rel} task {task_id} has no exact `W:` set"
+        for task_id, _, paths in task_rows
+        if not paths
+    ]
+    for body in stages:
+        stage, tasks = body.split(maxsplit=1)[0], stage_writes(body)
+        if not re.search(r"^- Contract:", body, re.MULTILINE):
+            errors.append(f"{rel} stage {stage} has no '- Contract:' line")
+        flat = [path for paths in tasks for path in set(paths)]
+        errors += [f"{rel} stage {stage}: two tasks write {path} — `W:` sets overlap"
+                   for path in sorted({p for p in flat if flat.count(p) > 1})]  # fmt: skip
+    return errors
+
+
+def current_plan_jobs(text: str) -> tuple[dict[str, tuple[int, set[str]]] | None, list[str]]:
+    """The current DAG's job -> (wave, exact writes) authority; ``None`` marks history."""
+    if not re.search(r"^## (?:\d+\. )?As-is review\s*$", text, re.MULTILINE):
+        return {}, ["PLAN.md has no 'As-is review' section"]
+    section = re.split(r"^## DAG.*$", text, maxsplit=1, flags=re.MULTILINE)[1:]
+    if not section:
+        return {}, ["PLAN.md has no '## DAG' section"]
+    lines = re.split(r"^#", section[0], maxsplit=1, flags=re.MULTILINE)[0].splitlines()
+    header_at = next((n for n, line in enumerate(lines) if line.lstrip().startswith("|")), None)
+    if header_at is None:
+        return {}, ["PLAN.md DAG has no table"]
+    headers = [cell.strip().strip("`").lower() for cell in _cells(lines[header_at])]
+    required = ("job", "waits on")
+    if any(name not in headers for name in required):
+        return {}, ["PLAN.md DAG table must carry job and waits on columns"]
+    current = "wave" in headers or "w:" in headers
+    if current and not {"wave", "w:"}.issubset(headers):
+        return {}, ["PLAN.md DAG table must carry wave and exact `W:` columns together"]
+    if not current:  # historical plans carry their overlap metadata in `### Hot files`.
+        history_errors = (
+            []
+            if re.search(r"^### Hot files\s*$", text, re.MULTILINE)
+            else ["PLAN.md DAG table has no wave and exact `W:` columns"]
+        )
+        return None, history_errors
+    rows, errors = _table_rows(
+        lines, header_at, headers, "PLAN.md DAG table has no canonical separator row"
+    )
+    if errors:
+        return {}, errors
+    return _plan_jobs(rows, headers)
+
+
+def _plan_jobs(
+    rows: list[str], headers: list[str]
+) -> tuple[dict[str, tuple[int, set[str]]], list[str]]:
+    """The DAG's job -> (wave, exact writes) from its data *rows*, and why a row is refused."""
+    job_at, wave_at, writes_at = (headers.index(name) for name in ("job", "wave", "w:"))
+    jobs: dict[str, tuple[int, set[str]]] = {}
+    errors: list[str] = []
+    for line in rows:
+        cells = _cells(line)
+        if len(cells) != len(headers) or not cells[job_at]:
+            errors.append("PLAN.md DAG has an empty or malformed job row")
+            continue
+        job = cells[job_at]
+        row_paths = re.findall(r"`([^`]+)`", cells[writes_at])
+        if not cells[wave_at].isdigit() or not row_paths:
+            errors.append(f"PLAN.md DAG job {job} has no numeric wave and exact `W:` set")
+        elif job in jobs:
+            errors.append(f"PLAN.md DAG repeats {job}")
+        else:
+            jobs[job] = (int(cells[wave_at]), set(row_paths))
+    if not jobs:
+        errors.append("PLAN.md DAG has no jobs")
+    return jobs, errors
+
+
+def plan_errors(text: str) -> list[str]:
+    """Why a current PLAN's as-is review and DAG table cannot enter implementation."""
+    jobs, errors = current_plan_jobs(text)
+    if jobs is None or errors:
+        return errors
+    by_wave: dict[int, list[str]] = {}
+    for wave, paths in jobs.values():
+        by_wave.setdefault(wave, []).extend(paths)
+    for wave, wave_paths in by_wave.items():
+        errors += [
+            f"PLAN.md DAG wave {wave}: two jobs write {path} — `W:` sets overlap"
+            for path in sorted({path for path in wave_paths if wave_paths.count(path) > 1})
+        ]
+    return errors

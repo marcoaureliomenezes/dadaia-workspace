@@ -1,0 +1,38 @@
+"""The CLI digest is
+DERIVED from the live command tree — one source, never transcribed."""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+from dadaia_workspace.cli.help_digest import _MAX_CHARS, render_digest, write_digest
+from tests.helpers.cli_root import live_root
+from tests.helpers.oslib import write_text
+
+
+def test_digest_derives_from_the_live_tree_within_budget() -> None:
+    text = render_digest(live_root())
+    assert len(text) <= _MAX_CHARS, "digest must stay within the ~4k-token budget"
+    # Derived and grounded in real groups; no version, which is not a fact of the tree —
+    # a version bump must never drift the committed docs/cli.md.
+    assert text.startswith("# dadaia CLI digest (derived from the live command tree")
+    assert "(v" not in text.splitlines()[0]
+    for group in ("context", "specs", "doctor", "public", "help"):
+        assert f"## dadaia {group}" in text or f"- {group} " in text, group
+    # The one retired phantom the old hand-written skill documented.
+    assert "specs hotfix" not in text
+
+
+def test_write_digest_skips_an_identical_file(tmp_path: Path) -> None:
+    first = write_digest(tmp_path, live_root())
+    assert first is not None and first.is_file()
+    mtime = first.stat().st_mtime_ns
+    second = write_digest(tmp_path, live_root())
+    assert second == first
+    assert first.stat().st_mtime_ns == mtime, "an identical digest must skip the rewrite"
+
+
+def test_write_digest_fails_soft(tmp_path: Path) -> None:
+    blocker = tmp_path / ".dadaia"
+    write_text(blocker, "not a dir")
+    assert write_digest(tmp_path, live_root()) is None

@@ -1,39 +1,43 @@
 ---
 name: dd-manager-orchestration
 description: >
-  Dispatch reference for the main thread (the operator's session), the only coordinator: the dispatch protocol, decision authority, escalation triggers, forbidden actions, and the
-  which-skill-when router. Use when dispatching work, resolving a conflict, or
-  routing a demand to the right skill.
+  Dispatch reference for the main thread (the operator's session), the only coordinator: the dispatch protocol, decision authority, escalation triggers, and main-thread discipline. Use when dispatching work or resolving a conflict. Not the order of a candidate's jobs and tasks (dd-release-implementation's RC-FLOW.md) nor worktree mechanics (worktrees/AGENTS.md).
 ---
 
 # dd-manager-orchestration
 
-> No engine runs the SDD flow — each stage is agent-dispatched.
-> This skill is reference for the main thread, never a substitute for the SDD
-> documents. It stays generic: no operator-private names, hosts, or repo slugs.
-
 ## 1. Dispatch protocol
 
-1. The main thread dispatches the three roles; resolve the target agent and its stage from the root `AGENTS.md` map §2.
-2. Only the main thread calls other agents — a leaf specialist cannot chain
-   further dispatch; route a leaf's returned handoff to its `next_handoff.agent`.
-3. Open every dispatch prompt with the Input Contract block: context, specs_dir,
-   release_id, task_id, report_dir, handoff_dir, allowed_write_paths.
-4. Reports land in the repo's reports home; every report
-   feeding another agent gets a handoff under `.dadaia/handoff/<context>/`.
-5. The review/QA sequence holds by discipline (main thread, implementer, reviewer
-   each uphold their half); git chokepoints are the only mechanical backstop.
+1. Resolve the target agent from the root `AGENTS.md`, heading "Who does what". Research and extraction go to `dd-researcher`, never `Explore` or `general-purpose`.
+2. Only the main thread calls other agents; route a leaf's returned handoff to its `next_handoff.agent`.
+3. Open every dispatch prompt with this block:
+
+   ```
+   context: <ctx>
+   specs_dir: <path>
+   release_id: <id>
+   task_id: <J<n>.T<k> or the review target>
+   worktree: <path>
+   ```
+4. Reports land where the root `AGENTS.md`, heading "Where things are written", says; a report feeding another agent gets a handoff under `.dadaia/handoff/<context>/`.
+5. Open, merge and clean worktrees with `.dadaia/.venv/bin/dadaia worktree` (verbs: its `--help`; rules: `worktrees/AGENTS.md`).
+6. The task is the unit of dispatch, never a job: sub-agents work disjoint tasks in parallel, one `wt-task-<kkk>` tree each (`worktrees/AGENTS.md`, heading "The tree").
+7. Dispatch by the job file's `who:` (shape rule: `dd-release-definition`, heading "The job file — tasks"): `sr` → dd-sw-engineer-sr, `jr` → dd-sw-engineer-jr, `pe`/`cr` → the owning persona. Pass no model; the installed template decides.
+8. A REJECTED verdict whose finding names a `jr` task re-dispatches that task to dd-sw-engineer-sr.
+9. A ruling carries its reproduction and a consumer sweep across every repo of the context.
+10. A rework brief names the finding's contract class, requires its RED test first and a sweep of every other site of the class, and carries the bug history to read, the seams with evidence and the merge hazards with sibling jobs.
+11. One fresh agent per task, its full scope in its first prompt; a changed scope is a new dispatch, and an agent that stops early leaves the rest to a new dispatch against the same worktree.
+12. Check commits, files and test runs yourself; a handoff reported but not written does not count.
+13. A status answer counts each open class with its number.
+14. When a task's work merges or its hand-back is checked, stop every agent of that task still running; a finished agent is never left running.
 
 ## 2. Conflict resolution
 
-1. Resolve a decision by domain with the Decision Authority table (§3); evidence
+1. Resolve a decision by domain with the "Decision authority" table below; evidence
    means `file:line`, spec citation, command output, or handoff field.
-2. On a two-agent deadlock: each agent writes a `Conflict Position` section in its
-   report; the main thread writes a synthesis naming the exact decision point.
-3. Still unresolved: call `dd-grill-me`, ask the operator one concrete question,
-   and reflect the answer in SPEC, PLAN, TASKS, ADR, or memory per the phase.
-4. Stop and surface to the operator on any Escalation trigger (§3); never perform a
-   Forbidden action (§3).
+2. On a two-agent deadlock: each agent states its position with evidence in the `findings` of its handoff or verdict; the main thread writes a synthesis naming the exact decision point.
+3. Still unresolved: before launch, call `dd-grill-me` and reflect the operator's answer in SPEC, PLAN, job files, ADR, or memory per the phase; after launch, decide by law, ADRs and rulings (a failing old test: the root `AGENTS.md`, heading "The flow", test line) and log it with the label `dd-grill-me` gives an unruled default.
+4. Between launch and the closure report to the operator the main thread asks nothing: every question belongs to `dd-grill-me` before launch. An act the law reserves to the operator, and a bug proposal, wait for the closure report as one batch while independent tasks continue; the exception is a block-list bug (`specs/bugs/AGENTS.md`, heading "Resolution", a security finding included), put to the operator at once since it stops every merge.
 
 ## 3. Reference tables
 
@@ -41,37 +45,30 @@ description: >
 
 | Domain | Primary authority | May object with evidence | Tie-breaker |
 |---|---|---|---|
-| Scope, SPEC, memory, backlog | dd-product-engineer | any agent | operator |
-| PLAN, TASKS, implementation, tests | dd-software-engineer | dd-code-reviewer | operator |
-| Every review lens (architecture, security, QA, product, audit, AI surface) | dd-code-reviewer | dd-software-engineer | operator |
+| Scope, SPEC, memory, backlog | dd-product-engineer | any agent | main thread; operator for a product-contract change |
+| PLAN, job files, implementation, tests | dd-sw-engineer-sr | dd-code-reviewer | main thread |
+| Every review lens (architecture, security, QA, product, audit, AI surface) | dd-code-reviewer | dd-sw-engineer-sr | main thread |
 
-### Escalation triggers — stop and surface to the operator
+### Escalation triggers — a report line, not a wait
 
-1. Required SPEC/PLAN/TASKS or a resolvable `_RELEASE.json` `phase` missing or not
-   approved.
+1. Required SPEC/PLAN/job files or a resolvable `_RELEASE.json` `phase` missing or not
+   approved (the `specs/AGENTS.md` precondition, heading "Before implementing", fails).
 2. A CRITICAL security issue.
 3. A dispatched agent returns `[SCOPE ERROR]`.
 4. Three or more unresolved conflicts open.
-5. The work needs an optional domain pack that is not installed.
-6. The demand cannot decompose into tasks without changing an approved SPEC.
+5. The demand cannot decompose into tasks without changing an approved SPEC.
 
-### Forbidden actions
+### Main-thread discipline
 
-| Action | Why |
+| Do | Because |
 |---|---|
-| Recursive agent chains without operator approval | Breaks traceability |
-| Marking tasks DONE without validation evidence | Skips acceptance |
-| Push, PR, merge, deploy, closure, or `[x]` before the reviewer's `APPROVED` | Bypasses the quality gate |
-| Editing production files without a `[-]` reservation | Breaks task traceability |
-| Private/project-specific details in public assets | Security and portability |
+| Chain agents only through the main thread | Every hand-off stays traceable |
+| Merge a task only with its validation evidence | Acceptance is checked |
+| Merge only as `worktrees/AGENTS.md`, heading "Merges, gates, review", says | One gate, one home |
+| Edit production files only inside the tree its task names; a bug fix, where `specs/bugs/AGENTS.md`, heading "Resolution", says | The edit then passes its tree's merge checks and review. |
+| Land an edit inside an open job as one of its tasks | Micro-dispatch: the ritual wait it adds outweighs the edit |
 
-## 4. The router
+## 4. Done when
 
-- One line per skill, and the two arms they serve, live in the root `AGENTS.md` map — read it there, never a second roster.
-
-## 5. Done when
-
-- Every dispatch prompt carries the Input Contract block and a handoff on
-  completion.
-- Every conflict either resolved via evidence-based authority or escalated.
-- No forbidden action occurred.
+- Every merge meets its gate (the "Merge only as" row above); every dispatch prompt carries the block of step 3.
+- Every conflict either resolved via evidence-based authority or reported.

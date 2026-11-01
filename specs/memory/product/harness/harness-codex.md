@@ -2,33 +2,35 @@
 slug: harness-codex
 title: harness-codex
 tldr: "Entry harness on the Codex CLI: native AGENTS.md chain and .agents/skills; .codex/ carries config, hooks, the command policy and persona TOML."
-summary: Codex reads the root map, the root->cwd AGENTS.md chain and .agents/skills natively; .codex/ holds config.toml, hooks.json, the command-policy rules and the three dd- persona TOMLs transcoded from .agents/agents/.
+summary: Codex reads the root map, the root->cwd AGENTS.md chain and .agents/skills natively; .codex/ holds config.toml, hooks.json, the command-policy rules and the five dd- persona TOMLs transcoded from .agents/agents/.
 tags: [harness, codex, projection, hooks]
 sources:
   - dadaia_workspace/core/harness_registry.py
   - dadaia_workspace/infrastructure/codex_doctor.py
   - dadaia_workspace/infrastructure/agent_transcodes.py
   - dadaia_workspace/infrastructure/runtime_config.py
+  - dadaia_workspace/infrastructure/runtime_transforms/codex_assets.py
   - dadaia_workspace/infrastructure/runtime_transforms/hook_wrappers.py
 ---
 
 ## Surface
 
 - Codex is an entry harness — the `codex` TUI and headless `codex exec` — reading the root `AGENTS.md` map, the root->cwd `AGENTS.md` chain and `.agents/skills/` natively; scoped law outside that chain reaches it by skill procedure ([[agentic-entities]]).
-- `dadaia harness add codex` projects `.codex/config.toml`, `.codex/hooks.json`, `.codex/rules/dadaia-command-policy.rules` and `.codex/agents/dd-*.toml` — each persona transcoded from `.agents/agents/` with `sandbox_mode` `read-only` or `workspace-write` derived from its `activity_class`; every file is compared byte-wise against its renderer, stale persona files pruned.
-- Command policy is the Starlark `.rules` file — prefix rules over venv-form paths, the one rule dialect Codex executes.
-- Without a workspace, the standalone `dd-` skills reach a Codex user through the `dadaia-skills` repository installed into `.agents/skills` ([[public-asset-distribution]]).
+- `dadaia harness add codex` projects `.codex/config.toml`, `.codex/hooks.json`, `.codex/rules/dadaia-command-policy.rules` and `.codex/agents/dd-*.toml` — each persona transcoded from `.agents/agents/` with `sandbox_mode = "workspace-write"` always (a persona's `read_only` is validated and fail-closed on a bad value, never rendered as a sandbox; the reviewer's read-only holds through its write set and `verdict.py`); every file is compared byte-wise against its renderer, stale persona files pruned.
+- Command policy is the Starlark `.rules` file — prefix rules over venv-form paths, the one rule dialect Codex executes. Ordinary `public install` and work-branch pushes receive no product-defined decision; pushes follow the root `AGENTS.md` Gitflow and its shipped pre-push chokepoint. `public install --force`, context deletion and destructive commands receive product-defined prompts.
 
 ## Hooks
 
-- The four hook behaviours ([[agentic-entities]]) are registered in `.codex/hooks.json` through wrappers under `.dadaia/hooks/codex-*`: `PreToolUse` the pre-gate (matcher `^(apply_patch|Edit|Write|Bash)$`), a matcher-less `PostToolUse` post-gate, `SessionStart` (`startup|resume`) ctx-inject plus the reaper, and `UserPromptSubmit` ctx-inject.
-- Codex reads the gate's `decision: block`/`reason` envelope directly; the wrappers translate nothing ([[sdd-gate-v3]]).
-- Hook firing is version-qualified: live-certified only at the one codex-cli version pinned in `_CODEX_HOOKS_LIVE_CERTIFIED_VERSION` (`dadaia_workspace/infrastructure/codex_doctor.py`); any other version is reported UNVERIFIED, no version floor enforced. `dadaia certify`'s `codex-live-probe` runs a real `codex exec`.
+- The hook behaviours ([[agentic-entities]]) are registered in `.codex/hooks.json` through wrappers under `.dadaia/hooks/codex-*`: `PreToolUse` the pre-gate (matcher `^(apply_patch|Edit|Write)$`), a matcher-less `PostToolUse` post-gate, `SessionStart` (`startup|resume`) ctx-inject plus the reaper, and `UserPromptSubmit` ctx-inject.
+- Codex reads the gate's `decision: block`/`reason` envelope directly; the wrappers translate nothing.
+- Its hooks run with no session id in their env: each takes the payload's `session_id`, which equals the id a command of the session and of its subagents sees in `CODEX_SESSION_ID`, or `CODEX_THREAD_ID` on a Codex that sets only that (the row's `session_env`), so the heartbeat leaves the live record under that id ([[context-management]]).
+- Its registry row names the payload's `agent_type` as its subagent key, so Codex is judged by its session record: `context bind` and every write verb of `verdict.py`, `backlog.py`, `release.py` and `worktree.py` refuse a call whose env carries a Codex session id with no live record under the workspace root, with the governed-session refusal's message and fix ([[context-management]]). Codex runs a project hook only for a trusted project whose hook hashes it trusts, so a session launched outside the root, or in a project Codex does not trust, writes no record and is refused; the library sets no Codex trust itself. The pre-gate's matcher holds no shell tool, so the verdict-writer act itself is not judged: inside a governed session an ad-hoc subagent can still write a verdict, which the eval's forged-verdict check measures ([[sdd-gate-v3]], [[agent-evals]]).
+- Whether hooks fire is `dadaia certify`'s `codex-live-probe` (a real `codex exec`), never the doctor's.
 
 ## Models and doctor
 
-- Codex tier identity is native `(model id × model_reasoning_effort)`, derived from the model registry; two tiers collapsing to one pair fail loudly.
-- `dadaia public doctor` keeps the structural checks byte comparison cannot express: `D-CX-7` (every `dd-` token a persona cites resolves to a skill or persona), `D-CX-8` (rules are Starlark `.rules`, never Markdown) and `D-CX-9` (hooks invoke executable wrappers).
+- Codex tier identity is native `(model id × model_reasoning_effort)`: `TIER_CODEX` maps the template's tier alias to the Codex id, an alias outside it failing closed, and the effort comes from one resolver: the D-3 clamp of the template effort, else `medium`.
+- `dadaia public doctor` keeps the structural checks byte comparison cannot express: `D-CX-7` (every `dd-` token a persona cites resolves to a skill or persona) and `D-CX-8` (a Markdown file in `.codex/rules/` is flagged; the `.rules` file itself is a byte-compared rule).
 
 ## Dependencies
 

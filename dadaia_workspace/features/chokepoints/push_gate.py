@@ -1,27 +1,26 @@
-"""Push-gate orchestration.
-
-:func:`push_gate_decision` is the pre-push half of the chokepoint contract: branch
-policy (:mod:`~dadaia_workspace.features.chokepoints.branch_policy`) first, then the
-specs/ canon scan, then the range-scoped denylist scan
-(:mod:`~dadaia_workspace.features.chokepoints.denylist_scan`) — first refusal wins.
-Security review is the reviewer's lens before each PR, never a step here.
-
-This module is business logic: it imports ``core`` only, NEVER ``infrastructure``, and
-never spawns a subprocess. The canon predicate (``canon_violations_fn``) and the injected :class:`ObjectSource` are parameters, wired
-by the CLI composition root (``cli/commands/ci.py``) — an unwired production call site
-is a CLI defect, never a bypass.
-"""
+"""Push-gate orchestration: branch policy, then the specs/ canon scan over the paths
+the push nets in and the denylist scan over ONE object walk — first refusal wins. Business logic only: the
+canon predicate and the :class:`ObjectSource` are injected by ``cli/commands/ci.py``."""
 
 from __future__ import annotations
 
 from collections.abc import Callable, Iterable, Iterator, Sequence
-from dataclasses import dataclass
+from dataclasses import replace
 from pathlib import Path
 from typing import Protocol
 
-from dadaia_workspace.core.models.git_scan import GitObjectReadError, ScannedObject
+from dadaia_workspace.core.cli_line import git_line, spell_fix
+from dadaia_workspace.core.gitflow import Gitflow
+from dadaia_workspace.core.models.git_scan import (
+    GitObjectReadError,
+    GitRunError,
+    ScannedObject,
+)
+from dadaia_workspace.core.platform import act
 from dadaia_workspace.features.chokepoints.branch_policy import (
+    HEADS_PREFIX,
     Decision,
+    GateFixes,
     PushRef,
     check_branch_policy,
 )
@@ -30,364 +29,136 @@ from dadaia_workspace.features.chokepoints.denylist_scan import (
     Hit,
     OversizedNote,
     PathMasker,
-    compile_slug_patterns,
     scan_objects,
 )
 
-__all__ = ["push_gate_decision"]
+__all__ = ["content_decision", "push_gate_decision"]
 
-#: The integration branch's remote-tracking ref — the denylist baseline for a brand-new
-#: ref (nothing published yet) is its tip.
-INTEGRATION_TIP_REF = "refs/remotes/origin/develop"
-
-#: The law this scan enforces (SPEC v0.9.0 FR5) — quoted verbatim in every refusal.
-_DENYLIST_LAW = "dd-release-implementation §2a — private names never enter public/pushed material"
-
-#: FR5/A5.4 — at most this many offending objects are listed before a remainder count.
+_PUSH = "[pre-push]"
+_DENYLIST_LAW = ".dadaia/AGENTS.md §3, worktrees/AGENTS.md §2 — a denylisted secret is refused"
 _MAX_LISTED_HITS = 10
-
-#: The fix hint every specs-canon refusal line carries (operator, 2026-08-28) — a
-#: canon or verdict violation has exactly one remediation: remove the offending path.
-_SPECS_CANON_FIX_HINT = "delete the path; canon: specs/AGENTS.md"
 
 
 class ObjectSource(Protocol):
-    """Feature-local structural port over the push-range object reader (ADR-0001: no
-    ``core/protocols`` port — the concrete adapter, ``GitSubprocessObjectReader``, is
-    the only implementer; this module still never imports ``infrastructure`` or
-    spawns a subprocess itself — the CLI composition root (``cli/commands/ci.py``)
-    constructs the real adapter and injects it here, exactly as before).
-    """
+    """The push-range object reader, injected by the CLI (``GitSubprocessObjectReader``)."""
 
     def new_objects(
         self, repo: Path, local_sha: str, remote_sha: str
     ) -> Iterable[ScannedObject]: ...
 
-    def parents(self, repo: Path, sha: str) -> tuple[str, ...]: ...
-
-    def resolve_ref(self, repo: Path, ref: str) -> str | None: ...
-
-    def tree_matches(self, repo: Path, sha: str, patterns: Sequence[str]) -> set[str]: ...
+    def netted_specs(self, repo: Path, local_sha: str, remote_sha: str) -> list[str]: ...
 
 
-def _annotate_skip(
+def _refusal(
+    head: str, rows: Sequence[str] = (), noun: str = "", advice: str = "", tag: str = _PUSH
+) -> str:
+    """The one pre-push refusal shape: head, rows capped at 10 plus a remainder count,
+    then the advice when there is any."""
+    lines = [f"{tag} BLOCKED: {head}", *rows[:_MAX_LISTED_HITS]]
+    if len(rows) > _MAX_LISTED_HITS:
+        lines.append(f"  ... and {len(rows) - _MAX_LISTED_HITS} more offending {noun}.")
+    return "\n".join([*lines, *([f"  {advice}"] if advice else [])])
+
+
+def _fail_closed(what: str, tag: str = _PUSH) -> str:
+    return _refusal(
+        f"{what} — a policy gate never skips what it cannot evaluate (fail closed).", tag=tag
+    )
+
+
+def _notes(
     decision: Decision,
-    skipped_binary_count: int,
-    oversized_notes: tuple[OversizedNote, ...] = (),
-    path_masker: PathMasker | None = None,
+    binaries: int,
+    oversized: Sequence[OversizedNote],
+    masker: PathMasker,
+    tag: str,
 ) -> Decision:
-    """Attach the FR6 row-3 skip count AND the v0.11.0 FR4 oversized-blob notes to
-    *decision* — reported either way (allow/refuse), and kept honestly DISTINCT: the
-    binary count means "not text-decodable at all"; an oversized note means "the first
-    N bytes were scanned, the rest genuinely never was — verify it by hand" (grill P13).
-
-    v0.11.0 A6.3: the oversized note's path is masked through *path_masker* — the SAME
-    class-wide rule FR6 applies to the denylist refusal, since the note itself began
-    naming a path in T-110-06 and is the second channel of the same CWE-532 class
-    entry #23 already found once.
-    """
-    lines: list[str] = []
-    if skipped_binary_count > 0:
-        lines.append(
-            f"[pre-push] {skipped_binary_count} binary blob(s) skipped by the denylist "
-            "scan (not text-decodable)."
-        )
-    for note in oversized_notes:
-        masked_path = path_masker.mask_path(note.path) if path_masker is not None else note.path
-        lines.append(
-            f"[pre-push] {masked_path} is {note.size_bytes} byte(s) — only its first "
-            f"{note.scanned_bytes} byte(s) were scanned by the denylist scan; the "
-            "remainder was NOT scanned. Verify the rest by hand."
-        )
+    """Attach the skipped-binary count and the oversized-blob notes (path masked,
+    CWE-532) as a warning, allow or refuse alike."""
+    lines = [
+        f"{tag} {binaries} binary blob(s) skipped by the denylist scan (not text-decodable)."
+    ] * (binaries > 0)
+    lines += [
+        f"{tag} {masker.mask_path(n.path)} is {n.size_bytes} byte(s) — only its first "
+        f"{n.scanned_bytes} byte(s) were scanned by the denylist scan; the remainder was NOT "
+        "scanned. Verify the rest by hand."
+        for n in oversized
+    ]
     if not lines:
         return decision
-    note_text = "\n".join(lines)
-    warn = f"{decision.warn}\n{note_text}" if decision.warn else note_text
-    return Decision(allowed=decision.allowed, message=decision.message, warn=warn)
+    warn = "\n".join([decision.warn, *lines] if decision.warn else lines)
+    return replace(decision, warn=warn)
 
 
-def _compose_denylist_refusal(hits: list[tuple[PushRef, Hit]], path_masker: PathMasker) -> str:
-    """FR5: ref, path:line, short blob sha, masked term + source layer, the law, the
-    edit + rewrite-before-push remediation, ``--no-verify``, capped at 10 hits.
-
-    v0.11.0 FR6(b): the blob path itself is masked through *path_masker* before
-    rendering (entry #23 resolution A) — only offending segments change; the line
-    number and short sha stay exactly as today.
-    """
-    lines = [
-        f"[pre-push] BLOCKED: the pushed range publishes {len(hits)} object(s) carrying "
-        f"a denylisted term ({_DENYLIST_LAW})."
-    ]
-    shown = hits[:_MAX_LISTED_HITS]
-    remainder = len(hits) - len(shown)
-    for ref, hit in shown:
-        masked_path = path_masker.mask_path(hit.path)
-        lines.append(
-            f"  {ref.local_ref} -> {ref.remote_ref}: {masked_path}:{hit.line} "
-            f"(blob {hit.sha[:12]}) — masked term '{hit.masked_term}' ({hit.source_layer})"
+def _refusal_fix(ref: PushRef, fixes: GateFixes, names: Sequence[str]) -> str:
+    """The one fix for the first refused ref: a switch to its branch, or an Agent action naming the
+    listed paths and commits. The gate offers no history rewrite (origin is never rewritten)."""
+    branch = ref.local_ref.removeprefix(HEADS_PREFIX)
+    if ref.local_ref.startswith("refs/tags/") or not fixes.head:
+        fix = act("agent", "a tag or a detached HEAD has no branch to amend; push a branch.")
+    elif branch != ref.local_ref and branch != fixes.head:
+        fix = git_line(fixes.repo, "switch", branch)
+    else:
+        fix = act(
+            "agent",
+            f"remove the listed term or path from {', '.join(names)} in the unpublished commits, "
+            "reword or split those commits by hand",
         )
-    if remainder > 0:
-        lines.append(f"  ... and {remainder} more offending object(s).")
-    lines.append(
-        "  The range scope means already-published history never needs a rewrite. If "
-        "this push is a genuine emergency, git's sanctioned, traceable bypass is "
-        "`git push --no-verify` (discouraged; leaves a reflog trace)."
-    )
-    lines.append(
-        "Remove the term from the listed file(s), then rewrite the offending "
-        "commit(s) and push again:\n"
-        "fix: git rebase -i <first-offending-sha>^"
-    )
-    return "\n".join(lines)
-
-
-def _render_git_read_error(exc: GitObjectReadError, path_masker: PathMasker) -> str:
-    """SPEC v0.4.2 FR4/A4.2: render a caught :class:`GitObjectReadError`'s detail with
-    its structured ``path`` (if any) masked through *path_masker* — the single render
-    boundary for this failure channel. Never ``repr(exc)``, and the path never reaches
-    the message unmasked: ``str(exc)`` is the message text the raise site composed
-    (already path-free — the path lives on ``exc.path``, not embedded in the string),
-    and the masked path is appended structurally here, once.
-    """
-    detail = str(exc)
-    if exc.path is not None:
-        detail = f"{detail} (path: {path_masker.mask_path(exc.path)})"
-    return detail
-
-
-def _dedup_new_objects(
-    object_source: ObjectSource,
-    repo: Path,
-    ref: PushRef,
-    seen_shas: set[str],
-) -> Iterator[ScannedObject]:
-    """Yield each object new to *ref*'s range that has not already been seen earlier in
-    this scan, recording it into *seen_shas* as it is yielded (A1.4 cross-ref dedupe).
-
-    Streamed straight into :func:`~dadaia_workspace.features.chokepoints.denylist_scan.
-    scan_objects` by the caller rather than materialized into a list first
-    (code-reviewer MEDIUM performance finding: building the full ``fresh`` list before
-    scanning measured ~129 MB resident over a large fallback range) —
-    ``scan_objects`` already consumes its ``objects`` argument lazily, one object at a
-    time, so nothing downstream needs the list shape.
-    """
-    for obj in object_source.new_objects(repo, ref.local_sha, ref.remote_sha):
-        if obj.sha in seen_shas:
-            continue
-        seen_shas.add(obj.sha)
-        yield obj
-
-
-@dataclass(frozen=True)
-class _RangeScan:
-    """The outcome of the ONE streaming pass over the pushed-range objects.
-
-    ``read_failed`` is the typed discriminator the decision keys on (never the refusal
-    prose): True means git could not be read and ``refusal`` names that failure; False
-    with a ``refusal`` means denylist hits; False without one means clean.
-    ``specs_paths_by_ref`` (operator ruling 2026-09-13, bug
-    ``pre-push-canon-scan-not-range-scoped``) is every ``specs/`` path the range
-    introduces or rewrites, per local sha — the canon scan's input, recorded from the
-    SAME pass instead of a second whole-tree listing.
-    """
-
-    refusal: Decision | None
-    read_failed: bool
-    skipped_binary_count: int
-    oversized_notes: tuple[OversizedNote, ...]
-    path_masker: PathMasker
-    specs_paths_by_ref: dict[str, list[str]]
+    return spell_fix(fix)
 
 
 def _run_denylist_scan(
     scan_refs: list[PushRef],
     object_source: ObjectSource,
     repo: Path,
-    terms: Iterable[tuple[str, str]],
-    patterns: Iterable[BaselinePatternLike],
-    slugs: Iterable[str],
-) -> _RangeScan:
-    """Run the FR1/FR2 scan over *scan_refs* — every non-deletion ref, tags included.
+    terms: list[tuple[str, str]],
+    patterns: list[BaselinePatternLike],
+    masker: PathMasker,
+    tag: str,
+) -> tuple[list[tuple[PushRef, Hit]], int, list[OversizedNote]] | Decision:
+    """ONE streamed walk over every ref's new objects (deduplicated across refs; a
+    materialized range measured ~129 MB): denylist hits and skip counts. A read failure
+    refuses (fail closed)."""
+    seen: set[str] = set()
 
-    A git object-read failure refuses immediately, naming the failure (FR6 row 2) —
-    never a silent empty scan. ``oversized_notes`` is deduplicated for free — it is
-    built from ``scan_objects`` runs over :func:`_dedup_new_objects`, which shares
-    ``seen_shas`` across every ref in this scan, so a blob reachable from two refs
-    contributes at most one note (mirrors the existing hit/skip dedup). The returned
-    ``path_masker`` (v0.11.0 FR6(b)) is built from the SAME three term sources and is
-    reused by the caller for every subsequently rendered oversized note, so a repeated
-    offending path segment gets one stable ordinal across the whole invocation.
+    def fresh(ref: PushRef) -> Iterator[ScannedObject]:
+        for obj in object_source.new_objects(repo, ref.local_sha, ref.remote_sha):
+            if obj.sha not in seen:
+                seen.add(obj.sha)
+                yield obj
 
-    code-reviewer MEDIUM finding (v0.11.0 pre-PR review): *terms*, *patterns* and
-    *slugs* are each materialized EXACTLY ONCE, right here, before either the
-    :class:`PathMasker` or the scan loop below touches them. A one-shot Iterable
-    (e.g. a generator) consumed a second time yields nothing — building the masker from
-    the raw parameter and separately re-``list()``-ing it later silently emptied the
-    second consumption's term set, a latent fail-open. The materialized lists are the
-    ONLY thing passed onward from here.
-    """
-    term_list = list(terms)
-    pattern_list = list(patterns)
-    slug_list = list(slugs)
-    path_masker = PathMasker(term_list, pattern_list, slug_list)
-    specs_paths_by_ref: dict[str, list[str]] = {}
-    if not scan_refs:
-        return _RangeScan(None, False, 0, (), path_masker, specs_paths_by_ref)
-    try:
-        published = _published_slugs(scan_refs, object_source, repo, slug_list)
-    except GitObjectReadError:
-        published = set()  # fail CLOSED: an unreadable baseline amnesties nothing
-    scan_slugs = [slug for slug in slug_list if slug not in published]
-    seen_shas: set[str] = set()
-    per_ref_hits: list[tuple[PushRef, Hit]] = []
-    skipped_total = 0
-    oversized_all: list[OversizedNote] = []
+    hits: list[tuple[PushRef, Hit]] = []
+    binaries, oversized = 0, list[OversizedNote]()
     try:
         for ref in scan_refs:
-            fresh = _record_specs_paths(
-                _dedup_new_objects(object_source, repo, ref, seen_shas),
-                specs_paths_by_ref.setdefault(ref.local_sha, []),
-            )
-            outcome = scan_objects(fresh, term_list, pattern_list, scan_slugs)
-            skipped_total += outcome.skipped_binary_count
-            oversized_all.extend(outcome.oversized_notes)
-            per_ref_hits.extend((ref, hit) for hit in outcome.hits)
+            outcome = scan_objects(fresh(ref), terms, patterns)
+            binaries += outcome.skipped_binary_count
+            oversized.extend(outcome.oversized_notes)
+            hits.extend((ref, hit) for hit in outcome.hits)
     except GitObjectReadError as exc:
-        return _RangeScan(
-            Decision(
-                allowed=False,
-                message=(
-                    f"[pre-push] BLOCKED: reading the pushed-range git objects failed "
-                    f"({_render_git_read_error(exc, path_masker)}) — a policy gate never "
-                    "skips what it cannot evaluate (fail closed). The sanctioned, "
-                    "traceable emergency bypass is `git push --no-verify` "
-                    "(discouraged; leaves a reflog trace).\n"
-                    "fix: git fetch origin && git push origin feature/<M.m.p> (repair "
-                    "the object store first — git fsck)"
-                ),
-            ),
-            True,
-            0,
-            (),
-            path_masker,
-            specs_paths_by_ref,
+        return _read_failure(exc, masker, repo, tag)
+    return hits, binaries, oversized
+
+
+def read_failure_fix(exc: GitObjectReadError, repo: Path) -> str:
+    """The one fix for a git-object read failure: git that could not run is not corruption, so no
+    fsck; any other read failure points git's own check at *repo*."""
+    if isinstance(exc, GitRunError):
+        return exc.fix
+    return git_line(repo, "fsck")
+
+
+def _read_failure(exc: GitObjectReadError, masker: PathMasker, repo: Path, tag: str) -> Decision:
+    """A git read failure refuses (fail closed), its path masked."""
+    masked = f" (path: {masker.mask_path(exc.path)})" if exc.path is not None else ""
+    return Decision(
+        allowed=False,
+        message=_fail_closed(
+            f"reading the pushed-range git objects failed ({exc.message}{masked})", tag
         )
-    oversized_notes = tuple(oversized_all)
-    refusal = (
-        Decision(allowed=False, message=_compose_denylist_refusal(per_ref_hits, path_masker))
-        if per_ref_hits
-        else None
+        + "\n"
+        + spell_fix(read_failure_fix(exc, repo)),
     )
-    return _RangeScan(
-        refusal, False, skipped_total, oversized_notes, path_masker, specs_paths_by_ref
-    )
-
-
-def _compose_specs_canon_refusal(violations: list[tuple[PushRef, str]]) -> str:
-    """FR2 (v0.5.0 specs-canon closure): ref, the offending ``specs/``-relative path,
-    the law, one fix hint per offending path, ``--no-verify``, capped at 10 hits —
-    the SAME shape :func:`_compose_denylist_refusal` uses."""
-    lines = [
-        f"[pre-push] BLOCKED: the pushed range publishes {len(violations)} specs/ "
-        "path(s) violating the v6 canon or the verdict rule (specs/AGENTS.md)."
-    ]
-    shown = violations[:_MAX_LISTED_HITS]
-    remainder = len(violations) - len(shown)
-    for ref, path in shown:
-        lines.append(
-            f"  {ref.local_ref} -> {ref.remote_ref}: specs/{path} — {_SPECS_CANON_FIX_HINT}"
-        )
-    if remainder > 0:
-        lines.append(f"  ... and {remainder} more offending path(s).")
-    lines.append(
-        "  If this push is a genuine emergency, git's sanctioned, traceable bypass is "
-        "`git push --no-verify` (discouraged; leaves a reflog trace)."
-    )
-    lines.append(
-        "git rm the listed specs/ path(s), then rewrite the offending commit(s) and "
-        "push again:\n"
-        "fix: git rebase -i <first-offending-sha>^"
-    )
-    return "\n".join(lines)
-
-
-def _record_specs_paths(
-    objects: Iterator[ScannedObject], sink: list[str]
-) -> Iterator[ScannedObject]:
-    """Stream *objects* through unchanged, recording each ``specs/`` path into *sink*.
-
-    Bug ``pre-push-canon-scan-not-range-scoped`` (operator ruling 2026-09-13): the
-    canon scan reads the SAME pushed-range objects the denylist scan streams — one
-    pass over ``new_objects``, never the whole tree at the tip. A path no commit in
-    the range touches is already published, so it never blocks a push (the principle
-    the denylist refusal text has always stated: the range scope means published
-    history never needs a rewrite).
-    """
-    for obj in objects:
-        if obj.path.startswith("specs/"):
-            sink.append(obj.path)
-        yield obj
-
-
-def _run_specs_canon_scan(
-    scan_refs: list[PushRef],
-    specs_paths_by_ref: dict[str, list[str]],
-    object_source: ObjectSource,
-    repo: Path,
-    canon_violations_fn: Callable[[Sequence[str]], Sequence[str]],
-) -> Decision | None:
-    """SPEC v0.5.0 specs-canon closure (operator ruling 2026-08-28), range-scoped since
-    2026-09-13: every ``specs/`` path the pushed range introduces or rewrites
-    (*specs_paths_by_ref*, recorded by :func:`_record_specs_paths`) is checked against
-    the v6 canon via the INJECTED predicate (v0.5.1 K7: the SAME predicate the doctor's
-    TREE-8 check uses, never a second, hand-kept member list — injected rather than
-    imported at module scope so this module carries no ``chokepoints -> specs.canon``
-    edge).
-    """
-    violations: list[tuple[PushRef, str]] = []
-    for ref in scan_refs:
-        range_rel = sorted({p[len("specs/") :] for p in specs_paths_by_ref.get(ref.local_sha, [])})
-        bad = set(canon_violations_fn(range_rel))
-        violations.extend((ref, path) for path in sorted(bad))
-    if not violations:
-        return None
-    return Decision(allowed=False, message=_compose_specs_canon_refusal(violations))
-
-
-def _published_slugs(
-    scan_refs: list[PushRef],
-    object_source: ObjectSource,
-    repo: Path,
-    slugs: Sequence[str],
-) -> set[str]:
-    """The foreign slugs the pushed refs' remote tips (or, for a brand-new ref, the
-    integration tip) already publish — a sibling repository's name this repository's
-    published history already carries is not a new disclosure (operator ruling
-    2026-09-13; extends the v0.11.0 FR1 per-path amnesty to the repository).
-
-    Amnesty is a SUBSET of detection by construction: the baseline is searched with
-    the very :func:`compile_slug_patterns` regexes the scan matches with (whole-token,
-    case-insensitive), one ``git grep`` per baseline carrying every pattern — never a
-    substring test (the 2026-08-27 substring bug on this layer must not recur on the
-    fail-open side). Raises :class:`GitObjectReadError` through; the caller then
-    amnesties nothing.
-    """
-    compiled = compile_slug_patterns(slugs)
-    if not compiled:
-        return set()
-    baselines: set[str] = set()
-    for ref in scan_refs:
-        if ref.remote_sha and ref.remote_sha != "0" * 40:
-            baselines.add(ref.remote_sha)
-        else:
-            tip = object_source.resolve_ref(repo, INTEGRATION_TIP_REF)
-            if tip:
-                baselines.add(tip)
-    regexes = [regex.pattern for _slug, regex in compiled]
-    matched: set[str] = set()
-    for sha in baselines:
-        matched |= {m.lower() for m in object_source.tree_matches(repo, sha, regexes)}
-    return {slug for slug, _regex in compiled if slug.lower() in matched}
 
 
 def push_gate_decision(
@@ -396,103 +167,114 @@ def push_gate_decision(
     object_source: ObjectSource,
     repo: Path,
     canon_violations_fn: Callable[[Sequence[str]], Sequence[str]],
+    gitflow: Gitflow,
+    fixes: GateFixes,
     malformed_lines: int = 0,
     denylist_terms: Iterable[tuple[str, str]] = (),
     baseline_patterns: Iterable[BaselinePatternLike] = (),
-    foreign_slugs: Iterable[str] = (),
 ) -> Decision:
-    """Decide whether a push may proceed (v0.4.4 FR3 — the gitflow v2 inversion).
-
-    Policy order, first refusal wins:
-
-    1. **Branch policy** (dd-gitflow-default, :func:`~dadaia_workspace.features.chokepoints.
-       branch_policy.check_branch_policy`) — every non-deletion, non-tag ref must be
-       ``refs/heads/feature/{M.m.p}``, pushed to the SAME remote name: ``develop`` and
-       ``main`` are refused outright (they advance by PR only); names outside the three
-       permitted patterns are refused as invalid.
-    2. **specs/ canon scan** (v0.5.0 specs-canon closure, operator ruling 2026-08-28)
-       — every ``specs/`` path the pushed range introduces or rewrites is checked
-       against the canon (range-scoped: a path no commit in the range touches never
-       blocks), through the injected *canon_violations_fn*.
-    3. **Range-scoped denylist scan** (v0.9.0 FR1/FR2) — every non-deletion ref, tags
-       included, is scanned via *object_source* for new objects carrying a denylisted
-       term. Steps 2 and 3 share ONE object walk (the walk runs once, after branch
-       policy; step 2's refusal is decided first) — under v2 this feature push is the
-       first publication to ``origin`` (A3.3).
-
-    There is no fourth step: security review is the reviewer's lens before each PR,
-    never a pre-push step.
-
-    Deletions (zero sha) are never scanned. Tag pushes ARE scanned but were never
-    branch-policy-gated (publishing depends on tag pushes). A malformed stdin line
-    fails CLOSED (finding 1) and the REMOTE side of every branch-policy ref must
-    match its LOCAL branch name (finding 2: ``push feature/0.0.1:develop``).
-
-    *object_source*, *repo* and *canon_violations_fn* are
-    REQUIRED — FR7/A7.2 (extended at v0.5.1 K7 to the canon predicates): the decision
-    function always takes every external capability it needs as a parameter; an
-    unwired production call site is a CLI defect, never a bypass (FR6 row 4), so there
-    is no default that would silently skip a step.
-    """
+    """Decide a push, first refusal wins: a malformed stdin line (fail closed); branch
+    policy over every non-deletion, non-tag ref; then :func:`content_decision`. Every capability is a required parameter: an unwired call site is a CLI defect, never a
+    bypass."""
     if malformed_lines > 0:
         return Decision(
             allowed=False,
-            message=(
-                f"[pre-push] BLOCKED: {malformed_lines} unparseable pre-push stdin "
-                "line(s) — a policy gate never skips what it cannot parse (fail "
-                "closed). The sanctioned, traceable emergency bypass is "
-                "`git push --no-verify` (discouraged; leaves a reflog trace).\n"
-                "fix: git push origin feature/<M.m.p> (one explicit refspec)"
-            ),
+            message=_fail_closed(f"{malformed_lines} unparseable pre-push stdin line(s)")
+            + "\nPush one explicit refspec.\n"
+            + spell_fix(git_line(fixes.repo, "push", "origin", fixes.work)),
         )
+    branch_refs = [r for r in refs if not r.is_deletion and not r.is_tag]
+    if refusal := check_branch_policy(branch_refs, gitflow, fixes):
+        return refusal
+    return content_decision(
+        refs,
+        object_source=object_source,
+        repo=repo,
+        canon_violations_fn=canon_violations_fn,
+        fixes=fixes,
+        denylist_terms=denylist_terms,
+        baseline_patterns=baseline_patterns,
+    )
 
-    branch_policy_refs = [r for r in refs if not r.is_deletion and not r.is_tag]
-    branch_refusal = check_branch_policy(branch_policy_refs)
-    if branch_refusal is not None:
-        return branch_refusal
 
-    # Every non-deletion ref (tags included) — computed independently of
-    # `branch_policy_refs`, which excludes tags. Runs after branch policy (free and
-    # pure, already checked above); shared by both the specs-canon scan (step 2) and
-    # the denylist scan (step 3, A3.4).
+def content_decision(
+    refs: list[PushRef],
+    *,
+    object_source: ObjectSource,
+    repo: Path,
+    canon_violations_fn: Callable[[Sequence[str]], Sequence[str]],
+    fixes: GateFixes,
+    denylist_terms: Iterable[tuple[str, str]] = (),
+    baseline_patterns: Iterable[BaselinePatternLike] = (),
+    tag: str = _PUSH,
+) -> Decision:
+    """The content half of a push, no branch policy: ONE walk over every non-deletion ref's
+    new objects (tags included) for the denylist scan, while the specs/ canon scan (refused
+    first) judges only the paths each ref nets in; an unreadable object store refuses."""
     scan_refs = [r for r in refs if not r.is_deletion]
-
-    # One streaming pass over the pushed-range objects feeds BOTH step 2 (specs canon,
-    # range-scoped, operator ruling 2026-09-13) and step 3 (denylist); step 2's refusal
-    # still takes precedence over step 3's.
-    scan = _run_denylist_scan(
-        scan_refs, object_source, repo, denylist_terms, baseline_patterns, foreign_slugs
-    )
-    if scan.read_failed and scan.refusal is not None:
-        # Nothing was streamed, so the canon scan has no input either — fail closed
-        # on the read error itself.
-        return _annotate_skip(
-            scan.refusal, scan.skipped_binary_count, scan.oversized_notes, scan.path_masker
+    terms, patterns = list(denylist_terms), list(baseline_patterns)  # one-shot iterables
+    masker = PathMasker(terms, patterns)
+    scan = _run_denylist_scan(scan_refs, object_source, repo, terms, patterns, masker, tag)
+    if isinstance(scan, Decision):
+        return scan
+    hits, binaries, oversized = scan
+    try:
+        canon = [
+            (r, p)
+            for r in scan_refs
+            for p in canon_violations_fn(
+                [s[6:] for s in object_source.netted_specs(repo, r.local_sha, r.remote_sha)]
+            )
+        ]
+    except GitObjectReadError as exc:
+        return _read_failure(exc, masker, repo, tag)
+    messages = frozenset[str]()
+    if canon:
+        message = _refusal(
+            f"the range carries {len(canon)} specs/ path(s) violating the v6 canon "
+            "(specs/AGENTS.md).",
+            [
+                f"  {r.local_ref} -> {r.remote_ref}: specs/{p} — delete the path; "
+                "canon: specs/AGENTS.md"
+                for r, p in canon
+            ],
+            "path(s)",
+            tag=tag,
         )
-
-    canon_refusal = _run_specs_canon_scan(
-        scan_refs,
-        scan.specs_paths_by_ref,
-        object_source,
-        repo,
-        canon_violations_fn,
-    )
-    if canon_refusal is not None:
-        return _annotate_skip(
-            canon_refusal, scan.skipped_binary_count, scan.oversized_notes, scan.path_masker
+        listed = frozenset(f"specs/{p}" for _, p in canon)
+        fix = _refusal_fix(canon[0][0], fixes, sorted(masker.mask_path(p) for p in listed))
+    elif hits:
+        message = _refusal(
+            f"the range carries {len(hits)} object(s) with a denylisted term ({_DENYLIST_LAW}).",
+            [
+                f"  {r.local_ref} -> {r.remote_ref}: {masker.mask_path(h.path)}:{h.line} "
+                f"(blob {h.sha[:12]}) — masked term '{h.masked_term}' ({h.source_layer})"
+                for r, h in hits
+            ],
+            "object(s)",
+            "A test fixture that needs a secret shape composes it at runtime (string "
+            "concatenation), never as a tracked literal. The range scope means "
+            "already-published history never needs a rewrite.",
+            tag=tag,
         )
-
-    if scan.refusal is not None:
-        return _annotate_skip(
-            scan.refusal, scan.skipped_binary_count, scan.oversized_notes, scan.path_masker
+        listed = frozenset(h.path for _, h in hits)
+        messages = frozenset(h.sha for _, h in hits if h.path == "(commit message)")
+        names = sorted(
+            {
+                f"commit {h.sha[:12]}" if h.path == "(commit message)" else masker.mask_path(h.path)
+                for _, h in hits
+            }
         )
-
-    return _annotate_skip(
-        Decision(
-            allowed=True,
-            message="[pre-push] branch policy + specs-canon scan + denylist scan passed; allow.",
-        ),
-        scan.skipped_binary_count,
-        scan.oversized_notes,
-        scan.path_masker,
+        fix = _refusal_fix(hits[0][0], fixes, names)
+    else:
+        message = fix = ""
+        listed = frozenset()
+    decision = Decision(
+        allowed=True,
+        message="[pre-push] branch policy + specs-canon scan + denylist scan passed; allow.",
     )
+    if message:
+        decision = Decision(
+            allowed=False, message=f"{message}\n{fix}", listed=listed, messages=messages
+        )
+    return _notes(decision, binaries, oversized, masker, tag)

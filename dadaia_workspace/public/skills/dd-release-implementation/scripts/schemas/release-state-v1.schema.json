@@ -1,0 +1,208 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "release-state-v1",
+  "title": "Release State v1",
+  "description": "The whole content of specs/releases/<release-id>/_RELEASE.json: one mutable state document whose transitions are written by release.py. Per candidate, `release.py phase` advances DEFINITION to IMPLEMENTATION to CLOSURE once and stamps `defined` then `implemented`; `release.py new` alone reopens the next candidate at DEFINITION. `release.py ship` writes `shipped` once after promotion. `log` is append-only governance narrative, oldest first, with each entry classified by the closed `kind` enum. Historical documents remain readable.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "release",
+    "phase",
+    "defined",
+    "implemented",
+    "shipped",
+    "log"
+  ],
+  "properties": {
+    "schema": {
+      "type": "string",
+      "const": "release-state-v1",
+      "description": "This schema's own id, carried in every document for a self-describing file."
+    },
+    "release": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "Bare SemVer release id (e.g. '0.6.0') — matches the directory name this file lives under."
+    },
+    "phase": {
+      "type": "string",
+      "description": "The release's current lifecycle phase. The three canonical phases enumerated here equal the dd-release-implementation _release_schema.py PHASES. Overwritten in place on every phase transition — no history of prior phases survives in this field; a transition worth remembering is recorded as a `log` entry.",
+      "enum": [
+        "DEFINITION",
+        "IMPLEMENTATION",
+        "CLOSURE"
+      ]
+    },
+    "defined": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false,
+      "required": [
+        "ts"
+      ],
+      "properties": {
+        "sha": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Written by older release.py versions and never read; milestones are found by their commit subject."
+        },
+        "ts": {
+          "type": "string",
+          "description": "When this milestone was recorded."
+        }
+      },
+      "description": "Set once, at the definition promotion commit (dd-product-engineer). null before that point."
+    },
+    "implemented": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false,
+      "required": [
+        "ts"
+      ],
+      "properties": {
+        "sha": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Written by older release.py versions and never read; milestones are found by their commit subject."
+        },
+        "ts": {
+          "type": "string",
+          "description": "When this milestone was recorded."
+        }
+      },
+      "description": "Stamped once per candidate by release.py phase on entry to CLOSURE. null before that point."
+    },
+    "shipped": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false,
+      "required": [
+        "pr",
+        "ts"
+      ],
+      "properties": {
+        "sha": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Written by older release.py versions and never read; milestones are found by their commit subject."
+        },
+        "pr": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "description": "The ship PR number."
+        },
+        "ts": {
+          "type": "string",
+          "description": "When this milestone was recorded."
+        }
+      },
+      "description": "Set once, at the promote merge. null before that point."
+    },
+    "log": {
+      "type": "array",
+      "description": "Append-only governance narrative living inside this mutable document, oldest first. Legacy kinds remain schema-readable; release.py check restricts entries after the live candidate's birth to note, milestone, summary and closure-only memory.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "ts",
+          "agent",
+          "kind",
+          "text"
+        ],
+        "properties": {
+          "ts": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?(Z|[+-]\\d{2}:\\d{2})$",
+            "description": "ISO 8601 UTC timestamp this note was appended."
+          },
+          "agent": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Agent or runtime that appended this note."
+          },
+          "kind": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The entry category. The enum retains historical kinds; current candidates write only note, milestone, summary and closure-only memory.",
+            "enum": [
+              "note",
+              "summary",
+              "size",
+              "drifts",
+              "dispositions",
+              "test-dispositions",
+              "artifact-gc",
+              "reviews",
+              "merge",
+              "memory",
+              "milestone"
+            ]
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The note's free-text body."
+          },
+          "candidate": {
+            "type": "string",
+            "pattern": "^rc-[1-9][0-9]*$",
+            "description": "kind 'milestone' only: the candidate folder the stamp belongs to."
+          },
+          "milestone": {
+            "type": "string",
+            "enum": ["defined", "implemented"],
+            "description": "kind 'milestone' only: which slot the stamp set; the slot keeps the live candidate's value, these entries keep every candidate's."
+          },
+          "sha": {
+            "type": "string",
+            "pattern": "^(?:[0-9a-f]{7,40}|[0-9a-f]{64})$",
+            "description": "kind 'milestone' only: the commit the stamp names."
+          },
+          "since": {
+            "type": "string",
+            "pattern": "^(?:[0-9a-f]{7,40}|[0-9a-f]{64})$",
+            "description": "kind 'memory' only: the commit the reconciliation window opened at — the previous memory entry's until, else defined.sha."
+          },
+          "until": {
+            "type": "string",
+            "pattern": "^(?:[0-9a-f]{7,40}|[0-9a-f]{64})$",
+            "description": "kind 'memory' only: the HEAD the reconciliation window closed at; the next window opens here."
+          },
+          "reviewed": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "kind 'memory' only: the worklist entries read against their sources' diff and left as they were."
+          },
+          "changed": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "kind 'memory' only: the worklist entries rewritten by this reconciliation."
+          }
+        }
+      }
+    }
+  }
+}

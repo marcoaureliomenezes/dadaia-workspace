@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "dadaia-workspace"
-version = "0.4.7"
+version = "0.5.0rc25"
 description = "A local-first, spec-driven workspace that gives AI agents current context, a document-governed lifecycle, visible concurrency and anti-slop boundaries."
 authors = ["Marco Menezes <marcoaureliomenezes@users.noreply.github.com>"]
 readme = "README.md"
@@ -14,7 +14,7 @@ exclude = ["**/__pycache__", "**/*.pyc", "**/*.pyo"]
 keywords = [
     "ai-agents", "claude-code", "codex", "kimi-code",
     "workspace", "multi-agent", "sdd", "spec-driven-development",
-    "cli"
+    "cli", "cursor", "devin", "github-copilot", "agent-skills"
 ]
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -31,12 +31,12 @@ classifiers = [
     "Operating System :: Microsoft :: Windows",
 ]
 
-# What PyPI renders beside the long description. Homepage is the PyPI project page:
-# no documentation site exists, and the docs entry point is the repository's own.
+# What PyPI renders beside the long description. Homepage is the author's project page;
+# Documentation is the repository's docs/ folder (no separate site is published).
 [tool.poetry.urls]
-Homepage = "https://pypi.org/project/dadaia-workspace/"
+Homepage = "https://marco-menezes.com/projetos/dadaia-workspace"
 Repository = "https://github.com/marcoaureliomenezes/dadaia-workspace"
-Documentation = "https://marcoaureliomenezes.github.io/dadaia-workspace/"
+Documentation = "https://github.com/marcoaureliomenezes/dadaia-workspace/tree/main/docs"
 Changelog = "https://github.com/marcoaureliomenezes/dadaia-workspace/blob/main/CHANGELOG.md"
 Issues = "https://github.com/marcoaureliomenezes/dadaia-workspace/issues"
 
@@ -48,18 +48,9 @@ dadaia-workspace = "dadaia_workspace.cli.main:_safe_app"
 python = "^3.12"
 typer = ">=0.27.1"
 rich = ">=13,<16"
-pyyaml = "^6.0"
-jinja2 = "^3.1"
 jsonschema = "^4"
+packaging = ">=22"
 
-# Optional runtime extra — the Claude Agent SDK enables live Claude execution via
-# ClaudeSdkAdapter. It is NOT a base dependency: the offline-first build and lockfile
-# stay SDK-free, the adapter lazily imports it, and base installs never pull it. Enable
-# with `pip install dadaia-workspace[claude-sdk]`.
-claude-agent-sdk = {version = ">=0.2.132,<1.0", optional = true}
-
-[tool.poetry.extras]
-claude-sdk = ["claude-agent-sdk"]
 
 [tool.poetry.group.dev.dependencies]
 pytest = ">=8,<10"
@@ -67,52 +58,20 @@ pytest-cov = ">=5,<8"
 ruff = ">=0.16.2"
 mypy = ">=2.3.0,<3.0"
 types-PyYAML = ">=6"
+# the differential oracle of the frontmatter owner (tests and guard scripts only)
+pyyaml = "^6.0"
 pytest-randomly = "^4.1.0"
 import-linter = ">=2.11"
 # The declared build backend, so the bootstrap e2e can `pip wheel --no-build-isolation`
 # the checkout offline in any environment that ran `poetry install --with dev` (CI included).
 poetry-core = ">=1.9"
 
-# Dev/build tooling CVE floors (security audit F-6, sec-reviewer 2026-06-10;
-# re-verified T-011-17 / residual R9, 2026-06-10).
-# `pip`, `poetry`, and `dulwich` are NOT declared dependencies of this project and do
-# not appear in `poetry.lock` (build-system uses `poetry-core`, which has no dulwich in
-# its closure — verified: `grep name=\"(pip|poetry|dulwich)\" poetry.lock` -> 0 hits).
-# The flagged CVEs live only in the workspace *tool* environment (`.dadaia/.venv`),
-# where `poetry` (and its transitive `dulwich`) and `pip` are installed to operate the
-# workspace — pip-installed, not locked here. They are therefore outside this repo's
-# lockfile control. Required safe floors, enforced on the tool environment only:
-#   pip     >= 25.3   (CVE-2025-8869  — sdist symlink traversal; project venv is 26.0.1, OK)
-#   poetry  >= 2.3.4  (CVE-2026-34591, CVE-2026-41140)
-#   dulwich >= 1.2.5  (CVE-2026-42305, CVE-2026-47734  — poetry transitive)
-#
-# R9 disposition (T-011-17): DEFERRED — cannot be remediated from this repo.
-#   * No lockfile bump is possible: these packages are not in poetry.lock, so neither a
-#     pyproject constraint nor `poetry update` would touch them. Declaring `poetry` as a
-#     dev dep is rejected as unjustified dependency drift (it pulls poetry's entire heavy
-#     tree, incl. dulwich, into every contributor install + the lock).
-#   * pip-audit was unavailable in the project venv on the implementing host; audit was
-#     performed via `python -m pip list --format json` against both venvs + these CVE
-#     floors. The live tool venv was found at poetry 1.8.3 / dulwich 0.21.7 / pip 24.0 —
-#     all below floor — but `poetry` is broken (snap-confined, non-executable) on that
-#     host, so the tool venv cannot be regenerated here.
-#   * Operator/devops remediation (rebuild/upgrade the tool venv, NOT a repo lock op):
-#       .dadaia/.venv/bin/pip install --upgrade 'pip>=25.3' 'poetry>=2.3.4' 'dulwich>=1.2.5'
-#     then re-verify: .dadaia/.venv/bin/pip list | grep -Ei '^(pip|poetry|dulwich) '
+# poetry is CI and release tooling, not a dependency: every workflow pins poetry==2.5.1, and
+# scripts/guards/repo.py (_POETRY_FLOOR, rule poetry-below-the-floor) refuses a pin below the
+# CVE floor (GHSA-2599-h6xx-hpxp, GHSA-73h3-mf4w-8647).
 hypothesis = ">=6.165.2"
 pytest-xdist = "^3.8.0"
 pytest-timeout = "^2.3.1"
-
-# Optional, non-default dependency group — mutation testing (FR20, T-043-28). A plain
-# `poetry install` (what CI, the push preflight, and every consumer install already run)
-# never pulls this group: it requires an explicit `poetry install --with mutation`.
-# Selection verdict: qa-engineer, .dadaia/tmp/qa-engineer/20260817/
-# v0.4.3-T-043-28-mutation-tool-verdict.md. Exact pin per FR1 (T-043-03's pin rule).
-[tool.poetry.group.mutation]
-optional = true
-
-[tool.poetry.group.mutation.dependencies]
-mutmut = "3.7.0"
 
 [build-system]
 requires = ["poetry-core"]
@@ -120,86 +79,18 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.ruff]
 line-length = 100
-# 0.4.7 FR3: the cache is redirected by CONFIGURATION, not by a flag on every command
-# (the venv guard's cache rule is deleted). The path is RELATIVE — resolved the same way
-# on every OS, and from a `repos/<slug>/` checkout it lands in the workspace's own
-# `.dadaia/tmp/` zone. From a standalone CI checkout it lands in the checkout's
-# grandparent, which is writable on every runner. Either way the repo tree stays clean.
-cache-dir = "../../.dadaia/tmp/ruff-cache"
 target-version = "py312"
 
-# Complexity/size governance (FR21a, T-043-29, R8): a MEASURED RATCHET, never an
-# aspiration. `C90` (McCabe cyclomatic complexity) and `PLR1702` (nesting depth) are
-# selected with ceilings pinned AT the maxima observed by ruff's own V6 measurement
-# capture (`.dadaia/tmp/software-engineer/20260817/v0.4.3-T-043-29-v6-complexity-maxima.md`),
-# over the same scope this repo's `ruff check .` gate already covers (production +
-# tests + scripts) — never a smaller, aspirational number. The worst offender at
-# measurement time was `dadaia_workspace/features/telemetry/reader/allowlist.py` (nesting
-# depth 6); it already sits inside `dadaia_workspace/`, so no tests-only per-file-ignore
-# was needed to keep `ruff check` green at HEAD by construction (A21.2).
-#
-# RATCHET DIRECTION — read before touching either ceiling below:
-# `max-complexity` and `max-nested-blocks` may only DECREASE, never increase. A future
-# release lowering either number re-measures first (same two-step rule: measure, then
-# pin) and justifies the decrease in that release's CLOSURE.md `## Size accounting`
-# table (A21.3/A21.5, wired by T-043-30's mandatory closure section). Raising a ceiling
-# to make a check pass is exactly the aspirational-number failure R8 forbids — refuse
-# it; refactor the offending function or split the file instead.
 [tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B", "SIM", "C90", "PLR1702"]
-ignore = ["E501", "B008", "B903"]
-# `preview = true` is required only because PLR1702 (too-many-nested-blocks) is still a
-# preview-status Pylint rule in ruff 0.16.2 (`ruff rule PLR1702` prints "The --preview
-# flag is required for use") — selecting its exact code with no CLI/config preview flag
-# is silently inert (ruff emits "has no effect because preview is not enabled" and skips
-# it entirely). Enabling preview mode also activates every OTHER preview-status rule
-# nested under an already-selected prefix; measured side effect at v0.16.2: exactly one,
-# `B903` (class-as-data-structure, flake8-bugbear preview), 4 hits in
-# `tests/{integration/panel,unit/features/telemetry}/**` — added to `ignore` above
-# rather than silently widening this task's declared write set (pyproject.toml select +
-# mccabe config only) into unrelated test-file edits. `preview` is scoped to
-# `[tool.ruff.lint]` only (never `[tool.ruff]`/`[tool.ruff.format]`), so it never
-# changes `ruff format --check .`'s result — verified identical (same 5
-# pre-existing, unrelated, bug-registered `specs/_archive/**` findings; see
-# `ruff-0-16-2-markdown-python-fence-format-drift`) with and without this diff.
+select = ["E", "F", "I", "UP", "B", "SIM", "PLW1514"]
+ignore = ["E501", "B008"]
+# Preview is on only to reach PLW1514; explicit-preview-rules keeps every other preview rule off.
 preview = true
-
-[tool.ruff.lint.mccabe]
-# Ceiling pinned at the measured maximum. Ratchets DOWN ONLY — see the doctrine comment
-# above `[tool.ruff.lint]`.
-#
-# V35/A22.12 (T-050-34, v0.5.0) RE-MEASURED AND FOUND THE PRIOR "61" RADON READING
-# UNSAFE TO RATCHET TO — recorded here rather than silently applied, per the
-# ratchet-direction doctrine above ("measure, then pin", never a number that breaks
-# `ruff check .`). `radon cc -s -j dadaia_workspace` reports a maximum of 61
-# (`features/telemetry/aggregator/queries.py::_list_agents_impl`, unchanged), but
-# `ruff check .` itself (the actual gate this ceiling governs) still flags
-# `dadaia_workspace/features/panel/handler.py::make_handler_class` at complexity 63 —
-# unchanged since the original v0.4.3 T-043-29 measurement that set this ceiling.
-# Root cause: `make_handler_class` is a factory function that defines and returns a
-# nested `class PanelHandler(...)` with several methods (`do_GET`, `_host_rejected`,
-# etc.) in its body; `radon cc -s -j`'s file-level walk scores the factory function's
-# OWN top-level branches only (6) and never separately surfaces the nested class's
-# methods, while ruff's C901 (the actual enforced rule) counts every branch inside the
-# enclosing function's lexical scope, nested class included, as one unit (63). Verified
-# directly: T-050-03's own baseline radon JSON already scored `make_handler_class` at 6,
-# not 63 — the "radon methodology parity" it claimed was checked only against
-# `#upgrade`/`#doctor`'s two named CC values, never against the whole-codebase max.
-# Bug registered: `radon-undercounts-nested-class-in-function-complexity-vs-ruff-c901`.
-# The true, gate-enforced maximum this release is still 63 (make_handler_class,
-# untouched) — no ratchet is safe until that function is refactored or the measurement
-# tooling is fixed; lowering to 61 here would fail `ruff check .` outright.
-max-complexity = 63
-
-[tool.ruff.lint.pylint]
-# Ceiling pinned at the measured maximum (V6). Ratchets DOWN ONLY — see the doctrine
-# comment above `[tool.ruff.lint]`.
-max-nested-blocks = 6
+explicit-preview-rules = true
 
 [tool.ruff.lint.per-file-ignores]
-"dadaia_workspace/cli/commands/*.py" = ["B904"]
-"dadaia_workspace/cli/commands/repos.py" = ["SIM118"]
-# Test files that place pytestmark before platform-gated imports (E402 is intentional).
+# The skill entry points bootstrap sys.path before their sibling imports (kernel rule 2).
+"dadaia_workspace/public/skills/*/scripts/*.py" = ["E402"]
 
 # Bug ruff-0-16-2-markdown-python-fence-format-drift: ruff 0.16.2 started reformatting
 # fenced Python code blocks embedded in Markdown by default, which reached 5
@@ -230,25 +121,20 @@ python_version = "3.12"
 strict = true
 ignore_missing_imports = true
 incremental = false
-# 0.4.7 FR3: same relative redirect as `[tool.ruff] cache-dir` — one rule, both tools,
-# every OS. mypy writes `.mypy_cache/` even with `incremental = false` (bug
-# mypy-strict-cache-dir-created-without-cache-dir-env-override), so the destination must
-# be named; a relative path is the only portable value (an absolute one is
-# machine-specific and `/dev/null` is POSIX-only — ruff cannot even open it).
-cache_dir = "../../.dadaia/tmp/mypy-cache"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-ra -p no:cacheprovider"
+addopts = "-ra -p no:cacheprovider --strict-markers"
+truncation_limit_lines = "0"
+truncation_limit_chars = "0"
 markers = [
-    "unit: pure or near-pure fast tests",
-    "contract: public API/schema/security contracts",
-    "integration: multi-component tests using real tmp filesystem or CLI runner",
-    "e2e: full user journeys and browser-backed flows",
+    "e2e: full user journeys through the real CLI",
+    "small: no process, no real git: 10 s",
+    "medium: reaches a process or real git: 60 s",
     "slow: tests over 1s or tests that start a server/subprocess",
-    "tmp: temporary debugging tests excluded from default runs",
-    "flaky: observed pass+fail on identical code; being diagnosed (dd-test-stewardship, flakes and quarantine)",
-    "quarantine: out of gating selectors; requires bug= id and expires (dd-test-stewardship, flakes and quarantine)",
+    "tmp: scaffolding of the open job, collected",
+    "flaky: observed pass+fail on identical code; being diagnosed",
+    "quarantine: out of gating selectors; requires bug= id",
 ]
 norecursedirs = [
     ".*",
@@ -260,7 +146,6 @@ norecursedirs = [
     "dist",
     "venv",
     ".venv",
-    "tests/tmp",
 ]
 # Disk guard: only retain tmp_path trees for FAILED tests (default keeps the last 3
 # full sessions, which — combined with per-test venvs — exhausted the disk). See the
@@ -270,6 +155,7 @@ tmp_path_retention_policy = "failed"
 [tool.coverage.run]
 source = ["dadaia_workspace"]
 parallel = false
+patch = ["subprocess"]
 
 [tool.coverage.report]
 exclude_lines = [
@@ -277,26 +163,3 @@ exclude_lines = [
   "raise NotImplementedError",
   "if __name__ == .__main__.:",
 ]
-
-# Mutation-testing config (FR20, T-043-28). This table is INERT here — mutmut's own
-# `mutants/` sandbox directory is hardcoded relative to its invocation cwd with no
-# config key to redirect it (mutmut configuration.py:107), which collides with this
-# repo's "no caches in the repo tree" law (DADAIA.md §4) if invoked with cwd = repo
-# root. mutmut is therefore never invoked against THIS file: the actual execution cwd
-# is a staged copy under `.dadaia/tmp/software-engineer/<date>/mutation-run/` (see
-# `tests/scripts/run_mutation_baseline.sh`), which carries its own generated
-# `pyproject.toml` with these same keys. This copy is the single documented source of
-# truth for what those keys should be, kept in sync by hand at each release's run.
-#
-# Scope is `core/models/` (the verdict's own already-validated smoke-trial sub-slice),
-# not the wider `core/` the verdict recommended for the first baseline: mutmut's
-# `mutants/` sandbox mirrors ONLY `source_paths` on disk, and `tests/unit/core/` (flat)
-# contains real cross-layer architecture tests (e.g. test_kernel_tunables.py imports
-# `dadaia_workspace.hooks.*`) that cannot run inside any sandbox narrower than the whole
-# package. Widening this scope is real follow-up work, not done here — see the runner
-# script's header for the full narrowing rationale.
-[tool.mutmut]
-source_paths = ["dadaia_workspace/core/models"]
-pytest_add_cli_args_test_selection = ["tests/unit/core/models"]
-mutate_only_covered_lines = true
-use_git_change_detection = false

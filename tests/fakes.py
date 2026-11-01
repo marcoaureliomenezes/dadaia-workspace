@@ -1,138 +1,11 @@
-"""In-memory fakes for all protocols — enable unit tests without I/O."""
+"""In-memory fakes for the container-built collaborators — unit tests without I/O."""
 
-import sqlite3
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Collection
 from pathlib import Path
 from typing import Any
 
+from dadaia_workspace import container
 from dadaia_workspace.core.models.doctor_report import DoctorLine, DoctorStatus
-from dadaia_workspace.core.models.spec_context import SpecContextProject
-
-
-class FakeContextStore:
-    def __init__(self) -> None:
-        self._store: dict[str, SpecContextProject] = {}
-
-    def save(self, ctx: SpecContextProject) -> None:
-        self._store[ctx.name] = ctx
-
-    def update(self, ctx: SpecContextProject) -> None:
-        self._store[ctx.name] = ctx
-
-    def get(self, name: str) -> SpecContextProject | None:
-        return self._store.get(name)
-
-    def list_all(self) -> list[SpecContextProject]:
-        return list(self._store.values())
-
-    def delete(self, name: str) -> None:
-        self._store.pop(name, None)
-
-
-class FakePrimaryContextStore:
-    def __init__(self) -> None:
-        self._data: dict[str, str] | None = None
-
-    def write(self, name: str, repo_slug: str, specs_dir: Path) -> None:
-        self._data = {"name": name, "repo_slug": repo_slug, "specs_dir": str(specs_dir)}
-
-    def read(self) -> dict[str, str] | None:
-        return self._data
-
-    def clear(self) -> None:
-        self._data = None
-
-
-class FakeGitClient:
-    def __init__(self) -> None:
-        self.cloned: list[tuple[str, Path]] = []
-        self.committed: list[Path] = []
-        self.committed_paths: list[tuple[Path, tuple[str, ...]]] = []
-        self.pushed: list[Path] = []
-        self.checked_out: list[tuple[Path, str]] = []
-        self._dirty: set[Path] = set()
-        self._has_remote: set[Path] = set()
-        self._branches: dict[Path, str] = {}
-        self._untracked: dict[Path, list[str]] = {}
-        self._remote_urls: dict[Path, str] = {}
-        self._upstream_branches: dict[Path, str | None] = {}
-        self._unpushed_commit_counts: dict[Path, int] = {}
-        self._has_commits: set[Path] = set()
-        self._diff_names: dict[Path, tuple[str, ...]] = {}
-
-    def clone(self, url: str, dest: Path) -> None:
-        dest.mkdir(parents=True, exist_ok=True)
-        self.cloned.append((url, dest))
-
-    def is_dirty(self, path: Path) -> bool:
-        return path in self._dirty
-
-    def has_commits(self, path: Path) -> bool:
-        return path in self._has_commits
-
-    def diff_name_only(self, path: Path) -> tuple[str, ...]:
-        return self._diff_names.get(path, ())
-
-    def commit_all(self, path: Path, msg: str) -> None:
-        self.committed.append(path)
-        self._has_commits.add(path)
-        self._dirty.discard(path)
-        self._diff_names.pop(path, None)
-        self._untracked.pop(path, None)
-
-    def commit_paths(self, path: Path, msg: str, paths: Sequence[str]) -> None:
-        """Explicit-path staging counterpart of ``commit_all`` (never a blanket sweep).
-
-        Records the exact *paths* the caller staged in ``committed_paths`` so tests can
-        assert the scaffold commit never widened beyond what it authored. A no-op when
-        *paths* is empty, mirroring :class:`GitSubprocessClient`.
-        """
-        if not paths:
-            return
-        self.committed.append(path)
-        self.committed_paths.append((path, tuple(paths)))
-        self._has_commits.add(path)
-        self._dirty.discard(path)
-        self._diff_names.pop(path, None)
-        self._untracked.pop(path, None)
-
-    def has_remote(self, path: Path) -> bool:
-        return path in self._has_remote
-
-    def push(self, path: Path) -> None:
-        self.pushed.append(path)
-
-    def current_branch(self, path: Path) -> str:
-        return self._branches.get(path, "main")
-
-    def checkout(self, path: Path, branch: str) -> None:
-        self.checked_out.append((path, branch))
-        self._branches[path] = branch
-
-    def is_git_root(self, path: Path) -> bool:
-        return path.exists()
-
-    def list_untracked(self, path: Path) -> list[str]:
-        return list(self._untracked.get(path, []))
-
-    def remote_url(self, path: Path) -> str:
-        return self._remote_urls.get(path, "")
-
-    def upstream_branch(self, path: Path) -> str | None:
-        """Configurable via ``self._upstream_branches[path] = "origin/main"``.
-
-        Defaults to ``None`` (no upstream configured) — mirrors
-        :class:`SubprocessGitClient`'s behavior on a checkout with no tracking branch.
-        """
-        return self._upstream_branches.get(path)
-
-    def unpushed_commit_count(self, path: Path) -> int:
-        """Configurable via ``self._unpushed_commit_counts[path] = 3``.
-
-        Defaults to ``0`` (nothing pending) — mirrors
-        :class:`SubprocessGitClient`'s behavior when there is no upstream to compare.
-        """
-        return self._unpushed_commit_counts.get(path, 0)
 
 
 class FakePublicAssetManager:
@@ -152,7 +25,7 @@ class FakePublicAssetManager:
         harness: str | None = None,
         force: bool = False,
         scope: str = "all",
-        only: str | None = None,
+        template: str | None = None,
     ) -> list[str]:
         self.installed.append((workspace_root, harness, force))
         return [str(workspace_root / ".agents" / "skills" / "fake-skill" / "SKILL.md")]
@@ -163,71 +36,6 @@ class FakePublicAssetManager:
     def doctor(self, workspace_root: Path) -> list[DoctorLine]:
         self.doctored.append(workspace_root)
         return [DoctorLine(DoctorStatus.OK, "fake")]
-
-
-class FakeExcelReader:
-    def __init__(self, rows: list[dict[str, str]] | None = None) -> None:
-        self._rows = rows or []
-
-    def read_rows(self, file_path: Path) -> list[dict[str, str]]:
-        return self._rows
-
-
-def shared_connection_factory(conn: sqlite3.Connection) -> Callable[[], Any]:
-    """Return a per-call connection factory that yields a non-closing view of *conn*.
-
-    ``TelemetryAggregator`` (per-call mode) closes each connection it opens; an in-memory
-    sqlite DB used by the aggregator tests cannot be reopened, so the factory hands back a
-    proxy whose ``close()`` is a no-op — keeping the seeded connection alive across the
-    queries of a single test (the seam the removed shared-``dao`` mode used to provide).
-    """
-
-    class _NonClosing:
-        # Transparent proxy: forward every attribute get AND set to the real connection
-        # (queries mutate e.g. ``conn.row_factory``), but neutralize ``close()`` so the
-        # seeded connection survives the aggregator's per-call ``finally: conn.close()``.
-        def __getattr__(self, name: str) -> Any:
-            return getattr(conn, name)
-
-        def __setattr__(self, name: str, value: Any) -> None:
-            setattr(conn, name, value)
-
-        def close(self) -> None:
-            return None
-
-    proxy = _NonClosing()
-    return lambda: proxy
-
-
-class FakeFilePermissionSetter:
-    """In-memory FilePermissionSetter — records calls, never performs I/O.
-
-    Optionally raises ``PlatformSecurityError`` on the next call when
-    ``_raise_on_next`` is set to ``True`` (for testing Tier-1 error paths).
-    """
-
-    def __init__(self, raise_on_next: bool = False) -> None:
-        self.restricted_files: list[tuple[Any, int]] = []
-        self.restricted_dirs: list[tuple[Any, int]] = []
-        self._raise_on_next = raise_on_next
-
-    def _maybe_raise(self) -> None:
-        if self._raise_on_next:
-            from dadaia_workspace.core.exceptions import PlatformSecurityError
-
-            raise PlatformSecurityError(
-                "FakeFilePermissionSetter: simulated failure",
-                feature_name="fake-permission-setter",
-                platform="test",
-            )
-
-    def restrict_to_owner(self, path: object, mode: int = 0o600) -> None:
-        self._maybe_raise()
-        self.restricted_files.append((path, mode))
-
-    def restrict_dir_to_owner(self, path: object, mode: int = 0o700) -> None:
-        self._maybe_raise()
-        self.restricted_dirs.append((path, mode))
 
 
 class FakePythonEnvironmentManager:
@@ -244,6 +52,9 @@ class FakePythonEnvironmentManager:
         self.ensured.append(workspace_root)
         return f"{workspace_root}/.dadaia/.venv"
 
+    def version_change(self, workspace_root: str) -> tuple[str | None, str | None, str]:
+        return None, None, "install"
+
     def python_executable(self, workspace_root: str) -> str:
         from dadaia_workspace.core.platform import PLATFORM
 
@@ -252,20 +63,68 @@ class FakePythonEnvironmentManager:
             f"/{PLATFORM.venv_scripts_dir}/python{PLATFORM.venv_exe_suffix}"
         )
 
-    def pip_executable(self, workspace_root: str) -> str:
-        from dadaia_workspace.core.platform import PLATFORM
 
-        return (
-            f"{workspace_root}/.dadaia/.venv"
-            f"/{PLATFORM.venv_scripts_dir}/pip{PLATFORM.venv_exe_suffix}"
+def register_dead(
+    service: Any,
+    name: str,
+    repo_slug: str,
+    repo_url: str,
+    *,
+    associated_repos: tuple[Any, ...] = (),
+) -> Any:
+    """Register a DEAD context record through the service's one validation seam —
+    the fixture shape of an ``init --from`` context (``create`` now materializes)."""
+    from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
+
+    return service.register(
+        SpecContextProject(
+            name=name,
+            state=ContextState.DEAD,
+            repo_slug=repo_slug,
+            repo_url=repo_url,
+            created_at="2026-01-01T00:00:00+00:00",
+            alive_since=None,
+            dead_since=None,
+            associated_repos=associated_repos,
         )
+    )
 
 
-class FakeProcessProbe:
-    """Controllable probe — add PIDs to _alive_pids to simulate live processes."""
+def seed_dead_context(
+    workspace_root: Path, name: str, repo_slug: str, repo_url: str, **kw: Any
+) -> Any:
+    """``register_dead`` against the workspace's real on-disk registry — the fixture
+    for CLI tests about verbs other than ``create`` (which now clones)."""
+    from dadaia_workspace import container
 
-    def __init__(self) -> None:
-        self._alive_pids: set[int] = set()
+    return register_dead(
+        container.build_spec_context_service(workspace_root), name, repo_slug, repo_url, **kw
+    )
 
-    def is_pid_alive(self, pid: int) -> bool:
-        return pid in self._alive_pids
+
+def gate_fixes() -> Any:
+    """The fix inputs a pure push-gate test feeds the decision (the CLI builds the real ones)."""
+    from dadaia_workspace.features.chokepoints.branch_policy import GateFixes
+
+    return GateFixes(repo="/repo")
+
+
+def no_worktree_rows(_root: Path, _repos: Collection[str]) -> tuple[list[dict[str, Any]], str, str]:
+    """The owner's rows with no open worktree: no process is spawned to read them."""
+    return [], "", ""
+
+
+class NoWorktreeContainer:
+    """``dadaia_workspace.container`` whose spec-context service reads no worktree rows."""
+
+    def build_spec_context_service(self, workspace_root: Path) -> Any:
+        return container.build_spec_context_service(workspace_root, rows=no_worktree_rows)
+
+    def build_git_client(self) -> Any:
+        return container.build_git_client()
+
+
+def land_fix(render: Callable[..., str]) -> str:
+    """The Agent action an outside-the-gitflow push refusal prints, its CLI words rendered by *render*."""
+    merge, listing, new = (render(None, "worktree", verb) for verb in ("merge", "list", "new"))
+    return f"Agent action: land the work with {merge} on its tree (see {listing}), or open one with {new}"

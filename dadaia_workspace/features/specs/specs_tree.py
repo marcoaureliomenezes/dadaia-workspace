@@ -1,10 +1,8 @@
-"""SpecsTree — the parsed snapshot of shared specs facts (F010, 20260830 audit).
+"""SpecsTree — the parsed snapshot of shared specs facts.
 
-Before this module every validator owned raw filesystem access: RELEASE.json was
-re-read and re-parsed by four checks per doctor run, so rules could observe different
-states mid-run and re-derive shared facts independently. A ``SpecsTree`` is built
-FRESH at the start of every ``SpecsDoctor.check()`` run and handed to the validators;
-its sections are lazy and cached for the lifetime of that one run.
+A ``SpecsTree`` is built fresh at the start of every ``SpecsDoctor.check()`` run and handed
+to the validators, so every rule reads the same state. Its sections are lazy and cached for
+the lifetime of that one run.
 
 Contract (the fix/check freshness rule): checks read the tree; fixes take paths and
 mutate the filesystem; after fixing, the next ``check()`` builds a fresh tree — a
@@ -17,6 +15,7 @@ from dataclasses import dataclass
 from functools import cached_property
 from pathlib import Path
 
+from dadaia_workspace.core.gitflow import resolve_live_candidate
 from dadaia_workspace.features.specs.doctor_common import resolve_active_release
 
 __all__ = ["ActiveRelease", "SpecsTree"]
@@ -24,11 +23,12 @@ __all__ = ["ActiveRelease", "SpecsTree"]
 
 @dataclass(frozen=True)
 class ActiveRelease:
-    """The one shared answer to "which release is live, in which phase"."""
+    """The one shared answer to "which release is live, in which phase, and which
+    ``rc-<N>/`` holds its live candidate."""
 
     release: str | None
     phase: str | None
-    error: str | None
+    candidate: Path | None
 
 
 class SpecsTree:
@@ -40,5 +40,6 @@ class SpecsTree:
     @cached_property
     def active_release(self) -> ActiveRelease:
         """Parsed ONCE per run — the four per-check re-reads collapse here."""
-        release, phase, error = resolve_active_release(self.specs_dir)
-        return ActiveRelease(release=release, phase=phase, error=error)
+        return ActiveRelease(
+            *resolve_active_release(self.specs_dir), resolve_live_candidate(self.specs_dir)
+        )

@@ -1,30 +1,29 @@
-<!-- derived-from: dadaia help tree — regenerate: `dadaia help tree > docs/cli.md` -->
-
 # dadaia CLI digest (derived from the live command tree; authoritative help: `dadaia <group> --help`)
 
 ## dadaia capabilities — Describe public dadaia-workspace features supported by this installation.
 
 ## dadaia certify — Certify assembled public features in a disposable local workspace.
 
-## dadaia ci — Local CI-equivalent preflight gate + git-hook chokepoints.
-- ci install-hook — Install the pre-push CI/security gate.
-- ci preflight — Run the five local CI checks; exit non-zero if any fail.
-- ci push-gate-check — Pre-push gate: branch-name validation + the range-scoped denylist scan.
+## dadaia ci — Git-hook chokepoints: the pre-push and ref gates and their installer.
+- ci install-hook — Install the pre-push and reference-transaction gates.
+- ci push-gate-check — Pre-push gate: branch policy by the project gitflow + the range-scoped denylist scan.
+- ci ref-gate-check — Reference-transaction gate: a work-branch update must land on origin's sha.
 
 ## dadaia context — Manage Spec Context Projects.
 - context alive — Transition a context to ALIVE; clone repo if absent. Idempotent if already ALIVE.
-- context baseline — Create the explicit initial scaffold commit for an unborn repository.
+- context baseline — Publish the project's main repo, append-only: adopt what origin holds, or give an
 - context bind — Bind this shell session to a context.
-- context create — Create a new Spec Context Project in state 'dead'.
-- context dead — Transition a context to DEAD; git sync + remove repo from disk.
+- context create — Clone (or adopt) every repo, install the pre-push and reference-transaction hooks, make the context ALIVE —
+- context dead — Transition a context to DEAD: push what is committed, hold each repo in reaped/.
 - context delete — Delete a context. Context must be dead.
 - context list — List all Spec Context Projects.
 - context repo <add, remove> — Manage a context's associated repos (main repo excluded).
+- context session-check — Exit 0 when no workspace hook is bypassed: an operator terminal or a session with a live record.
 - context show — Show details of a context.
 
 ## dadaia doctor — Diagnose and repair workspace, specs and ledger compliance.
 
-## dadaia export — Write `.dadaia/dist/spec-contexts.json` — one record per spec context.
+## dadaia export — Write `.dadaia/dist/spec-contexts.json` — one record per spec context, read-only.
 
 ## dadaia harness — Register and inspect the workspace's agent runtimes (harnesses).
 - harness add — Register a harness and project its runtime set into this workspace.
@@ -33,16 +32,13 @@
 ## dadaia help — Derived help surfaces (docker-style; generated, never transcribed).
 - help tree — Print the compact CLI digest derived from the live command tree.
 
-## dadaia import — Register every context of a `dadaia export` file this workspace does not know as DEAD.
-
-## dadaia init — Bootstrap a dadaia workspace in DIR for one harness: .dadaia/, the law, and that harness's projection.
+## dadaia init — Bootstrap a dadaia workspace in DIR: .dadaia/, the law, and the projection of each harness (--harness, else the --from artifact's).
 
 ## dadaia migrate — Migration helpers for dadaia workspace and spec trees.
 
 ## dadaia public — Manage distributed public agent assets.
 - public doctor — Diagnose drift between package source, staging, and runtime projections.
-- public install — Install staged public assets into runtime projections.
-- public stage — Stage packaged public assets into .dadaia/agentic/.
+- public install — Stage the packaged public assets, then install them into runtime projections.
 
 ## dadaia reconcile — Reconcile state and projections after installing an exact candidate wheel.
 
@@ -50,5 +46,7 @@
 - reports validate — Validate one or more agent handoff JSON files.
 
 ## dadaia specs — SDD release-lifecycle structural checks and helpers.
-- specs init — Bootstrap a SDD release-lifecycle specs/ directory structure.
+- specs init — Bring a repo's specs/ to the canon, committing only the scaffold on a new work branch.
 - specs upgrade — Upgrade a specs/ tree to the canonical pattern version.
+
+## dadaia worktree — Run a worktree verb of the installed dd-gitflow-default `worktree.py`.

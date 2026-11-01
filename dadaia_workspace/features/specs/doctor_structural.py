@@ -1,79 +1,40 @@
-"""Structural validator (v0.1.55 FR1): TREE-1..8 spec-tree invariants.
-
-Single-responsibility sibling of the SpecsDoctor coordinator. Owns the ``spec-context-tree-v2``
-structural invariants (foundation/root-spec deprecation, required memory atoms, required dirs,
-AGENTS.md drift, active-release artifacts, bug session_id) and the TREE-4 auto-fix. Leaf-only:
-imports the shared leaves, never a sibling validator.
-"""
+"""Structural validator: TREE-3..8 spec-tree invariants (required memory atoms, required
+dirs, AGENTS.md drift, canon placement) and their auto-fixes.
+Leaf-only: imports the shared leaves, never a sibling validator."""
 
 from __future__ import annotations
 
 import hashlib
-import re
-import shutil
 from pathlib import Path
 
+from dadaia_workspace.core import platform
 from dadaia_workspace.core.atomic_write import atomic_write
-from dadaia_workspace.core.kernel_tunables import MEMORY_SCRIPT
-from dadaia_workspace.core.workspace_layout import SCOPED_LAW_AREAS
+from dadaia_workspace.core.cli_line import mkdir_line, reinstall_fix, shell_line
+from dadaia_workspace.core.doctor_rules import SectionFinding
+from dadaia_workspace.core.platform import act
+from dadaia_workspace.core.template_history import was_shipped
+from dadaia_workspace.core.workspace_layout import (
+    SCOPED_LAW_AREAS,
+    render_registry_tables,
+    render_workspace_cli,
+)
 from dadaia_workspace.features.specs import memory_canon
 from dadaia_workspace.features.specs.canon import (
     CANON_ROOT_MEMBERS,
     REQUIRED_ROOT_DIRS,
     is_canon_path,
+    scaffold_entry,
 )
-from dadaia_workspace.features.specs.doctor_types import Severity, SpecsDoctorIssue
-from dadaia_workspace.features.specs.template_history import was_shipped
+from dadaia_workspace.features.specs.doctor_types import Severity, finding_path, specs_finding
 
-# TREE-3: memory .md files that must exist.  No Jinja templates — .md is canonical source.
-# v7 canon: the top-level pair is ARCHITECTURE.md and QUALITY.md. A tree still carrying
-# memory/TECHSTACK.md is no longer canon-conformant — TREE-8's sweep names it, and
-# `dadaia specs upgrade` folds its body into ARCHITECTURE.md's `## Tech Stack`.
 _TREE3_MEMORY_FILES: tuple[str, ...] = memory_canon.MEMORY_REQUIRED_FILES
 
-# TREE-5 scoped-law coverage (T-053-15, bug
-# releases-agents-projection-stale-vs-scaffold-source; 0.4.7 FR6, bug
-# scoped-memory-agents-md-prose-rewrite-undetected-by-doctor): the scaffold AGENTS.md
-# files a projection freezes at scaffold time. memory/ is IN — single-ownership decides
-# WHO may rewrite the file, never whether the doctor may notice that someone did; its
-# presence check (the retired TREE-5M) is the same comparator's missing-file branch.
-_TREE5_SCOPED_LAW_AREAS: tuple[str, ...] = SCOPED_LAW_AREAS
 
-# TREE-4: directories that must exist — folded over the canon table (v0.5.1 K4): every
-# area whose ``_archive/<area>_histo.jsonl`` is required_at_birth also needs its own
-# directory to exist (:data:`~dadaia_workspace.features.specs.canon.REQUIRED_ROOT_DIRS`,
-# imported) — never a second, hand-kept area tuple.
-_TREE4_REQUIRED_DIRS = REQUIRED_ROOT_DIRS
-
-# TREE-8: the v6 canon root (FR1, specs_pattern_version 5 -> 6) — nothing else is
-# conformant directly under specs/. ERROR + auto-fixable (v0.5.0 specs-canon closure):
-# a stray root entry, or any non-canon file anywhere inside specs/ (a dotfile, a loose
-# per-entry file, a markdown ADR, an old reviews/ file, …), is real drift — a directory
-# is kept by its AGENTS.md, never a placeholder file — never a WARN-only migration
-# nicety. Root-canon membership (:data:`CANON_ROOT_MEMBERS`, imported) plus a full-tree
-# nested-shape sweep, both driven by the ONE shared predicate in
-# ``features.specs.canon`` — the SAME module the pre-push gate uses
-# (``features.chokepoints.service.push_gate_decision``), never a second, hand-kept
-# member list (operator ruling 2026-08-28).
-_TREE8_CANON_ROOT: frozenset[str] = CANON_ROOT_MEMBERS
-
-#: Deprecated-layout root entries TREE-1/TREE-2 already own (loud migration hint,
-#: fixable=False by explicit design: auto-moving may destroy SDD-approved content
-#: pending operator consent). TREE-8 must never additionally flag-and-auto-remove
-#: either — that would silently destroy exactly the content TREE-1/TREE-2 protect.
-_TREE8_DEFERRED_TO_SIBLING_CHECKS: frozenset[str] = frozenset({"foundation", "SPEC.md"})
-
-# Migration hint printed loudly for TREE-1 and TREE-2 (regardless of --fix).
-_TREE_MIGRATION_HINT = (
-    "[TREE MIGRATION REQUIRED] Run: dadaia migrate tree-v2\n"
-    "  This command moves deprecated content to releases/legacy/ "
-    "without destroying SDD-approved artifacts."
-)
+def _sha(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
 class StructuralValidator:
-    """TREE-1..8 structural invariants for the spec tree."""
-
     def __init__(
         self,
         specs_dir: Path,
@@ -84,97 +45,30 @@ class StructuralValidator:
         self._scaffold_dir = scaffold_dir
         self._templates_dir = templates_dir
 
-    def check_tree1_foundation(self) -> list[SpecsDoctorIssue]:
-        """TREE-1: specs/foundation/ must NOT exist (deprecated layout).
-
-        Warn-only (fixable=False).  A loud migration hint pointing to
-        ``dadaia migrate tree-v2`` is emitted regardless of the --fix flag.
-        Auto-moving is intentionally blocked: foundation/ may hold SDD-approved
-        content and reclassification requires operator consent.
-        """
-        foundation = self.specs_dir / "foundation"
-        if not foundation.exists():
-            return []
+    def check_tree3_memory_md(self) -> list[SectionFinding]:
+        """TREE-3: a required memory atom is missing; ``--fix`` seeds it from its template."""
         return [
-            SpecsDoctorIssue(
-                code="TREE-1",
-                severity=Severity.WARNING,
-                description=(
-                    "specs/foundation/ exists — this is the deprecated layout. "
-                    f"{_TREE_MIGRATION_HINT}"
-                ),
-                path=str(foundation),
-                fixable=False,
+            specs_finding(
+                "TREE-3",
+                Severity.ERROR,
+                f"memory/{rel_path} is missing — required memory .md atom.",
+                str(self.specs_dir / "memory" / rel_path),
+                fixable=True,
             )
+            for rel_path in _TREE3_MEMORY_FILES
+            if not (self.specs_dir / "memory" / rel_path).exists()
         ]
 
-    def check_tree2_root_spec_md(self) -> list[SpecsDoctorIssue]:
-        """TREE-2: specs/SPEC.md at the tree root must NOT exist (deprecated).
+    def fix_tree3(self, issue: SectionFinding) -> None:
+        scaffold_entry(
+            self.specs_dir, Path(str(finding_path(issue))).relative_to(self.specs_dir).as_posix()
+        )
 
-        Warn-only (fixable=False).  A loud migration hint pointing to
-        ``dadaia migrate tree-v2`` is emitted regardless of the --fix flag.
-        Auto-moving is intentionally blocked: root SPEC.md may hold
-        SDD-approved content that requires operator consent to reclassify.
-        """
-        root_spec = self.specs_dir / "SPEC.md"
-        if not root_spec.exists():
-            return []
-        return [
-            SpecsDoctorIssue(
-                code="TREE-2",
-                severity=Severity.WARNING,
-                description=(
-                    "specs/SPEC.md exists at the tree root — this is the deprecated layout. "
-                    f"{_TREE_MIGRATION_HINT}"
-                ),
-                path=str(root_spec),
-                fixable=False,
-            )
-        ]
-
-    def check_tree3_memory_md(self) -> list[SpecsDoctorIssue]:
-        """TREE-3: required memory .md atom files must exist.
-
-        Checks: memory/ARCHITECTURE.md, memory/QUALITY.md,
-        memory/product/index.md.
-
-        .md is the canonical source (memory-markdown-source-v1 / D-4).
-        No auto-fix: .md atoms are operator-authored, not generated from templates.
-        """
-        issues: list[SpecsDoctorIssue] = []
-        mem_dir = self.specs_dir / "memory"
-        for rel_path in _TREE3_MEMORY_FILES:
-            target = mem_dir / rel_path
-            if target.exists():
-                continue
-            issues.append(
-                SpecsDoctorIssue(
-                    code="TREE-3",
-                    severity=Severity.WARNING,
-                    description=(
-                        f"memory/{rel_path} is missing — required memory .md atom. "
-                        f"Author it, then regenerate the pair with "
-                        f"`{MEMORY_SCRIPT} catalog generate`."
-                    ),
-                    path=str(target),
-                    fixable=False,
-                )
-            )
-        return issues
-
-    def check_tree4_required_dirs(self) -> list[SpecsDoctorIssue]:
-        """TREE-4: every area in ``REQUIRED_ROOT_DIRS`` (audits/, backlog/, bugs/,
-        releases/ today) must exist under specs/ — folded over the canon table
-        (v0.5.1 K4), not a second hand-kept tuple.
-
-        When a directory is absent the issue is emitted as fixable=True.
-        The fix creates the dir and writes AGENTS.md (content copied from the
-        canonical scaffold source — v6 canon, FR1: README.md retired) — matching
-        the exact output of ``scaffold()``. A directory is kept by its AGENTS.md;
-        no separate .gitkeep placeholder is written.
-        """
-        issues: list[SpecsDoctorIssue] = []
-        for dirname in _TREE4_REQUIRED_DIRS:
+    def check_tree4_required_dirs(self) -> list[SectionFinding]:
+        """TREE-4: a ``REQUIRED_ROOT_DIRS`` area is missing; fixable when its scaffold
+        AGENTS.md is at hand."""
+        issues: list[SectionFinding] = []
+        for dirname in REQUIRED_ROOT_DIRS:
             target = self.specs_dir / dirname
             if target.exists():
                 continue
@@ -182,194 +76,40 @@ class StructuralValidator:
                 self._scaffold_dir is not None
                 and (self._scaffold_dir / dirname / "AGENTS.md").exists()
             )
+            remedy = (
+                "Auto-fix available (run doctor --fix)."
+                if fixable
+                else "No scaffold source available — create manually."
+            )
             issues.append(
-                SpecsDoctorIssue(
-                    code="TREE-4",
-                    severity=Severity.WARNING,
-                    description=(
-                        f"specs/{dirname}/ is missing — required spec tree directory. "
-                        + (
-                            "Auto-fix available (run doctor --fix)."
-                            if fixable
-                            else "No scaffold source available — create manually."
-                        )
-                    ),
-                    path=str(target),
+                specs_finding(
+                    "TREE-4",
+                    Severity.WARNING,
+                    f"specs/{dirname}/ is missing — required spec tree directory. {remedy}",
+                    str(target),
                     fixable=fixable,
+                    fix="" if fixable else mkdir_line(target),
                 )
             )
         return issues
 
-    def fix_tree4(self, issue: SpecsDoctorIssue) -> None:
-        """Create the missing directory with AGENTS.md — a directory is kept by its
-        AGENTS.md, no separate .gitkeep placeholder."""
+    def fix_tree4(self, issue: SectionFinding) -> None:
+        """Create the missing directory with its scaffold AGENTS.md (no .gitkeep)."""
         assert issue.code == "TREE-4"
-        target = Path(issue.path)  # type: ignore[arg-type]
-        dirname = target.name
+        target = Path(str(finding_path(issue)))
         target.mkdir(parents=True, exist_ok=True)
-        # AGENTS.md — copy from scaffold source (v6 canon, FR1: README.md retired)
-        agents_content = ""
-        if self._scaffold_dir is not None:
-            src_agents = self._scaffold_dir / dirname / "AGENTS.md"
-            if src_agents.exists():
-                agents_content = src_agents.read_text(encoding="utf-8")
+        src = self._scaffold_dir / target.name / "AGENTS.md" if self._scaffold_dir else None
         agents_md = target / "AGENTS.md"
         if not agents_md.exists():
-            agents_md.write_text(agents_content, encoding="utf-8")
-
-    def check_tree5_agents_md(self) -> list[SpecsDoctorIssue]:
-        """TREE-5: projected law files must match their canonical source.
-
-        Root: ``specs/AGENTS.md`` vs ``templates/specs-AGENTS.md``. Scoped (T-053-15):
-        ``specs/<area>/AGENTS.md`` vs ``public/scaffold/<area>/AGENTS.md`` for every
-        area in :data:`_TREE5_SCOPED_LAW_AREAS` (memory excluded — single-ownership).
-
-        Absent root file → WARNING (fixable=False; intended for operator
-        customisation). Hash drift → WARNING; auto-fixable ONLY when the on-disk
-        bytes equal a version this project shipped (``was_shipped``) and the file is
-        not a symlink — anything else may hold operator content and stays warn-only.
-        """
-        issues: list[SpecsDoctorIssue] = []
-        issues.extend(self._tree5_root_issues())
-        issues.extend(self._tree5_scoped_issues())
-        return issues
-
-    def _tree5_root_issues(self) -> list[SpecsDoctorIssue]:
-        agents_md = self.specs_dir / "AGENTS.md"
-        if not agents_md.exists():
-            return [
-                SpecsDoctorIssue(
-                    code="TREE-5",
-                    severity=Severity.WARNING,
-                    description=(
-                        "specs/AGENTS.md is missing — expected SDD workflow contract. "
-                        "Create it from the canonical template "
-                        "(dadaia_workspace/public/templates/specs-AGENTS.md) "
-                        "or run `dadaia specs init` to scaffold it."
-                    ),
-                    path=str(agents_md),
-                    fixable=False,
-                )
-            ]
-        if self._templates_dir is None:
-            return []
-        canonical_path = self._templates_dir / "specs-AGENTS.md"
-        if not canonical_path.exists():
-            return []
-        return self._tree5_compare(
-            dst=agents_md,
-            canonical_path=canonical_path,
-            asset_name="specs-AGENTS.md",
-            label="specs/AGENTS.md",
-        )
-
-    def _tree5_scoped_issues(self) -> list[SpecsDoctorIssue]:
-        """Scoped scaffold law files (T-053-15) — same shipped-history discipline."""
-        if self._templates_dir is None or self._scaffold_dir is None:
-            return []
-        issues: list[SpecsDoctorIssue] = []
-        for area in _TREE5_SCOPED_LAW_AREAS:
-            dst = self.specs_dir / area / "AGENTS.md"
-            canonical_path = self._scaffold_dir / area / "AGENTS.md"
-            if not canonical_path.exists():
-                continue
-            if not dst.exists():
-                issues.append(self._tree5_missing(dst=dst, area=area))
-                continue
-            issues.extend(
-                self._tree5_compare(
-                    dst=dst,
-                    canonical_path=canonical_path,
-                    asset_name=f"scaffold/{area}/AGENTS.md",
-                    label=f"specs/{area}/AGENTS.md",
-                )
+            atomic_write(
+                agents_md,
+                platform.read_text(src, reinstall_fix(src)) if src and src.exists() else "",
             )
-        return issues
 
-    def _tree5_missing(self, *, dst: Path, area: str) -> SpecsDoctorIssue:
-        """A scaffolded law file that is not there at all — the check TREE-5M owned for
-        ``memory/`` alone, now the one comparator's missing-file branch for every area.
-
-        WARNING, never fixable: `dadaia public install` scaffolds this file when it is
-        missing and never updates an existing copy, so the repair is the operator
-        copying the source in deliberately.
-        """
-        return SpecsDoctorIssue(
-            code="TREE-5",
-            severity=Severity.WARNING,
-            description=(
-                f"specs/{area}/AGENTS.md is missing — expected the scaffolded law "
-                f"contract for specs/{area}/. Restore it by copying the canonical "
-                f"source dadaia_workspace/public/scaffold/{area}/AGENTS.md into "
-                f"specs/{area}/AGENTS.md."
-            ),
-            path=str(dst),
-            fixable=False,
-        )
-
-    def _tree5_compare(
-        self, *, dst: Path, canonical_path: Path, asset_name: str, label: str
-    ) -> list[SpecsDoctorIssue]:
-        """ONE comparison rule for every TREE-5 target (root and scoped alike)."""
+    def _tree5_targets(self) -> list[tuple[Path, Path, str]]:
+        """The CLOSED set of law files: (projection, canonical source, shipped asset name)."""
         assert self._templates_dir is not None
-        canonical_text = canonical_path.read_text(encoding="utf-8")
-        current_text = dst.read_text(encoding="utf-8")
-        canonical_hash = hashlib.sha256(canonical_text.encode("utf-8")).hexdigest()
-        current_hash = hashlib.sha256(current_text.encode("utf-8")).hexdigest()
-        if canonical_hash == current_hash:
-            return []
-        # A file whose bytes we published earlier carries no operator customisation, so
-        # refreshing it is lossless (bug
-        # upgrade-never-refreshes-uncustomised-scoped-law-projection). Anything else may
-        # hold operator content and stays warn-only. A symlinked projection is never
-        # repaired (the write would land outside the tree), so it must not be
-        # advertised as fixable either (CWE-393).
-        if was_shipped(current_text, asset_name, self._templates_dir) and not dst.is_symlink():
-            return [
-                SpecsDoctorIssue(
-                    code="TREE-5",
-                    severity=Severity.WARNING,
-                    description=(
-                        f"{label} is a superseded version of the canonical "
-                        f"template (current sha256:{current_hash[:12]}… is a previously "
-                        f"shipped release; canonical sha256:{canonical_hash[:12]}…). "
-                        "It carries no operator customisation, so it can be refreshed "
-                        "losslessly — run `dadaia doctor --fix`."
-                    ),
-                    path=str(dst),
-                    fixable=True,
-                )
-            ]
-        return [
-            SpecsDoctorIssue(
-                code="TREE-5",
-                severity=Severity.WARNING,
-                description=(
-                    f"copy-drift: {label} matches neither its canonical source nor any "
-                    "version this project shipped "
-                    f"(current sha256:{current_hash[:12]}… vs "
-                    f"canonical sha256:{canonical_hash[:12]}…). "
-                    "Review the diff and merge any upstream changes manually — "
-                    "auto-overwrite is disabled to protect operator customisations. "
-                    f"Canonical source: {canonical_path}"
-                ),
-                path=str(dst),
-                fixable=False,
-            )
-        ]
-
-    def fix_tree5(self, issue: SpecsDoctorIssue) -> None:
-        """Refresh a superseded projection from its canonical source (root or scoped).
-
-        Only ever reached for issues this validator marked ``fixable``. The repair
-        target is resolved against a CLOSED set of known law files — the issue's path
-        selects WHICH member, never an arbitrary destination (CWE-73); a symlink is
-        refused so the write cannot land outside the tree (CWE-59); ``was_shipped`` is
-        re-verified so the repair can never overwrite operator content.
-        """
-        if self._templates_dir is None:
-            return
-        targets: list[tuple[Path, Path, str]] = [
+        targets = [
             (
                 self.specs_dir / "AGENTS.md",
                 self._templates_dir / "specs-AGENTS.md",
@@ -377,163 +117,135 @@ class StructuralValidator:
             )
         ]
         if self._scaffold_dir is not None:
-            targets.extend(
+            targets += [
                 (
                     self.specs_dir / area / "AGENTS.md",
                     self._scaffold_dir / area / "AGENTS.md",
                     f"scaffold/{area}/AGENTS.md",
                 )
-                for area in _TREE5_SCOPED_LAW_AREAS
-            )
-        issue_path = Path(issue.path).resolve() if issue.path else None
-        for dst, canonical_path, asset_name in targets:
-            if issue_path is not None and dst.resolve() != issue_path:
-                continue
-            if dst.is_symlink() or not dst.exists() or not canonical_path.exists():
-                continue
-            current_text = dst.read_text(encoding="utf-8")
-            if not was_shipped(current_text, asset_name, self._templates_dir):
-                continue
-            atomic_write(dst, canonical_path.read_text(encoding="utf-8"), preserve_mode=True)
-            return
+                for area in SCOPED_LAW_AREAS
+            ]
+        return targets
 
-    def check_tree7_bug_session_id(self) -> list[SpecsDoctorIssue]:
-        """TREE-7: every bugs/<slug>.md must have a session_id frontmatter field.
-
-        Expected frontmatter format (YAML-like leading lines):
-            session_id: <value>   OR   session_id: null
-
-        Missing field → ERROR (no auto-fix — injecting a session_id would
-        falsify authorship; human review is required).
-
-        If bugs/ does not exist, this check is a no-op.
-        """
-        issues: list[SpecsDoctorIssue] = []
-        bugs_dir = self.specs_dir / "bugs"
-        if not bugs_dir.exists():
-            return issues
-        for bug_file in sorted(bugs_dir.glob("*.md")):
-            # Skip README.md (legacy) and AGENTS.md (v6 canon, FR1) and other
-            # non-bug files
-            if bug_file.name in ("README.md", "AGENTS.md"):
+    def check_tree5_agents_md(self) -> list[SectionFinding]:
+        """TREE-5: a projected law file is missing (fixable: lossless) or differs from its
+        canonical source (fixable only when its bytes are a version we shipped)."""
+        agents_md = self.specs_dir / "AGENTS.md"
+        if self._templates_dir is None:
+            return [] if agents_md.exists() else [self._tree5_missing(agents_md, False)]
+        issues: list[SectionFinding] = []
+        for dst, canonical_path, asset_name in self._tree5_targets():
+            if not canonical_path.exists():
+                if dst == agents_md and not dst.exists():
+                    issues.append(self._tree5_missing(dst, False))
                 continue
-            text = bug_file.read_text(encoding="utf-8")
-            has_session_id = bool(re.search(r"^session_id\s*:", text, re.MULTILINE))
-            if not has_session_id:
-                issues.append(
-                    SpecsDoctorIssue(
-                        code="TREE-7",
-                        severity=Severity.ERROR,
-                        description=(
-                            f"bugs/{bug_file.name} is missing the required 'session_id:' "
-                            "frontmatter field. "
-                            "Add 'session_id: null' if the session is unknown. "
-                            "Do NOT inject a fabricated session ID."
-                        ),
-                        path=str(bug_file),
-                        fixable=False,
-                    )
-                )
+            issues += self._tree5_check(dst, canonical_path, asset_name)
         return issues
 
-    def check_tree8_canon_root(self) -> list[SpecsDoctorIssue]:
-        """TREE-8: every path under specs/ must be v6-canon-conformant (FR1, v0.5.0
-        specs-canon closure, operator ruling 2026-08-28) — driven by the ONE shared
-        predicate in ``features.specs.canon``, the SAME module the pre-push
-        gate uses (``features.chokepoints.service.push_gate_decision``), never a
-        second, hand-kept member list.
-
-        Two tiers, mirroring the pre-canon-closure two-loop shape (root membership,
-        then a full-tree sweep) but now both driven by that one predicate instead of a
-        root-only set plus a separate dotfile-only sweep:
-
-        1. **Root membership** (:data:`CANON_ROOT_MEMBERS`) — a path directly under
-           ``specs/`` whose NAME is not a v6 canon root member is flagged ONCE,
-           whether it is a file or a directory, ALWAYS fixable=True — a name that
-           is not even canon-shaped at the root (e.g. a scratch/legacy directory) is
-           unambiguously disposable, and the fix removes the whole stray subtree.
-        2. **Nested canon-shape sweep** (:func:`~dadaia_workspace.features.specs
-           .canon.is_canon_path`) — every FILE inside an otherwise-conformant
-           root member is checked against its full ``specs/``-relative POSIX path; a
-           non-matching file (a dotfile, a loose per-entry file, a markdown ADR, an
-           old ``reviews/`` file, an unmigrated legacy-cased memory atom, …) is
-           flagged individually. **Only a dotfile is auto-fixable here** — a
-           genuinely disposable placeholder (the retired ``.gitkeep`` landing-zone
-           mechanism). Every OTHER tier-2 finding is fixable=False, ERROR, loud: a
-           non-dotfile nested violation may be REAL, unmigrated content (bug data,
-           an archived legacy-release landing zone tree-v2 relocated specifically so
-           it would not be dropped, a memory atom under a pre-canon filename) —
-           mirrors ``_TREE8_DEFERRED_TO_SIBLING_CHECKS``'s own precedent
-           ("auto-moving may destroy SDD-approved content pending operator
-           consent"). A real, destructive incident this exact distinction closes:
-           an earlier draft of this widened sweep marked EVERY tier-2 finding
-           fixable=True and ``doctor --fix`` silently deleted a migrated bug
-           ledger, three renamed-but-real memory atoms, and a tree-v2 legacy
-           landing zone in one pass (caught by
-           ``tests/e2e/features/test_specs_upgrade_e2e.py`` before it ever shipped).
-        """
-        if not self.specs_dir.is_dir():
-            return []
-        issues: list[SpecsDoctorIssue] = []
-        for entry in sorted(self.specs_dir.iterdir()):
-            if entry.name in _TREE8_CANON_ROOT:
-                continue
-            if entry.name in _TREE8_DEFERRED_TO_SIBLING_CHECKS:
-                continue
-            issues.append(self._tree8_issue(entry, fixable=True))
-        for entry in sorted(self.specs_dir.rglob("*")):
-            if entry.is_dir():
-                continue
-            # Root-level entries are already covered by the loop above (whether
-            # canon-named or not); this second pass reaches every FILE nested inside
-            # an otherwise-conformant root member. Never descend into a deprecated
-            # root TREE-1/TREE-2 owns (its own content is exempt from removal), nor
-            # into a root entry the first loop already flagged as a stray whole
-            # subtree (that finding already covers everything inside it).
-            root_name = entry.relative_to(self.specs_dir).parts[0]
-            if root_name in _TREE8_DEFERRED_TO_SIBLING_CHECKS or root_name not in _TREE8_CANON_ROOT:
-                continue
-            rel_posix = entry.relative_to(self.specs_dir).as_posix()
-            if not is_canon_path(rel_posix):
-                issues.append(self._tree8_issue(entry, fixable=entry.name.startswith(".")))
-        return issues
-
-    def _tree8_issue(self, entry: Path, *, fixable: bool) -> SpecsDoctorIssue:
-        rel = entry.relative_to(self.specs_dir).as_posix()
-        remedy = (
-            "Auto-fix available (run doctor --fix) to remove it"
-            if fixable
-            else "NOT auto-fixed — it may be real, unmigrated content; move/rename it "
-            "into the canon shape (or delete it) by hand"
+    def _tree5_check(self, dst: Path, canonical_path: Path, asset: str) -> list[SectionFinding]:
+        """ONE comparison rule for every TREE-5 target (root and scoped alike)."""
+        assert self._templates_dir is not None
+        if not dst.exists():
+            return [self._tree5_missing(dst, True)]
+        label = f"specs/{dst.relative_to(self.specs_dir).as_posix()}"
+        canonical_text = render_registry_tables(
+            platform.read_text(canonical_path, reinstall_fix(canonical_path))
         )
-        return SpecsDoctorIssue(
-            code="TREE-8",
-            severity=Severity.ERROR,
-            description=(
-                f"specs/{rel} is not part of the v6 canon (specs/AGENTS.md) — either a "
-                "stray root entry (not one of backlog/, bugs/, memory/, releases/, "
-                "audits/, ADRs/, constitution.md, AGENTS.md) or a file nested inside "
-                "a canon area whose shape does not match that area's canon (a "
-                "dotfile, a loose per-entry file, a markdown ADR, an old reviews/ "
-                "file, …) — a directory is kept by its AGENTS.md, never a "
-                f"placeholder. {remedy} (TREE-8)."
-            ),
-            path=str(entry),
+        current_text = platform.read_text(dst)
+        canonical_hash = _sha(canonical_text)
+        current_hash = _sha(render_workspace_cli(current_text))
+        if canonical_hash == current_hash:
+            return []
+        # A symlinked projection is never repaired (the write would leave the tree): never fixable.
+        if was_shipped(current_text, asset, self._templates_dir) and not platform.is_link(dst):
+            return [
+                specs_finding(
+                    "TREE-5",
+                    Severity.WARNING,
+                    f"{label} is a superseded version of the canonical template (current "
+                    f"sha256:{current_hash[:12]}… is a previously shipped release; canonical "
+                    f"sha256:{canonical_hash[:12]}…). It carries no operator customisation, "
+                    "so it can be refreshed losslessly.",
+                    str(dst),
+                    fixable=True,
+                )
+            ]
+        return [
+            specs_finding(
+                "TREE-5",
+                Severity.WARNING,
+                f"copy-drift: {label} matches neither its canonical source nor any version "
+                f"this project shipped (current sha256:{current_hash[:12]}… vs canonical "
+                f"sha256:{canonical_hash[:12]}…). Review the diff and merge any upstream "
+                "changes manually — auto-overwrite is disabled to protect operator "
+                "customisations.",
+                str(dst),
+                fix=shell_line("git", "diff", "--no-index", "--", str(canonical_path), str(dst)),
+            )
+        ]
+
+    def _tree5_missing(self, dst: Path, fixable: bool) -> SectionFinding:
+        label = f"specs/{dst.relative_to(self.specs_dir).as_posix()}"
+        return specs_finding(
+            "TREE-5",
+            Severity.WARNING,
+            f"{label} is missing — expected the shipped law contract.",
+            str(dst),
             fixable=fixable,
         )
 
-    def fix_tree8(self, issue: SpecsDoctorIssue) -> None:
-        """Remove a stray non-canon root entry or nested non-canon file (TREE-8 auto-fix).
-
-        Tolerant of an already-removed target: fixing a non-canon root DIRECTORY
-        first (via ``rmtree``) can make a separately-reported nested issue inside it
-        vanish in the same pass — never an error, just a no-op residual.
-        """
-        assert issue.code == "TREE-8"
-        target = Path(issue.path)  # type: ignore[arg-type]
-        if not target.exists() and not target.is_symlink():
+    def fix_tree5(self, issue: SectionFinding) -> None:
+        """Write a missing law file, or refresh a superseded one. The issue path selects a
+        member of the closed target set, never a destination (CWE-73); ``was_shipped`` is
+        re-verified so operator content is never overwritten."""
+        if self._templates_dir is None:
             return
-        if target.is_dir() and not target.is_symlink():
-            shutil.rmtree(target, ignore_errors=True)
-        else:
-            target.unlink(missing_ok=True)
+        named = finding_path(issue)
+        issue_path = Path(named).resolve() if named else None
+        for dst, canonical_path, asset_name in self._tree5_targets():
+            if issue_path is not None and dst.resolve() != issue_path:
+                continue
+            if not canonical_path.exists():
+                continue
+            if dst.exists() and not was_shipped(
+                platform.read_text(dst), asset_name, self._templates_dir
+            ):
+                continue
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            law = render_registry_tables(
+                platform.read_text(canonical_path, reinstall_fix(canonical_path))
+            )
+            atomic_write(dst, law, preserve_mode=True)
+            return
+
+    def check_tree8_canon_root(self) -> list[SectionFinding]:
+        """TREE-8: a root entry outside ``CANON_ROOT_MEMBERS`` (flagged once, whole), or a
+        file inside a canon area failing ``is_canon_path`` — the pre-push gate's predicate.
+        Never fixable: it may be operator content."""
+        if not self.specs_dir.is_dir():
+            return []
+        strays = [e for e in sorted(self.specs_dir.iterdir()) if e.name not in CANON_ROOT_MEMBERS]
+        nested = [
+            e
+            for e in sorted(self.specs_dir.rglob("*"))
+            if not e.is_dir()
+            and e.relative_to(self.specs_dir).parts[0] in CANON_ROOT_MEMBERS
+            and not is_canon_path(e.relative_to(self.specs_dir).as_posix())
+        ]
+        return [self._tree8_issue(entry) for entry in strays + nested]
+
+    def _tree8_issue(self, entry: Path) -> SectionFinding:
+        rel = entry.relative_to(self.specs_dir).as_posix()
+        return specs_finding(
+            "TREE-8",
+            Severity.ERROR,
+            f"specs/{rel} is not part of the v6 canon (specs/AGENTS.md) — either a stray root "
+            "entry (not one of backlog/, bugs/, memory/, releases/, audits/, ADRs/, "
+            "constitution.md, AGENTS.md) or a file nested inside a canon area whose shape does "
+            "not match that area's canon (a dotfile, a loose per-entry file, a markdown ADR, "
+            "an old reviews/ file, …) — a directory is kept by its AGENTS.md, never a "
+            "placeholder. Never auto-fixed — it may be real content; move/rename it into the "
+            "canon shape, or delete it, by hand (TREE-8).",
+            str(entry),
+            fix=act("agent", f"move {entry} into its canon shape, or out of specs/"),
+        )

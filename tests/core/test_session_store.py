@@ -1,0 +1,193 @@
+"""``core.session_store`` owns the session-binding record — its path, schema, liveness rule and
+stale selection."""
+
+from __future__ import annotations
+
+import datetime as dt
+from datetime import UTC, datetime
+from pathlib import Path
+from types import SimpleNamespace
+
+import pytest
+
+from dadaia_workspace.core import session_store as si
+from dadaia_workspace.core.skill_owner import load_owner
+from tests.helpers.oslib import read_text, write_text
+from tests.helpers.oslib import write_text as os_write_text
+
+SID = "my-session-id"
+
+
+@pytest.mark.parametrize("bad_name", ["../escape", "a/b", "a.b"])
+def test_path_validation_rejects_traversal(tmp_path: Path, bad_name: str) -> None:
+    """Records live under PROTECTED .dadaia/sessions/; a traversal name is CWE-22."""
+    assert si.session_record_path(tmp_path, SID).relative_to(tmp_path).as_posix() == (
+        f".dadaia/sessions/{SID}.json"
+    )
+    with pytest.raises(ValueError, match="CWE-22"):
+        si.session_record_path(tmp_path, bad_name)
+
+
+def test_record_roundtrip_atomicity_and_fail_soft(tmp_path: Path) -> None:
+    """A write reads back with no temp sibling; absent, corrupt, non-dict or invalid ids read None."""
+    assert si.read_session(tmp_path, SID) is None
+    record = {"id": SID, "mode": "READ", "pid": 4242, "context": "myctx"}
+    si.write_session(tmp_path, SID, record)
+    assert si.read_session(tmp_path, SID) == record
+    assert [p.name for p in si.sessions_dir(tmp_path).iterdir()] == [f"{SID}.json"]
+    os_write_text(si.session_record_path(tmp_path, "corrupt", create=True), "{not json")
+    os_write_text(si.session_record_path(tmp_path, "nondict", create=True), "[1, 2, 3]")
+    for name in ("corrupt", "nondict", "../bad"):
+        assert si.read_session(tmp_path, name) is None
+
+
+def test_touch_last_seen_at(tmp_path: Path) -> None:
+    """The heartbeat stamps and persists ``last_seen_at`` on an existing record."""
+    si.write_session(tmp_path, SID, {"id": SID, "last_seen_at": "2020-01-01T00:00:00+00:00"})
+    updated = si.touch_last_seen_at(tmp_path, SID, now="2030-06-10T12:00:00+00:00")
+    assert updated is not None and updated["last_seen_at"] == "2030-06-10T12:00:00+00:00"
+    assert si.read_session(tmp_path, SID) == updated
+
+
+def test_touch_creates_the_minimal_record_of_a_session_with_none(tmp_path: Path) -> None:
+    """A session the hooks see for the first time gets a record that binds nothing."""
+    created = si.touch_last_seen_at(tmp_path, "ghost", now="2030-06-10T12:00:00+00:00")
+    assert created == {"session_id": "ghost", "last_seen_at": "2030-06-10T12:00:00+00:00"}
+    assert si.read_session(tmp_path, "ghost") == created
+
+
+def test_touch_leaves_an_unreadable_record_for_doctor(tmp_path: Path) -> None:
+    path = si.session_record_path(tmp_path, SID, create=True)
+    os_write_text(path, "{bad")
+    before = path.read_bytes()
+
+    assert si.touch_last_seen_at(tmp_path, SID, now="2030-06-10T12:00:00+00:00") is None
+    assert path.read_bytes() == before
+
+
+def test_touch_renews_a_bound_record_without_changing_its_bind(tmp_path: Path) -> None:
+    bound = si.new_binding_record(
+        session_id=SID,
+        context="alpha",
+        runtime="claude-code",
+        pid=7,
+        now="2020-01-01T00:00:00+00:00",
+    )
+    si.write_session(tmp_path, SID, bound)
+
+    renewed = si.touch_last_seen_at(tmp_path, SID, now="2030-06-10T12:00:00+00:00")
+
+    assert renewed == {**bound, "last_seen_at": "2030-06-10T12:00:00+00:00"}
+    assert si.read_session(tmp_path, SID) == renewed
+
+
+def test_new_binding_record_authors_the_schema_and_retired_keys_still_parse() -> None:
+    """An old record with ``mode``/``release`` keys still reads live."""
+    now = datetime.now(tz=UTC).isoformat()
+    record = si.new_binding_record(
+        session_id="s1", context="alpha", runtime="claude-code", pid=1234, now=now
+    )
+    assert len(bytes.fromhex(str(record.pop("bind_id")))) == 8
+    assert record == {
+        "session_id": "s1",
+        "context": "alpha",
+        "runtime": "claude-code",
+        "pid": 1234,
+        "bound_at": now,
+        "last_seen_at": now,
+    }
+    assert si.is_live({**record, "mode": "BOUND_IMPLEMENTATION", "release": "0.5.3"})
+
+
+@pytest.mark.parametrize(
+    ("record", "live"),
+    [
+        ({"last_seen_at": "2026-06-05T12:00:01+00:00"}, True),
+        ({"last_seen_at": "2026-06-06T11:54:00Z"}, True),
+        ({"last_seen_at": "2026-06-06T11:59:59"}, True),
+        ({"last_seen_at": "2026-06-05T12:00:00+00:00"}, False),
+        ({"last_seen_at": "not-a-date"}, False),
+        ({"last_seen_at": ""}, False),
+        ({"bound_at": "2026-06-06T11:59:59+00:00"}, False),
+        ({}, False),
+    ],
+)
+def test_is_live_is_the_one_liveness_rule(record: dict[str, object], live: bool) -> None:
+    """``last_seen_at`` younger than a day (boundary stale) is live, minutes idle included; a
+    record without it (``bound_at`` only, the retired creation-time fallback) or with a corrupt
+    clock is not."""
+    assert si.is_live(record, clock=lambda: datetime(2026, 6, 6, 12, tzinfo=UTC)) is live
+
+
+def test_live_session_and_stale_records_select_by_the_same_rule(tmp_path: Path) -> None:
+    """A fresh record is the live session; an expired one is the only stale record."""
+    fresh = si.new_binding_record(
+        session_id="live-1",
+        context="a",
+        runtime="unknown",
+        pid=1,
+        now=datetime.now(tz=UTC).isoformat(),
+    )
+    si.write_session(tmp_path, "live-1", fresh)
+    si.write_session(tmp_path, "dead-1", {**fresh, "last_seen_at": "2000-01-01T00:00:00+00:00"})
+    write_text(si.sessions_dir(tmp_path) / "not-a-record.txt", "")
+    assert si.live_session(tmp_path, "live-1") == fresh
+    assert si.live_session(tmp_path, "dead-1") is None
+    assert si.live_session(tmp_path, "absent") is None
+    assert si.stale_records(tmp_path) == [si.sessions_dir(tmp_path) / "dead-1.json"]
+
+
+def test_gc_check_assembly_has_one_home() -> None:
+    """No module hand-builds the ``gc_check`` liveness input outside session_store."""
+    import dadaia_workspace
+
+    pkg_root = Path(dadaia_workspace.__file__).parent
+    offenders = [p for p in pkg_root.rglob("*.py") if "gc_check" in read_text(p)]
+    assert offenders == []
+
+
+@pytest.mark.parametrize(
+    ("name", "valid"),
+    [("a_b-C9", True), ("_", True), ("-", True), ("a b", False), ("a.b", False), ("", False)],
+)
+def test_context_name_rule_is_the_spec_context_rule(name: str, valid: bool) -> None:
+    """One context-name rule: the spec-context rule."""
+    from dadaia_workspace.core.models.spec_context import CONTEXT_NAME_RE
+
+    assert bool(CONTEXT_NAME_RE.fullmatch(name)) is valid
+    assert bool(si._NAME_RE.fullmatch(name)) is valid
+
+
+def test_naive_heartbeat_reads_as_utc_in_any_zone(monkeypatch: pytest.MonkeyPatch) -> None:
+    """``2026-10-11T04:00:00`` is 04:00 UTC whatever the local zone."""
+    tzset = getattr(__import__("time"), "tzset", None)
+    if tzset is None:
+        pytest.skip("time.tzset is absent on Windows; the zone cannot be pinned")
+    monkeypatch.setenv("TZ", "America/Sao_Paulo")
+    tzset()
+    try:
+        record = {si.SESSION_HEARTBEAT_FIELD: "2026-10-11T04:00:00"}
+        assert si.is_live(record, clock=lambda: datetime(2026, 10, 11, 5, tzinfo=UTC))
+        assert not si.is_live(record, clock=lambda: datetime(2026, 10, 12, 5, tzinfo=UTC))
+    finally:
+        monkeypatch.undo()
+        tzset()
+
+
+class _KernelNow(dt.datetime):
+    """The kernel clock frozen at 2026-10-11T03:04:05Z."""
+
+    @classmethod
+    def now(cls, tz: dt.tzinfo | None = None) -> _KernelNow:
+        return cls(2026, 10, 11, 3, 4, 5, tzinfo=tz)
+
+
+def _freeze_kernel_clock(monkeypatch: pytest.MonkeyPatch) -> None:
+    kernel = load_owner("dd-bug-resolution", "_clock")
+    monkeypatch.setattr(kernel, "_dt", SimpleNamespace(datetime=_KernelNow, UTC=dt.UTC))
+
+
+def test_is_live_without_a_clock_reads_the_kernel_clock(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A heartbeat one minute old on the kernel clock is live; the wall clock says it is dead."""
+    _freeze_kernel_clock(monkeypatch)
+    assert si.is_live({si.SESSION_HEARTBEAT_FIELD: "2026-10-11T03:03:00Z"})

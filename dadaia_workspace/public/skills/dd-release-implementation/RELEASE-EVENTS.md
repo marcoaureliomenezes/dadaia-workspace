@@ -1,39 +1,41 @@
-# RELEASE-EVENTS — the `_RELEASE.json` state+log contract
+# RELEASE-EVENTS — the `_RELEASE.json` state contract
 
-Disclosed reference reached from `SKILL.md`/`RC-FLOW.md` wherever the arc says "update the release state" or "append a log entry".
-
-- `specs/releases/<release-id>/_RELEASE.json` is ONE mutable JSON object — the release's current state, never an append-only event stream.
-- Schema: `dadaia_workspace/public/schemas/releases/release-state-v1.schema.json`.
+Disclosed reference reached from `SKILL.md`/`RC-FLOW.md` whenever the arc updates
+release state.
 
 ## Shape
 
-- Fields, all seven required: `{schema, release, phase, defined, implemented, shipped, log[]}`.
-- An audit is not a release milestone; the audit window is read from `audits/_archive/audits_histo.jsonl`.
-- `phase` is one of `DEFINITION IMPLEMENTATION CLOSURE ARCHIVED` — nothing else validates.
-- `phase` is rewritten in place on every transition — no history of prior values survives in the field.
-- A transition worth remembering becomes a `log` entry.
-- `defined`/`implemented`/`shipped` are the three sha-bearing milestone facts.
-- Each milestone is set at most once meaningfully (a later legitimate rewrite is a correction, not a duplicate), or `null` before that point.
-- `log` is the one append-only array inside the document — oldest first, never rewritten once appended; each entry is `{ts, agent, kind, text}`.
-- `kind` is one of `note summary size drifts dispositions test-dispositions artifact-gc reviews merge memory`.
+- `specs/releases/<release-id>/_RELEASE.json` is one mutable object; its fields are those of `.agents/skills/dd-release-implementation/scripts/schemas/release-state-v1.schema.json`.
+- `phase` takes its lifecycle value from that schema and is overwritten on a transition.
+- `log` is append-only, oldest first. Every entry carries `{ts, agent, kind, text}`.
+  The schema retains legacy kinds so archived and earlier-candidate history stays
+  readable. From the live candidate's birth onward, `release.py check` accepts only
+  `note`, `milestone`, `summary` and `memory`.
 
-## Who sets which milestone
+## Current entries
 
-| Milestone | Set by | Shape |
+| Kind | Writer | Completion criterion |
 |---|---|---|
-| `phase` + `defined` | `python3 .agents/skills/dd-release-implementation/scripts/release.py phase IMPLEMENTATION --sha <sha>` | phase string, `{sha, ts}` |
-| `phase` + `implemented` | `python3 .agents/skills/dd-release-implementation/scripts/release.py phase CLOSURE --sha <sha> [--pr <n>]` | phase string, `{sha, ts}` |
-| `phase: DEFINITION` | `python3 .agents/skills/dd-release-implementation/scripts/release.py new <id>` | phase string |
-| `phase: ARCHIVED` | no verb writes it — it describes history only |
+| `note` | `release.py new`, or the agent recording an operator authorization verbatim | The entry holds one fact that belongs to no typed entry. |
+| `milestone` | `release.py phase` | `{candidate, milestone}` matches the transition. |
+| `summary` | `dd-product-engineer`, Read-then-Edit | `release.py check` fullmatches its text, one line, against `delivered: …; carried: …; backlog exits: …`; each field is non-empty, `none` standing for an empty one. The last one at or after `defined.ts` is the closure summary. |
+| `memory` | `release.py memory` | The latest `memory` entry governs and carries `{since, until, reviewed, changed}`. |
 
+`memory` is closure-only. A rerun at the same HEAD appends nothing. `release.py check`
+requires a memory entry at or after `implemented.ts` and reads no git to validate that
+fact; `release.py drift` remains the worklist command used before the entry is written.
 
-## `log` — the closure narrative's home
+An open bug blocks `ship` by default. A carried bug needs all three facts: one
+`--allow-open <id>` flag per open id, a `kind: note` starting `Operator authorization verbatim:` and naming that id, and the id in the summary's `carried` field. The bug
+stays open.
 
-- Every closure-narrative class lands as one `log` entry whose `kind` names it — `summary`, `size`, `drifts`, `artifact-gc`, `test-dispositions`, `dispositions`, `memory`, `reviews`, `merge`.
-- The `memory` entry is written only by `release.py memory`; it adds `since`, `until`, `reviewed`, `changed` to `{ts, agent, kind, text}` — the ledger-derived window (previous entry's `until`, else `defined.sha`) and the HEAD it closed at, the atoms read and left byte-identical, the atoms rewritten or created; `dispositions` records the sweep.
-- Already-native facts need no entry: tasks completed (`TASKS.md` `[x]` + sha) and the trio `APPROVED` handoffs.
+## Milestones
 
-## Write seam
+A milestone or memory-window bound is found from its commit subject line, as a fix is (`specs/bugs/AGENTS.md` §Resolution); a stored sha is a hint a history rewrite can orphan. The subject is `chore(release): rc-<N> (phase|enters) <PHASE>`, optionally followed by more words, on a commit touching the release's own folder: `release.py phase` prints the `phase` form to commit, and both forms are read. The memory pass is `chore(release): rc-<N> memory pass recorded`; the memory window opens at the newest memory pass of any release that HEAD reaches, except the live candidate's own passes in the live release folder (product memory is one per repo, so commits landed between candidates are in the next window), else at the live candidate's IMPLEMENTATION commit.
 
-- `phase` and the three milestones move by verb only.
-- `log` entries are Read-then-Edit by the agent that owns the narrative.
+| Milestone | Command | Written shape |
+|---|---|---|
+| candidate birth | `release.py new <id> --specs <specs-dir>` | `phase: DEFINITION` plus a `note` |
+| definition | `release.py phase IMPLEMENTATION --specs <specs-dir>` | `defined: {ts}` plus a `milestone` |
+| implementation | `release.py phase CLOSURE --specs <specs-dir>` | `implemented: {ts}` plus a `milestone` |
+| ship | `release.py ship [--pr <n>] --specs <specs-dir>` | `shipped: {pr, ts}`, then archive |

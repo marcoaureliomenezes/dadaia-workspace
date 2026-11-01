@@ -3,59 +3,47 @@
 Scope: this file governs only `specs/bugs/`.
 
 - This directory holds the bug ledger: `BUGS.jsonl`, one JSON record per bug, appended once.
-- No event stream, no fold. Schema: `bug-record-v1` (`schemas/bugs/bug-record-v1.schema.json`).
-- There is no per-bug Markdown file and no session-lock gate on filing.
-- The ledger's ONE writer and validator — `bugs.py` below — is `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py <verb> --specs specs`.
+- Schema: `bug-record-v1` (`.agents/skills/dd-bug-resolution/scripts/schemas/bug-record-v1.schema.json`).
+- The ledger's ONE writer and validator — `bugs.py` below — is `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py <verb> --specs <specs-dir>` — the worktree's `specs/` for a write (`dd-bug-registration` §3), `repos/<slug>/specs` for a read.
 
 ## 1. What a bug is
 
-- A bug is a reproducible violation of a contract the tool documents — `--help`, the workspace law, a schema, a promised exit code.
-- NOT a bug: your own mistake, wrong usage, an environment limit, a designed validation (including every `fix:` line), a law ambiguity, a missing feature.
-- A law ambiguity goes to `dd-grill-me`; a missing feature goes to the backlog intake.
-- The agent proposes and the operator confirms: name the contract line violated, one reproducing command already run, and why it is not agent error.
+- A bug is a merged change that reproducibly breaks a documented contract — `--help`, the workspace law, a schema, a promised exit code.
+- The agent proposes and the operator confirms (`dd-bug-registration` §2).
 - `bugs.py append` runs only after that confirmation; with no operator, the proposal is a handoff finding whose `message` starts `bug-proposal:` — never a record.
+- NOT a bug: a failure inside an unmerged worktree (rework), your own mistake, wrong usage, an environment limit, a designed validation whose `fix:` line runs, a law ambiguity, a missing feature.
+- A law ambiguity goes to `dd-grill-me`; a missing feature goes to the backlog intake.
 - Redact local paths, IPs, hostnames, private names and secrets from every field, and from every command, output and artifact of the arc.
 
 ## 2. Resolution
 
-- Close in the same session as the fix: `bugs.py resolve` carrying the red-loop command, the regression-test seam and the diff direction.
-- Check prior resolutions on the same component first; declare `caused_by: <bug_id>|none`.
-- Commit exactly what the fix touched, never a blanket `-A`; a net-positive diff passes the architecture lens first.
+- The block list, closed: (1) the work branch's `verify:` line is red, or merging the change would turn the work branch's CI red; (2) a Stall; (3) the running task cannot deliver its AC;
+  (4) a security finding; (5) data loss or corruption.
+- Any confirmed bug in code the work branch holds takes a `<v>/wt-hotfix-<bug-id>` lane (`worktrees/AGENTS.md` §1–2), in any phase, landing before any other merge, then `worktree sync`.
+- After `release.py phase CLOSURE --specs <specs-dir>`, a fix to code that exists only on the `wt-rc` lands in that rc only for a block-list bug; any other confirmed bug there, REBUILD or operator demand is a job of the next rc, which opens at once. A block-list bug in that code takes the `wt-rc`: its registration, any `test(` commit, fix, `bugs.py update` and `resolve` are commits there, under its merge's `verify:` and `APPROVED` verdict; its `test(` and fix commits name `block: <item>`, the only path that requires it; no SPEC amendment.
+- Every other confirmed bug becomes explicit candidate scope. Ship refuses an open bug unless
+  the operator authorizes that exact id; the authorization is recorded verbatim and the bug remains open for the next candidate.
+- A fix whose `caused_by` names a culprit, a bug's fix or a feature task, or that lands on a unit already fixed in the window, is the REBUILD of that unit in the same lane, keeping its tests, under `refactor(bugs): <id> — REBUILD <unit>`; review refuses a `fix(bugs)` label there.
+- Close with the fix: `bugs.py resolve`, with the flags `dd-bug-resolution` Phase 6 names; a record's fix is the newest commit HEAD reaches and does not revert, whose message holds a line `fix(bugs): <id> — …` (a group lists its ids) or `refactor(bugs): <id> — …`, and `fix_sha` is its write-once hint.
+- Lineage before any fix: `dd-bug-resolution/LINEAGE.md`.
+- Commit exactly what the fix touched, never a blanket `-A`; a net-positive diff is judged by `dd-code-review` §6's Architecture lens at review.
 
-## 3. Field classes (D11)
+## 3. Field classes
 
-| Class | Meaning |
-|---|---|
-| `immutable-core` | Never rewritten once appended |
-| `write-once` | Absent at registration; settable once, then immutable |
-| `mutable-governance` | Rewritten in place, atomic refuse-stale |
-
-- `immutable-core` fields: `id`, `ts`, `title`, `severity`, `surface`, `component`, `symptom`, `repro`, `expected`.
-- `write-once` fields: `solution`, `evidence_loop`, `evidence_seam`, `evidence_diff`, `diff_direction` (derived from `evidence_diff`'s `net-*:` prefix).
-- `mutable-governance` fields: `status`, `closed_at`, `cause`, `caused_by`, `resolved_release`, `audited`.
+- Each field's class is its `x-mutability` in `bug-record-v1`; this law lists no fields.
+- `immutable-core`: never rewritten once appended.
+- `write-once`: settable once at closure, then immutable.
+- `mutable-governance`: rewritten in place, atomic refuse-stale.
 
 ## 4. Authoring rules
 
-- Register a new bug with `bugs.py append --bug-id <slug> --title ... --severity ...` and the remaining required flags.
-- Full command reference: `dd-bug-registration`.
-- Never hand-edit `BUGS.jsonl` to keep every entry schema-valid.
-- Every record change is one governance verb: `bugs.py append|update|resolve|supersede|defer|reject|archive`.
-- That seam is atomic, refuse-stale, redacted, and refuses any `immutable-core` field or a differing re-set of a `write-once` field.
-- `status` and `closed_at` change only through the four terminal transitions, never through `--set`; `bugs.py archive` ages by `closed_at`.
-- `status` has no `picked` value — a pick is the bundled release-definition commit, never a ledger write.
-- Bug reports are not specs — they do not authorize implementation changes on their own.
-- Never hand-delete a record once appended — `bugs.py archive` is the only retiring path, and it is idempotent.
+- Register a new bug with `bugs.py append --specs <specs-dir> --bug-id <slug> --title ... --severity ...` and the remaining required flags.
+- Every record change is one governance verb; `bugs.py --help` lists them.
+- `status` and `closed_at` change only through the three terminal transitions (`resolve`, `supersede`, `reject`), never through `--set`.
 
 ## 5. Duties this ledger carries, and where each lives
 
 - Diagnosing method, lineage first: `dd-bug-resolution` — window, cap, diff-trust rule, stated once there.
 - Commit shapes for a registration and a resolution: `dd-gitflow-default`.
 - CLI reference for filing: `dd-bug-registration`.
-- The rest of Arm B (branch, concurrency, the `resolved` write, evidence triple): `dd-bug-resolution`.
-
-## 6. Relationship to sessions
-
-- No session-lock gate on filing a bug (NO-LOCKS DOCTRINE) — `bugs.py append` never blocks on session state.
-- `reported_by` records the agent/runtime that registered the record.
-- Concurrent sessions racing to file or resolve the same bug are surfaced, never prevented.
-- `bugs.py status`/`stats` read the ledger as it stands.
+- The rest of Arm B (branch, concurrency, the `resolved` write): `dd-bug-resolution`.

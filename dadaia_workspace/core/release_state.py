@@ -1,198 +1,25 @@
-"""Pure parse/serialize helpers over ``release-state-v1`` (v0.5.x successor to the
-``RELEASE.jsonl`` event fold, operator ruling 2026-08-2x: "transformar o arquivo
-canonico das specs RELEASE.jsonl em RELEASE.json -- e um arquivo altamente mutavel
-onde acompanhamos o estado do release. Nao faz sentido ser append-only.").
+"""What the package reads of a release state: the file's name and the id grammars.
 
-``specs/releases/<release-id>/RELEASE.json`` is now ONE mutable JSON object -- the
-state IS the document, no event stream to fold. This module retires
-``core/release_events.py`` (``parse_release_events``/``fold_release_events``/
-``ReleaseEvent``/``ReleaseFold``): there is nothing left to fold, so there is nothing
-left to export under those names. Schema:
-``dadaia_workspace/public/schemas/releases/release-state-v1.schema.json``.
-
-**This module never reads or writes file content** (``core/`` file-I/O purity
-ratchet, ``tests/contract/test_core_file_io_purity.py``, architect A9) -- it
-parses/serializes already-read text; :func:`release_state_file` performs presence
-probes only (``is_file``), the same class of check ``core/platform`` carries. The ONE tri-state disk read of a release's ``RELEASE.json`` stays a
-``features``-layer concern (``features.specs.doctor_common``), same precedent this
-module's predecessor set.
-
-The pre-0.4.6 ``segment`` field is retired with the scaffolded segment lane
-(ADR 0006) — a legacy document still carrying it parses fine; the key is ignored.
+`release.py` (dd-release-implementation) is the ONE writer and validator of
+``specs/releases/<M.m.p>/_RELEASE.json``; the grammars are `_grammar`'s, re-exported.
 """
 
 from __future__ import annotations
 
-import json
-from dataclasses import dataclass, field
-from pathlib import Path
-from typing import Any
+import re
+
+from dadaia_workspace.core.skill_owner import load_owner
 
 __all__ = [
-    "PHASES",
-    "SCHEMA",
-    "ReleaseState",
-    "parse_release_state",
-    "serialize_release_state",
+    "CANDIDATE_RE",
+    "LEGACY_RELEASE_STATE_FILENAME",
+    "RELEASE_ID_RE",
+    "RELEASE_STATE_FILENAME",
 ]
 
-#: The schema identifier every ``RELEASE.json`` document's ``schema`` field must carry.
-SCHEMA = "release-state-v1"
-
-#: The canonical release-state document filename (release 0.4.6 FR1, ADR 0007): the
-#: underscore prefix groups it with ``_archive`` and sorts it apart from the
-#: working SPEC/PLAN/TASKS trio. ONE decider — no reader hand-builds this name.
-RELEASE_STATE_FILENAME = "_RELEASE.json"
-
-#: The pre-0.4.6 filename, recognised READ-side only so a consumer instance keeps
-#: working until ``specs doctor --fix`` renames it. Writers always use
-#: :data:`RELEASE_STATE_FILENAME`.
-LEGACY_RELEASE_STATE_FILENAME = "RELEASE.json"
-
-
-def release_state_file(release_dir: Path) -> Path | None:
-    """The release-state document inside ``release_dir``: the canonical
-    :data:`RELEASE_STATE_FILENAME` when present, else the legacy name, else ``None``.
-    The ONE existence-and-name rule every live-release discovery goes through."""
-    canonical = release_dir / RELEASE_STATE_FILENAME
-    if canonical.is_file():
-        return canonical
-    legacy = release_dir / LEGACY_RELEASE_STATE_FILENAME
-    if legacy.is_file():
-        return legacy
-    return None
-
-
-#: Canonical release lifecycle phase vocabulary (0.4.7 FR4; the ``phase`` field of
-#: release-state-v1). ONE home (F007, 20260830 audit) — every consumer imports this
-#: tuple, and ``release-state-v1.schema.json``'s ``phase`` enum is pinned equal to it
-#: by ``tests/contract/test_release_state_schema.py``.
-#:
-#: Four phases, in lifecycle order. The pre-0.4.7 vocabulary carried five more —
-#: ``DISCOVERY`` (intake, which happens in the backlog, before a release exists),
-#: ``SPEC``/``PLAN``/``TASKS`` (an authoring sub-phase per trio document, which the
-#: candidate model replaced: the trio is authored as one act, in DEFINITION) and the
-#: scaffold default ``"none"`` (a release id sentinel wearing a phase's clothes: "no
-#: live release" is the ABSENCE of a document, never a value inside one).
-PHASES: tuple[str, ...] = ("DEFINITION", "IMPLEMENTATION", "CLOSURE", "ARCHIVED")
-
-
-#: Per-milestone-kind required inner keys (light structural validation only -- the
-#: schema file is the shape authority; this is a parse-time sanity check, not a second
-#: schema implementation).
-_MILESTONE_REQUIRED: dict[str, frozenset[str]] = {
-    "defined": frozenset({"sha", "ts"}),
-    "implemented": frozenset({"sha", "ts"}),
-    "shipped": frozenset({"sha", "pr", "ts"}),
-}
-
-_TOP_LEVEL_REQUIRED: frozenset[str] = frozenset(
-    {"schema", "release", "phase", "defined", "implemented", "shipped", "log"}
-)
-
-_NOTE_REQUIRED: frozenset[str] = frozenset({"ts", "agent", "kind", "text"})
-
-
-@dataclass(frozen=True)
-class ReleaseState:
-    """One release's complete mutable state -- the whole ``RELEASE.json`` document.
-
-    ``defined``/``implemented``/``shipped`` are ``dict | None`` rather than
-    four near-identical dataclasses -- each already carries its own shape via
-    :data:`_MILESTONE_REQUIRED` and gains nothing from a bespoke type per kind. ``log``
-    is the append-only narrative array living INSIDE this otherwise-mutable document
-    (governance text: closure narrative, drift/dispositions, free-form log) --
-    rewritten in place by a CAS writer the same as every other field, never a second
-    file.
-    """
-
-    schema: str
-    release: str
-    phase: str
-    defined: dict[str, Any] | None
-    implemented: dict[str, Any] | None
-    shipped: dict[str, Any] | None
-    log: tuple[dict[str, Any], ...] = field(default_factory=tuple)
-
-    def to_dict(self) -> dict[str, Any]:
-        """The canonical field order this module always serializes -- schema first,
-        log last, matching ``release-state-v1.schema.json``'s ``properties`` order."""
-        out: dict[str, Any] = {
-            "schema": self.schema,
-            "release": self.release,
-            "phase": self.phase,
-            "defined": self.defined,
-            "implemented": self.implemented,
-            "shipped": self.shipped,
-        }
-        out["log"] = [dict(n) for n in self.log]
-        return out
-
-
-def _validate_milestone(kind: str, value: Any) -> dict[str, Any] | None:
-    if value is None:
-        return None
-    if not isinstance(value, dict):
-        raise ValueError(f"'{kind}' must be an object or null, got {type(value).__name__}")
-    missing = _MILESTONE_REQUIRED[kind] - value.keys()
-    if missing:
-        raise ValueError(f"'{kind}' is missing required key(s): {sorted(missing)}")
-    return value
-
-
-def _validate_notes(value: Any) -> tuple[dict[str, Any], ...]:
-    if not isinstance(value, list):
-        raise ValueError(f"'log' must be an array, got {type(value).__name__}")
-    log: list[dict[str, Any]] = []
-    for i, entry in enumerate(value):
-        if not isinstance(entry, dict):
-            raise ValueError(f"log[{i}] must be an object, got {type(entry).__name__}")
-        missing = _NOTE_REQUIRED - entry.keys()
-        if missing:
-            raise ValueError(f"log[{i}] is missing required key(s): {sorted(missing)}")
-        log.append(entry)
-    return tuple(log)
-
-
-def parse_release_state(text: str) -> ReleaseState:
-    """Decode ``text`` (the raw content of a ``RELEASE.json`` file) into a
-    :class:`ReleaseState`.
-
-    Pure -- no I/O. Raises :class:`ValueError` for anything that is not a single
-    well-formed ``release-state-v1`` document: invalid JSON, a non-object top level, a
-    missing required key, a wrong-typed value, or a milestone object missing its
-    required inner keys. A single mutable document has no "skip the bad line, keep the
-    rest" tolerance the old append-only fold needed -- a malformed ``RELEASE.json`` is
-    UNKNOWN state, in full, and every caller must treat it that way (never guess a
-    partial phase out of a document that failed to parse).
-    """
-    try:
-        obj = json.loads(text)
-    except json.JSONDecodeError as exc:
-        raise ValueError(f"RELEASE.json is not valid JSON: {exc}") from exc
-    if not isinstance(obj, dict):
-        raise ValueError(f"RELEASE.json must be a JSON object, got {type(obj).__name__}")
-    missing = _TOP_LEVEL_REQUIRED - obj.keys()
-    if missing:
-        raise ValueError(f"RELEASE.json is missing required key(s): {sorted(missing)}")
-    if obj["schema"] != SCHEMA:
-        raise ValueError(f"RELEASE.json schema={obj['schema']!r}, expected {SCHEMA!r}")
-    if not isinstance(obj["release"], str):
-        raise ValueError("'release' must be a string")
-    if not isinstance(obj["phase"], str):
-        raise ValueError("'phase' must be a string")
-    return ReleaseState(
-        schema=obj["schema"],
-        release=obj["release"],
-        phase=obj["phase"],
-        defined=_validate_milestone("defined", obj["defined"]),
-        implemented=_validate_milestone("implemented", obj["implemented"]),
-        shipped=_validate_milestone("shipped", obj["shipped"]),
-        log=_validate_notes(obj["log"]),
-    )
-
-
-def serialize_release_state(state: ReleaseState) -> str:
-    """Render *state* back to the canonical ``RELEASE.json`` text: 2-space indent,
-    the fixed field order :meth:`ReleaseState.to_dict` declares, trailing newline."""
-    return json.dumps(state.to_dict(), indent=2, ensure_ascii=False) + "\n"
+#: The release-state filename. The legacy name is never read as live; the doctor renames it.
+_grammar = load_owner("dd-bug-resolution", "_grammar")
+RELEASE_STATE_FILENAME: str = _grammar.STATE
+LEGACY_RELEASE_STATE_FILENAME = RELEASE_STATE_FILENAME.removeprefix("_")
+RELEASE_ID_RE: re.Pattern[str] = _grammar.SEMVER_RE
+CANDIDATE_RE: re.Pattern[str] = _grammar.CANDIDATE_RE

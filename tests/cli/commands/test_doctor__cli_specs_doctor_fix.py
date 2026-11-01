@@ -1,0 +1,132 @@
+"""Integration tests for the `specs` section of `dadaia doctor --fix`.
+
+Tests use Typer's CliRunner on a real tmp_path filesystem.
+
+Covers:
+- Memory atoms are .md (no HTML rendering); --fix creates missing dirs/files
+- TREE-4 auto-fix via --fix flag creates missing directories
+- --fix re-checks and reports residual issues
+"""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+import pytest
+from typer.testing import CliRunner
+
+from dadaia_workspace.cli.main import app
+from dadaia_workspace.features.specs.canon import scaffold
+from tests.helpers.oslib import read_text, write_text
+
+_runner = CliRunner()
+
+_REPO_ROOT = Path(__file__).parent.parent.parent.parent
+_TEMPLATES_DIR = _REPO_ROOT / "dadaia_workspace" / "public" / "templates"
+_PUBLIC_DIR = _REPO_ROOT / "dadaia_workspace" / "public"
+
+
+def _specs_findings(output: str) -> list[dict[str, str]]:
+    payload = json.loads(output)
+    findings: list[dict[str, str]] = payload["sections"]["specs"]["findings"]
+    return findings
+
+
+def _specs_errors(output: str) -> list[dict[str, str]]:
+    """The ERROR-class specs findings — the exit-code-bearing set (a warning never
+    failed `specs doctor` either)."""
+    return [f for f in _specs_findings(output) if f["verdict"] == "error"]
+
+
+def _make_minimal_specs(root: Path) -> Path:
+    """Scaffold a minimal valid specs/ tree using the canonical scaffold().
+
+    scaffold() writes bugs/AGENTS.md and
+    specs/AGENTS.md itself; no hand-rolled README.md/AGENTS.md injection is needed.
+    """
+    specs = root / "specs"
+    scaffold(
+        specs,
+        project_name="test-project",
+        force=False,
+        public_dir=_TEMPLATES_DIR.parent,
+    )
+    return specs
+
+
+@pytest.mark.medium
+def test_doctor_clean_tree_then_remove_backlog_then_fix_recreates_then_no_fix_never_mutates(
+    tmp_path: Path,
+) -> None:
+    """A fully clean scaffolded tree exits 0 without --fix; removing backlog/ and
+    running --fix recreates it (AGENTS.md, v6 canon — a directory is kept by its
+    AGENTS.md, no .gitkeep placeholder); and without --fix, behaviour is unchanged —
+    the doctor never auto-creates/mutates anything (removing the core architecture.md
+    atom stays removed)."""
+    specs = _make_minimal_specs(tmp_path)
+
+    clean_result = _runner.invoke(
+        app,
+        ["doctor", "--json", "--specs-dir", str(specs), "--public-dir", str(_PUBLIC_DIR)],
+    )
+    # This test's subject is the `specs` section's own verdict, not the run's exit code.
+    assert _specs_errors(clean_result.output) == [], clean_result.output
+
+    import shutil
+
+    backlog = specs / "backlog"
+    if backlog.exists():
+        shutil.rmtree(backlog)
+
+    fix_result = _runner.invoke(
+        app,
+        ["doctor", "--json", "--fix", "--specs-dir", str(specs), "--public-dir", str(_PUBLIC_DIR)],
+    )
+    assert backlog.exists(), f"backlog/ must be created; output:\n{fix_result.output}"
+    assert (backlog / "AGENTS.md").exists(), "backlog/AGENTS.md must be created"
+    assert _specs_errors(fix_result.output) == [], fix_result.output
+
+    arch = specs / "memory" / "ARCHITECTURE.md"
+    arch.unlink()
+    _runner.invoke(app, ["doctor", "--json", "--specs-dir", str(specs)])
+    assert not arch.exists(), "Without --fix, missing files must NOT be created"
+
+
+@pytest.mark.medium
+def test_tree8_stray_root_folder_errors_and_fix_keeps_it(tmp_path: Path) -> None:
+    """TREE-8 is ERROR and never auto-fixed: a non-canon top-level folder flips the exit code non-zero,
+    and ``--fix`` leaves it and its content on disk, still reported."""
+    specs = _make_minimal_specs(tmp_path)
+
+    baseline = _runner.invoke(
+        app,
+        ["doctor", "--json", "--specs-dir", str(specs), "--public-dir", str(_PUBLIC_DIR)],
+    )
+    assert _specs_errors(baseline.output) == [], baseline.output
+
+    stray = specs / "features"
+    stray.mkdir()
+    write_text(stray / "login.md", "# Login\n")
+
+    fix_result = _runner.invoke(
+        app,
+        ["doctor", "--json", "--fix", "--specs-dir", str(specs), "--public-dir", str(_PUBLIC_DIR)],
+    )
+    assert read_text(stray / "login.md") == "# Login\n", fix_result.output
+    codes = [f["code"] for f in _specs_findings(fix_result.output)]
+    assert "TREE-8" in codes, f"TREE-8 must still be reported after --fix; got {codes}"
+    assert fix_result.exit_code != 0, fix_result.output
+
+
+def test_the_fix_help_composes_the_workspace_steps_from_their_owner() -> None:
+    from dadaia_workspace.features.spec_context import doctor as owner
+
+    out = _runner.invoke(app, ["doctor", "--help"], terminal_width=400).output
+
+    text = " ".join(out.replace("│", " ").split())
+    assert text.count(owner.EXPIRE_STEPS) == 2  # --fix and --expired-only
+    assert text.count(owner.REAP_STEPS) == 1
+    assert text.index(owner.REAP_STEPS) < text.index("re-checks")
+    assert "never auto-fixed" not in text
+    assert "deletes only those" not in text

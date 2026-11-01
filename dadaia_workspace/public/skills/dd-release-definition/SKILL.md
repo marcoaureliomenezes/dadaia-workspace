@@ -1,89 +1,100 @@
 ---
 name: dd-release-definition
 description: >
-  Turn bugs and backlog items into the live release's next closed-scope candidate:
-  pick the set, run the mandatory grill, author the trio. Use at the start of each
-  candidate's definition.
+  Define the live release's next closed-scope candidate from bugs, backlog items and audit findings:
+  pick the set, the As-is review, the SPEC, the PLAN's job DAG and the rc-<N>/tasks/job<n>.md
+  job files. Use when drafting a candidate in its `wt-rc` or writing its SPEC, PLAN or a job file.
+  The grill is the main thread's dd-grill-me; implementing tasks is dd-release-implementation's.
 ---
 
 # dd-release-definition
 
-> `dd-product-engineer` authors the SPEC (the engineer authors PLAN and TASKS),
-> from picking the set through SPEC → PLAN → TASKS. A release has open scope; each
-> candidate does not.
+> `dd-product-engineer` authors the SPEC, `dd-sw-engineer-sr` the as-is review, PLAN and the job files. A release has open scope; each candidate does not.
 
 ## 1. Pick the set
 
 1. Open `specs/releases/AGENTS.md` (the area's scoped law) and follow it.
-2. Inspect `specs/bugs/BUGS.jsonl` via `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py status`/`stats`.
-3. Read `specs/backlog/BACKLOG.json`'s `active[]` — sanitized by `dd-backlog-definition`, consumed untriaged.
-4. Read `specs/audits/**` for undispositioned findings; each enters the SPEC with the
-   disposition it will take (`python3 .agents/skills/dd-audit-project/scripts/audit.py disposition`).
-5. Name the SPEC's `**Origin:**`: `operator-demand`, `backlog:<ids>` or `bugs:<ids>`.
-6. Keep picking scoped to `specs/bugs/` + `specs/backlog/` + `specs/audits/` discovery.
+2. Inspect `specs/bugs/BUGS.jsonl` via `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py status --specs <specs-dir>`/`stats --specs <specs-dir>`; read the prior candidate's `## Bug window review` and the ledger slice of `.agents/skills/dd-bug-resolution/LINEAGE.md` §The window and §The filter.
+3. Read `specs/backlog/BACKLOG.json`'s `active[]`; audit each entry before scheduling it (gain, cost, trade-offs, product fit, no new gate, no layer on an existing feature) and take open doubts to the grill.
+4. Each undispositioned `specs/audits/**` finding enters the SPEC's Origin as `findings:<id>`.
+5. Name the SPEC's `**Origin:**` per `specs/releases/AGENTS.md` §Authoring rules.
+6. Write the SPEC's `## Bug window review`: list the resolved bugs' ids in `<specs-dir>/bugs/BUGS.jsonl`, find and inspect each fix as `dd-bug-resolution/LINEAGE.md` §Read persisted facts says, and compare that fix against the overfitting patterns — an assert or test the fix changed; a special case on a test value; a new branch, flag or second path; a reach into another feature; deleted functionality.
+7. Give each fix KEEP or REBUILD; a fix judged REBUILD is proposed as a bug (Arm B, `specs/bugs/AGENTS.md` §What a bug is); once the operator confirms it, it is rebuilt in its own lane under `specs/bugs/AGENTS.md` §Resolution. The window review judges and never schedules.
 
-**Done when** the picked set is recorded; it becomes the SPEC's scope.
+## 2. As-is review
 
-## 2. The mandatory grill
+- `dd-sw-engineer-sr` runs it read-only, dispatched after the pick and before the grill.
+- The pick ranks its set into waves: law, skills and dev loop; shared foundation; features and bugs; promote-facing.
+- Read every unit the picked set touches and its ledger slice (its history per `dd-bug-resolution/LINEAGE.md` §The filter); the table rides the handoff into the grill and lands as the PLAN's As-is review.
+- One row per touched unit, columns `unit | today | bugs | verdict | why`; DELETE vs KEEP is the deletion test (`dd-code-review` SLOP.md); a duplicated decider lists every copy with `path:line`, and a repro where the copies diverge; verdicts follow the root map §The flow work order, ADD only for what no unit can carry (`today` `—`, `why` says why).
+- REBUILD is mandatory when `bugs.py` reports it due (`dd-bug-resolution/LINEAGE.md` §The filter), the demand changes its fundamental behaviour, the change would need a layer (`dd-code-review` SLOP.md S5), or its contract contradicts the demand; the engineer and the reviewer judge these triggers.
+- Authorities: one row per touched question, one authority each; `consults` call it, `deleted` leave with the row's bug.
+- A row that REBUILDs or DELETEs a grammar, format, public name or fix line names its consumers; a read-only `dd-researcher` pre-mortem precedes the SPEC approval and the PLAN answers each hit.
+- The As-is review skeleton:
 
-Call the Skill tool with `dd-grill-me` on the picked set — never skipped, even when
-scope "looks obvious". Sharpen terminology as it surfaces (`dd-domain-modeling`):
-a fuzzy term in the demand becomes a canonical term before it reaches the SPEC.
+```markdown
+## 1. As-is review
 
-## 3. Author the trio
+| unit | today | bugs | verdict | why |
+|---|---|---|---|---|
+| `features/x/service.py` `run` | what it does today | 2 (`bug-a`, `bug-b`) | REBUILD | `bug-b` is a child bug after the unit's last REBUILD |
 
-1. Author the SPEC (Draft) only after the grill: the picked bug+backlog set, their
-   acceptance, every `superseded_by` link.
-2. Definition runs on `feature/{M.m.p}`; the trio lives at the RELEASE ROOT
-   (`specs/releases/<v>/`) and overwrites the prior candidate's, which stays in git at
-   its CLOSURE commit.
-3. Commit shape 5 (`dd-gitflow-default` §3a): SPEC + PLAN + TASKS + the picked entries
-   flipped to `status: picked` + picked bugs, one commit; set the `defined` milestone in `_RELEASE.json`
-   (`dd-release-implementation`'s `RELEASE-EVENTS.md`).
-4. PLAN names the seams the work will cut — speak `dd-codebase-design`
-   (module, seam, deletion test) when declaring what each FR grows or deletes.
-5. SPEC in domain names (`dd-domain-modeling`'s `CONTEXT.md`); only FR, AC and T-
-   numbered; `wc -c SPEC.md TASKS.md` under the `specs/releases/AGENTS.md` size ceiling before commit
-   shape 5.
+### 1.1 Authorities
 
-## 4. TASKS as tracer bullets
+| question | authority | consults | deleted |
+|---|---|---|---|
+| who runs x | `features/x/service.py` `run` | `cli/x.py` | `legacy_run` |
 
-- Every task carries two keys beside its write set: `blocked by:` (explicit
-  dependency edge, may be `none`) and `delivers:` (the observable end-to-end slice —
-  "after this task the operator can …").
-- Order the group so the FIRST tasks cut a thin end-to-end path; a group that
-  delivers no verifiable slice until the last task is misordered.
-- A demolition (deleting a subsystem) is authored expand–contract: add the new
-  path, switch consumers, contract by deleting the old — three tasks, each
-  independently green.
-- A task whose `delivers:` cannot be stated is either not a task (fold it) or not
-  understood yet (back to the SPEC).
+## DAG
 
-## 5. Declaring consumption
+| job | waits on | wave | W: |
+|---|---|---|---|
+| Job 1 | — | 1 | `src/x.py`, `tests/unit/test_x.py` |
+```
 
-- Declare fully-consumed backlog items in the SPEC: `**Consumes:** slug-a, slug-b`;
-  omit the line when the candidate consumes none.
-- `**Consumes:**` is SPEC provenance only — no library/CLI verb reads it.
-- Declare a slug only when fully consumed (all its bound anchors shipped); abort on
-  an unknown slug — fix it before it lands in the SPEC.
-- A picked entry stays in `active[]` as `status: picked`; it exits once, at closure,
-  by `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py exit` (`dd-release-implementation` RC-FLOW step 7).
-- Mechanical backstop: `dadaia doctor`'s `ledgers` section schema-validates
-  `BACKLOG.json` and `backlog_histo.jsonl` on every run.
+## 3. The mandatory grill
 
-## 6. Done when
+Before the SPEC or any ADR, the main thread runs `dd-grill-me` on the picked set with its `references/release.md`; an ADR also takes `references/adr.md`. Never skipped.
+
+## 4. Author the SPEC, PLAN and job files
+
+1. Author the SPEC (Draft) after the grill: the picked set, its acceptance, every `superseded_by` link.
+2. Definition runs in the rc's `wt-rc` tree, its first commits (`worktrees/AGENTS.md` §The tree); the files' place is the releases law's.
+3. Commit shape 5 (`dd-gitflow-default` §Commit shapes — each write in its own shape); after the operator approves SPEC and PLAN, `release.py phase IMPLEMENTATION --specs <specs-dir>` sets `defined` (`dd-release-implementation`'s `RELEASE-EVENTS.md`).
+4. SPEC states the pick's wave ranking unprompted; SPEC says what; PLAN opens with the As-is review (this skill's As-is review) and draws the rc's DAG of jobs — Job 1 first (the reconcile is the `wt-rc`'s last commits, `dd-release-implementation`'s `RC-FLOW.md` step 4), an edge where one job needs another's merge; SPEC carries `Replaces` — one bullet per current behaviour a DELETE/REBUILD row removes, or `none` with its reason.
+5. SPEC in the repo's existing domain names; only FR, AC and `J<n>.T<k>` numbered; each AC names its test level (unit, integration, E2E, or no test with its reason); sizes per the releases law.
+6. After the PLAN, only for a technical decision past the threshold, run `dd-grill-me` with its `references/plan.md`.
+
+## 5. The job file — tasks
+
+- One file per job, `rc-<N>/tasks/job<n>.md`, its PLAN DAG row `Job <n>`, which names the job's wave and complete `W:` set.
+- Every job file carries a task table. Each task has id `J<n>.T<k>`, `who`, its AC, exact `W:`, owner test file and RED tests; one owner, one session (~1 h), ~100 new code lines.
+- `who` names the dispatched role: `sr` or `jr`; `pe` or `cr` for a task another persona owns. `jr`: the outcome is fully stated by its AC and `W:`; `sr`: new behaviour, design choice, root cause, RED test of a new contract, PLAN, job files, as-is review.
+- A behavior is two tasks, its RED test then its implementation, each its own dispatch and `wt-task-<kkk>` tree (`worktrees/AGENTS.md` §The tree).
+- A task is `running` while its task worktree exists. A cancelled task keeps its row and reason.
+- DELETE/REBUILD tasks precede ADD tasks; a task with no statable AC is folded, or goes back to the SPEC.
+
+```markdown
+# Job 2 — feature x
+
+| task | who | AC | `W:` | outcome |
+|---|---|---|---|---|
+| J2.T1 | sr | AC<n>.<m> | `tests/unit/test_x.py` | RED acceptance test |
+| J2.T2 | jr | AC<n>.<m> | `src/x.py` | implementation; owner `tests/unit/test_x.py` |
+```
+
+## 6. Declaring consumption
+
+- The pick is the SPEC's `**Origin:** backlog:<ids>` line (`release.py new --origin`); its exit is closure work (`dd-release-implementation`'s `RC-FLOW.md` Step 4).
+
+## 7. Done when
 
 - Picked set recorded; the `dd-grill-me` session completed and emitted.
-- SPEC authored from the refined set; `**Consumes:**` declared or omitted.
-- Traceability: every approved requirement maps into PLAN strategy and >=1 TASKS entry.
-- Every unresolved gap routed to the main thread's operator-gated intake report — never a
-  direct backlog append.
+- The As-is review gives every touched unit one verdict and every touched question one Authorities row; SPEC authored from the refined set, `Replaces` present, `**Origin:**` declared.
+- Every approved requirement maps into the PLAN's DAG and >=1 job-file task.
+- `python3 .agents/skills/dd-release-implementation/scripts/release.py check --specs <specs-dir>` exits 0.
+- Every unresolved gap rides the handoff to the main thread's operator-gated intake, the backlog's one entry path.
 
-## 7. References
+## 8. References
 
-- `dd-backlog-definition` — the sanitized-set source and the histo contract.
-- `dd-grill-me` — the mandatory pre-SPEC session.
-- `dd-gitflow-default` §3a shape 5 — the definition commit shape.
-- `dd-release-implementation` (`RELEASE-EVENTS.md`, `RC-FLOW.md`) — state recipe, gate
-  cadence, disposition sweep.
-- `specs/releases/AGENTS.md` — release-id format, `_RELEASE.json`, the promote act.
+- `specs/releases/AGENTS.md` — release-id format, `_RELEASE.json`, the promote act; every other skill is cited where it is used.

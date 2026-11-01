@@ -1,69 +1,46 @@
-"""Branch policy — the gitflow v2 contract (v0.4.4 FR3; split out of ``service.py`` at
-v0.5.1 K7, "split chokepoints.service into its four modules; one verdict store").
+"""Branch policy — the project gitflow read by role; zero I/O.
 
-Zero I/O, zero dependency on anything else in this package: :class:`PushRef` (the
-parsed pre-push stdin shape), the three permitted branch patterns, and
-:func:`push_ref_policy_decision` (the per-ref loop :func:`~dadaia_workspace.features.
-chokepoints.push_gate.push_gate_decision` runs first, before either specs-scan step).
-:class:`Decision` — the shared outcome shape every chokepoint gate returns — lives here
-too: this module has no internal-package dependency, so every sibling module (``pre_commit``,
-``push_gate``, ``verdict``) imports it from here rather than duplicating it or reaching
-into ``__init__.py`` (which itself re-exports from this module, never the reverse).
-"""
+Also home of :class:`Decision`, the outcome every chokepoint gate returns (this module
+has no internal-package dependency, so siblings import it from here)."""
 
 from __future__ import annotations
 
-import re
+from collections.abc import Callable
 from dataclasses import dataclass
-from pathlib import Path
+
+from dadaia_workspace.core import platform
+from dadaia_workspace.core.cli_line import cli_words, git_line, spell_fix
+from dadaia_workspace.core.exceptions import GitSyncError
+from dadaia_workspace.core.gitflow import Gitflow
+from dadaia_workspace.core.models.git_scan import SHA_SHAPE_RE, is_zero_sha
+from dadaia_workspace.core.platform import act
 
 __all__ = [
     "Decision",
+    "GateFixes",
     "PushRef",
-    "branch_name_is_permitted",
     "check_branch_policy",
-    "context_slug_for_path",
-    "parse_push_refs",
+    "check_ref_policy",
     "parse_push_stdin",
 ]
 
 
 @dataclass(frozen=True)
 class Decision:
-    """Outcome of a chokepoint gate.
-
-    ``allowed`` is the only thing the git hook keys its exit code on. ``warn`` carries an
-    advisory line that is logged/printed but never blocks (the DP-4 degradation path).
-    ``message`` is the human-facing block/allow explanation.
-    """
+    """``allowed`` keys the hook's exit code; ``warn`` is advisory, never blocks; *listed* are
+    the paths a refusal names (a commit message is listed as such): what its remedy may touch; *messages* are the shas of the commits whose message it lists."""
 
     allowed: bool
     message: str = ""
     warn: str | None = None
-
-
-#: A pre-push sha is 40-char (SHA-1) or 64-char (SHA-256) hex (v0.11.0 FR7/A7.3) — an
-#: option-shaped value (``--glob=refs/nonexistent``) is malformed, never a silent no-op
-#: (CWE-88/CWE-20). The all-zero deletion sentinel is 40 hex characters and already
-#: matches — no special case needed.
-_SHA_SHAPE_RE = re.compile(r"^[0-9a-fA-F]{40}$|^[0-9a-fA-F]{64}$")
-
-#: git's zero-sha deletion sentinel (40 hex zeros) — imported by ``push_gate`` too.
-ZERO_SHA = "0" * 40
-
-
-def _is_sha_shaped(value: str) -> bool:
-    return bool(_SHA_SHAPE_RE.match(value))
+    listed: frozenset[str] = frozenset()
+    messages: frozenset[str] = frozenset()
 
 
 @dataclass(frozen=True)
 class PushRef:
-    """One parsed pre-push stdin ref line.
-
-    git feeds the pre-push hook lines of ``<local-ref> <local-sha> <remote-ref>
-    <remote-sha>`` on stdin. The push gate keys ONLY on ``local_sha`` (never
-    ``git rev-parse HEAD``): a zero ``local_sha`` is a branch deletion.
-    """
+    """One pre-push stdin line ``<local-ref> <local-sha> <remote-ref> <remote-sha>``;
+    the gate keys on ``local_sha`` (never HEAD), zero meaning a deletion."""
 
     local_ref: str
     local_sha: str
@@ -72,161 +49,152 @@ class PushRef:
 
     @property
     def is_deletion(self) -> bool:
-        """True when this ref is being deleted (zero local sha) — passes with no verdict."""
-        return self.local_sha == ZERO_SHA or not self.local_sha
+        return is_zero_sha(self.local_sha) or not self.local_sha
 
     @property
     def is_tag(self) -> bool:
-        """True when this ref is a tag push — passes with no verdict (DP-5)."""
-        return self.local_ref.startswith("refs/tags/")
+        return self.remote_ref.startswith("refs/tags/")
 
 
 def parse_push_stdin(stdin_text: str) -> tuple[list[PushRef], int]:
-    """Parse pre-push stdin into :class:`PushRef` rows plus a malformed-line count.
-
-    A non-empty line that does not split into exactly four fields is counted, not
-    silently dropped — the gate FAILS CLOSED on any malformed line (T-060-07 finding 1:
-    a policy gate that skips what it cannot parse is a policy gate that can be
-    disabled without a trace; ``git push --no-verify`` is the sanctioned bypass).
-
-    v0.11.0 FR7/A7.1-A7.3: both shas are additionally validated against
-    :data:`_SHA_SHAPE_RE` — a violation reuses the SAME malformed-line counter and the
-    SAME fail-closed message (no new branch), so an option-shaped ``local_sha`` (the
-    measured silent-no-op class) refuses instead of producing a successful empty
-    ``git rev-list``.
-    """
+    """Rows plus a malformed-line count (not four fields, or a non-sha-shaped sha —
+    an option-shaped sha included); the gate fails closed on any malformed line."""
     refs: list[PushRef] = []
     malformed = 0
-    for raw in stdin_text.splitlines():
+    for raw in stdin_text.split("\n"):
         line = raw.strip()
         if not line:
             continue
-        parts = line.split()
+        parts = line.split(" ")
         if len(parts) != 4:
             malformed += 1
             continue
         local_ref, local_sha, remote_ref, remote_sha = parts
-        if not _is_sha_shaped(local_sha) or not _is_sha_shaped(remote_sha):
+        if not (SHA_SHAPE_RE.match(local_sha) and SHA_SHAPE_RE.match(remote_sha)):
             malformed += 1
             continue
         refs.append(PushRef(local_ref, local_sha, remote_ref, remote_sha))
     return refs, malformed
 
 
-def parse_push_refs(stdin_text: str) -> list[PushRef]:
-    """Back-compat wrapper over :func:`parse_push_stdin` (refs only)."""
-    return parse_push_stdin(stdin_text)[0]
-
-
-# ── The three permitted branch patterns (v0.4.4 FR3 / T-044-06 — the gitflow v2 -------
-# inversion). The gitflow law (dd-gitflow-default, operator ruling 2026-08-23): exactly three
-# branch patterns exist — no ``v`` prefix, no ``hotfix`` row (G2 retires it outright) —
-# and ``feature/{M.m.p}`` is the ONLY pushable one; ``develop`` and ``main`` advance by
-# PR only. This tuple is the ONE pattern source — the pre-push hook and the CI
-# pr-source-guard both encode the model, and any second regex copy is drift (A3.2).
-_MAIN_RE = re.compile(r"^main$")
-_DEVELOP_RE = re.compile(r"^develop$")
-_FEATURE_RE = re.compile(r"^feature/\d+\.\d+\.\d+$")
-
-_PERMITTED_BRANCH_RES: tuple[re.Pattern[str], ...] = (_MAIN_RE, _DEVELOP_RE, _FEATURE_RE)
-
 HEADS_PREFIX = "refs/heads/"
 
-
-def branch_name_is_permitted(branch: str) -> bool:
-    """True when *branch* matches one of the three permitted patterns.
-
-    ``main`` | ``develop`` | ``feature/M.m.p`` — no leading ``v``, no suffix, no
-    ``hotfix`` row (G2). Matching one of these patterns does not by itself mean
-    *branch* is pushable — only ``feature/M.m.p`` is (see :func:`check_branch_policy`).
-    """
-    return any(pattern.match(branch) for pattern in _PERMITTED_BRANCH_RES)
+#: Where the project gitflow is stated — every refusal points there.
+_LAW = "project gitflow: specs/constitution.md"
 
 
-def _refuse_branch(branch: str, local_ref: str) -> Decision:
-    """Actionable refusal for a non-pushable ref (A4.2 shape: rule + permitted + fix)."""
-    if branch == "main":
-        return Decision(
-            allowed=False,
-            message=(
-                "[pre-push] BLOCKED: 'main' is never pushed directly — it advances only "
-                "via a PR from 'develop' (gitflow law, dd-gitflow-default).\n"
-                "fix: gh pr create --base main --head develop"
-            ),
-        )
-    if branch == "develop":
-        return Decision(
-            allowed=False,
-            message=(
-                "[pre-push] BLOCKED: 'develop' is never pushed directly — it advances "
-                "only via a PR from 'feature/{M.m.p}' (gitflow law, dd-gitflow-default).\n"
-                "fix: gh pr create --base develop --head feature/<M.m.p>"
-            ),
-        )
+@dataclass(frozen=True)
+class GateFixes:
+    """What a fix line names: the repo (``git -C``), the live work branch, and
+    HEAD's branch (``""``: detached)."""
+
+    repo: str
+    work: str = ""
+    head: str = ""
+
+
+def _pushable(branch: str) -> bool:
+    """The worktree grammar's one answer (its owner, through the one loader), loaded only
+    for a branch the gitflow does not already name."""
+    from dadaia_workspace.infrastructure.ledger_scripts import load_owner
+
+    return bool(load_owner("dd-gitflow-default", "_worktree_names").pushable(branch))
+
+
+def _blocked(text: str, fix: str) -> Decision:
+    """One refusal with one single-command fix (no ``&&``: Windows PowerShell 5.1)."""
     return Decision(
-        allowed=False,
-        message=(
-            f"[pre-push] BLOCKED: ref '{local_ref}' is outside the three permitted "
-            "branch patterns — main, develop, feature/M.m.p (gitflow law, "
-            "dd-gitflow-default). Only 'feature/M.m.p' is pushable.\n"
-            "fix: git checkout -b feature/<M.m.p> main && git push origin feature/<M.m.p>"
+        allowed=False, message=f"[pre-push] BLOCKED: {text} ({_LAW}).\n{spell_fix(fix)}"
+    )
+
+
+def _refuse_branch(ref: PushRef, gitflow: Gitflow, fixes: GateFixes) -> Decision:
+    """Actionable refusal for a ref outside the gitflow (not a branch head, or unpushable)."""
+    return _blocked(
+        f"ref '{ref.local_ref}' is outside the gitflow — principal '{gitflow.principal}', "
+        f"integration '{gitflow.integration}', work '{fixes.work}'; the pushable branches are "
+        "dd-gitflow-default's branch contract (§2a), and work reaches them through a tree: a wt/ "
+        "tree lands by `worktree merge` into its parent, never a raw merge",
+        act(
+            "agent",
+            f"land the work with {platform.inline(*cli_words(None, 'worktree', 'merge'))} on its "
+            f"tree (see {platform.inline(*cli_words(None, 'worktree', 'list'))}), or open one "
+            f"with {platform.inline(*cli_words(None, 'worktree', 'new'))}",
         ),
     )
 
 
-def check_branch_policy(refs: list[PushRef]) -> Decision | None:
-    """Step 1 of :func:`~dadaia_workspace.features.chokepoints.push_gate.push_gate_decision`
-    (dd-gitflow-default): every non-deletion, non-tag ref must be
-    ``refs/heads/feature/{M.m.p}``, pushed to the SAME remote name — ``develop``/``main``
-    are refused outright (PR only); names outside the three permitted patterns are
-    refused as invalid. Returns the first refusal, or ``None`` when every ref clears
-    branch policy (tags and deletions are never checked here — the caller has already
-    excluded them from *refs*).
-    """
+def check_branch_policy(refs: list[PushRef], gitflow: Gitflow, fixes: GateFixes) -> Decision | None:
+    """The first refusal, or ``None``: each ref is a gitflow role branch, or a pushable work or
+    job branch, pushed from the same-named local head."""
     for ref in refs:
+        if not ref.remote_ref.startswith(HEADS_PREFIX):
+            return _refuse_branch(ref, gitflow, fixes)
+        branch = ref.remote_ref[len(HEADS_PREFIX) :]
+        role = gitflow.role_of(branch)
+        if role is None and not _pushable(branch):
+            return _refuse_branch(ref, gitflow, fixes)
         if not ref.local_ref.startswith(HEADS_PREFIX):
-            return Decision(
-                allowed=False,
-                message=(
-                    f"[pre-push] BLOCKED: local ref '{ref.local_ref}' is not a branch "
-                    "head — only a 'refs/heads/feature/M.m.p' branch may be pushed "
-                    "(gitflow law, dd-gitflow-default).\n"
-                    "fix: git checkout feature/<M.m.p> && git push origin feature/<M.m.p>"
-                ),
-            )
-        branch = ref.local_ref[len(HEADS_PREFIX) :]
-        if not _FEATURE_RE.match(branch):
-            return _refuse_branch(branch, ref.local_ref)
-        if ref.remote_ref != f"{HEADS_PREFIX}{branch}":
-            return Decision(
-                allowed=False,
-                message=(
-                    f"[pre-push] BLOCKED: refspec aims local '{branch}' at remote "
-                    f"'{ref.remote_ref}' — only refs/heads/{branch} → "
-                    f"refs/heads/{branch} is pushable (gitflow law, dd-gitflow-default; "
-                    "'develop' and 'main' advance via PR only).\n"
-                    f"fix: git push origin {branch}:{branch}"
-                ),
+            return _refuse_branch(ref, gitflow, fixes)
+        if ref.local_ref != ref.remote_ref:
+            return _blocked(
+                f"refspec aims '{ref.local_ref}' at remote '{ref.remote_ref}' — only "
+                f"refs/heads/{branch} → refs/heads/{branch} is pushable: name the local "
+                "branch as the remote one, then push it",
+                git_line(fixes.repo, "branch", "-m", ref.local_ref[len(HEADS_PREFIX) :], branch),
             )
     return None
 
 
-# ---------------------------------------------------------------------------------------
-# Context resolution — derive the slug from the repo path, NEVER first-ALIVE.
-# ---------------------------------------------------------------------------------------
-def context_slug_for_path(workspace: Path, repo_root: Path) -> str | None:
-    """Return the context slug for a repo at ``repo_root`` under ``workspace``.
-
-    A Spec Context repo lives at ``<workspace>/repos/<slug>``. The slug is that single path
-    component — derived from the path, never from the first-ALIVE registry entry. Returns
-    ``None`` when ``repo_root`` is not directly under ``<workspace>/repos/`` (e.g. the
-    library repo run standalone, or the workspace root itself).
-    """
+def _audit_descendant(
+    moved: Callable[[str, str], tuple[bool, list[str]]], old: str, new: str
+) -> bool:
+    """True when *old* is an ancestor of *new* and every changed path, at least one, is in the
+    ``audit`` zone; an unreadable fact is False."""
     try:
-        rel = repo_root.resolve().relative_to((workspace / "repos").resolve())
-    except (ValueError, OSError):
-        return None
-    parts = rel.parts
-    if len(parts) != 1:
-        return None
-    return parts[0]
+        descendant, zones = moved(old, new)
+    except GitSyncError:
+        return False
+    return descendant and bool(zones) and set(zones) == {"audit"}
+
+
+def check_ref_policy(
+    lines: list[str],
+    gitflow: Gitflow,
+    origin: dict[str, str],
+    repo: str,
+    moved: Callable[[str, str], tuple[bool, list[str]]],
+) -> Decision:
+    """The first refusal over ``<old> <new> <ref>`` lines: a work-branch update or creation
+    (new non-zero, different from old) must land on origin's sha for its ref, or be an audit-only
+    descendant move per ``moved(old, new) -> (old is an ancestor of new, zone of each renames-off
+    changed path)``, read only for a move that would otherwise be refused; deletions, non-work refs
+    and a ref origin does not hold pass. The fix names the tree to open for *repo*."""
+    for line in filter(str.strip, lines):
+        old, new, ref = line.split()
+        branch = ref.removeprefix(HEADS_PREFIX)
+        held = origin.get(ref)
+        if (
+            is_zero_sha(new)
+            or old == new
+            or gitflow.role_of(branch) != "work"
+            or held in ("", None, new)
+            or _audit_descendant(moved, old, new)
+        ):
+            continue
+        fix = (
+            platform.command("git", "branch", branch, f"origin/{branch}")
+            if is_zero_sha(old)
+            else act(
+                "agent",
+                f"open a tree for this change with {platform.inline(*cli_words(None, 'worktree', 'new', repo))} "
+                "and the name of a live job, a backlog slug or a hotfix bug id, then land the change "
+                "through that tree's merge",
+            )
+        )
+        return Decision(
+            allowed=False,
+            message=f"[ref-gate] BLOCKED: '{branch}' would move to {new}, origin holds {held} ({_LAW}).\n"
+            f"{spell_fix(fix)}",
+        )
+    return Decision(allowed=True)

@@ -1,8 +1,7 @@
 """Derived CLI help digest — generated from the live command tree, never transcribed.
 
-Backlog `cli-help-architecture-and-session-injection` (operator request 2026-08-23,
-docker/cobra model): the hand-written CLI skill was structurally condemned to rot
-(ghost verbs, 53% coverage). The digest is introspected from the Typer/Click tree —
+A hand-written CLI skill rots (ghost verbs, stale coverage). The digest is introspected
+from the Typer/Click tree —
 ONE source — written under ``.dadaia/agentic/`` by ``public install``
 and ``reconcile`` (NEVER at hook fire: hooks read the file, they never build it), and
 attached to every ctx-inject emission bind-independent.
@@ -10,8 +9,9 @@ attached to every ctx-inject emission bind-independent.
 
 from __future__ import annotations
 
-import functools
 from pathlib import Path
+
+from dadaia_workspace.core import platform
 
 __all__ = ["DIGEST_REL", "command_paths", "digest_path", "render_digest", "write_digest"]
 
@@ -21,33 +21,15 @@ DIGEST_REL = Path(".dadaia") / "agentic" / "help-digest.md"
 #: Hard budget for the rendered digest (~4k tokens; the full --help dump measures
 #: ~33.5k tokens and is unusable as an injection payload).
 _MAX_CHARS = 16_000
-#: Emitted by the generator itself, so `dadaia help tree > docs/cli.md` reproduces the
-#: committed file byte-for-byte — the regenerate line names a command that is true.
-_HEADER = "<!-- derived-from: dadaia help tree — regenerate: `dadaia help tree > docs/cli.md` -->"
 
 
 def _first_line(text: str | None) -> str:
     return (text or "").strip().splitlines()[0].strip() if (text or "").strip() else ""
 
 
-def _root_command() -> object:
-    """The live Typer app as a click-compatible root command.
-
-    Imported, never a subprocess ``--help`` parse: hermetic, fast and always in sync
-    with the tree this process ships.
-    """
-    from typer.main import get_command
-
-    from dadaia_workspace.cli.main import app  # lazy: avoid an import cycle
-
-    return get_command(app)
-
-
-@functools.lru_cache(maxsize=1)
-def command_paths() -> frozenset[tuple[str, ...]]:
-    """Every command path of the live tree, root ``()`` included — walked ONCE per
-    process (0.4.7 FR2: the digest, the citation contract tests and the doctor's
-    ``MEM-DRIFT-2`` share this one walk).
+def command_paths(root: object) -> frozenset[tuple[str, ...]]:
+    """Every command path of the tree under *root* (the click-compatible root command
+    the running command received), root ``()`` included.
 
     Walked by duck-typing (``hasattr(cmd, "commands")``), never ``isinstance(cmd,
     click.Group)``: the installed ``typer`` (``>=0.27.1``) vendors its own
@@ -66,20 +48,17 @@ def command_paths() -> frozenset[tuple[str, ...]]:
             paths.add(child)
             _walk(sub, child)
 
-    _walk(_root_command(), ())
+    _walk(root, ())
     return frozenset(paths)
 
 
-def render_digest() -> str:
-    """Introspect the live command tree into a compact, stamped digest."""
-    root = _root_command()
+def render_digest(root: object) -> str:
+    """Introspect the command tree under *root* into a compact digest."""
     # Duck-typed group detection: this typer version ships its own click shim
     # (typer._click), so isinstance against the click package is unreliable.
     root_commands: dict[str, object] = dict(getattr(root, "commands", {}) or {})
     assert root_commands, "command-tree introspection found no commands"
     lines: list[str] = [
-        _HEADER,
-        "",
         "# dadaia CLI digest (derived from the live command tree; "
         "authoritative help: `dadaia <group> --help`)",
         "",
@@ -112,7 +91,7 @@ def digest_path(workspace_root: Path) -> Path:
     return workspace_root / DIGEST_REL
 
 
-def write_digest(workspace_root: Path) -> Path | None:
+def write_digest(workspace_root: Path, root: object) -> Path | None:
     """Write the digest, skipping when the file already holds exactly this digest.
 
     Fail-soft: any error returns ``None`` — regeneration is a convenience rider on
@@ -120,11 +99,11 @@ def write_digest(workspace_root: Path) -> Path | None:
     """
     try:
         path = digest_path(workspace_root)
-        text = render_digest()
-        if path.is_file() and path.read_text(encoding="utf-8") == text:
+        text = render_digest(root)
+        if path.is_file() and platform.read_text(path) == text:
             return path
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(text, encoding="utf-8")
+        platform.write_text(path, text)
         return path
     except Exception:  # noqa: BLE001 — advisory artifact only
         return None

@@ -1,12 +1,11 @@
-"""One derived skill-inventory oracle (v0.4.5 FR4, ``coupled-inventory-shared-oracle``).
+"""One derived skill-inventory oracle: the single roster of skills every reader uses.
 
 Skill inventories kept by hand drift from the tree: a skill added, renamed or removed
 is forgotten in one copy. Every consumer reads this one derived inventory instead.
 
 This module is the single, DERIVED source of that inventory: it reuses
 :func:`tests.helpers.public_asset_roster.scan` — itself a thin wrapper over
-``FileSystemPublicAssetManager``'s own private walk (``_iter_files`` /
-``_is_ignored_public_asset``, the EXACT enumeration ``install()``/``stage()``/
+``iter_public_files`` (the EXACT enumeration ``install()``/``stage()``/
 ``doctor()`` use internally) — and extracts the top-level directory name under
 ``skills/`` from every real (non-ignored) file path already enumerated there.
 
@@ -16,26 +15,6 @@ uses via ``(skills_dir / skill).is_dir()``. Deriving the name set from the roste
 already-proven file enumeration (rather than re-walking ``skills/`` a second,
 independently-maintained time) keeps this oracle coupled to the ONE real walk instead of
 adding a fourth scan that could itself drift from the other three.
-
-**FR10A re-measurement (v0.5.0, T-050-19A).** T-050-19 (FR10) landed a second,
-independent glob — ``tests/contract/test_behavior_map.py``'s ``_skills_on_disk``/
-``_scoped_agents_md_sources`` — covering skills AND scoped ``AGENTS.md`` sources for the
-behavior-map enforcer. FR10A's scope is deletion-only: retire every remaining
-``EXPECTED_SKILLS``-style hand-kept roster either glob already makes redundant.
-Re-measured at task time against the exact command the SPEC names (``grep -rn`` for the
-three alternatives ``EXPECTED_SKILLS``, ``SKILL_ROSTER``, ``frozenset({`` under ``tests/``,
-restricted to skill/persona/``AGENTS.md`` membership): the three literals this module's own opening
-paragraph names as retired by v0.4.5 FR4 stay retired — zero-hit grep for a live
-``EXPECTED_SKILLS =`` assignment anywhere in the tree — and all four bugs this oracle
-exists to prevent a recurrence of (``skill-orphans-unwired-agent-frontmatter``,
-``test-public-assets-stale-grill-me-name``, ``test-public-pipeline-stale-skill-roster``,
-``skill-orphan-checker-misses-disable-model-invocation``) carry ``status: resolved`` in
-``specs/bugs/BUGS.jsonl``. No further skill/persona/``AGENTS.md``-membership roster
-survives in ``tests/`` for either glob to replace: this module remains the ONE consumer
-every skill-roster reader in the repo goes through, and FR10's ``_scoped_agents_md_sources``
-has no pre-existing hand-kept consumer to retire — it is net-new discovery, not a
-replacement. The full raw-grep disposition table (every hit, kept-or-repointed, with a
-reason) is T-050-19A's task evidence in ``specs/releases/0.5.0/TASKS.md``.
 """
 
 from __future__ import annotations

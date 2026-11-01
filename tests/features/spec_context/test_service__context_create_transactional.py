@@ -1,0 +1,184 @@
+"""`dadaia context create` is one transactional step, proved against real bare remotes."""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+import pytest
+from typer.testing import CliRunner  # noqa: E402
+
+from dadaia_workspace.cli.main import app  # noqa: E402
+from dadaia_workspace.core import session_store
+from dadaia_workspace.core.cli_line import cli_words  # noqa: E402
+from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES  # noqa: E402
+from dadaia_workspace.features.spec_context.service import slug_from_url  # noqa: E402
+from dadaia_workspace.features.workspace.service import WorkspaceService  # noqa: E402
+from dadaia_workspace.infrastructure.public_assets import (  # noqa: E402
+    FileSystemPublicAssetManager,
+)
+from dadaia_workspace.infrastructure.python_env import (  # noqa: E402
+    VenvPythonEnvironmentManager,
+)
+from tests.helpers.oslib import command, read_text, run, write_text
+
+_runner = CliRunner()
+_SID = "sess_create01"
+
+
+def _git(*args: str, cwd: Path | None = None) -> str:
+    return run(["git", *args], cwd=cwd, check=True).stdout.strip()
+
+
+def _remote(parent: Path, name: str) -> Path:
+    bare = parent / name
+    _git("init", "-q", "--bare", "-b", "main", str(bare))
+    seed = parent / f"seed-{name}"
+    _git("clone", "-q", str(bare), str(seed))
+    write_text(seed / "README.md", "hi\n")
+    _git("add", "README.md", cwd=seed)
+    _git("commit", "-qm", "init", cwd=seed)
+    _git("push", "-q", "origin", "HEAD:main", cwd=seed)
+    return bare
+
+
+def _names(ws: Path) -> list[str]:
+    path = ws / ".dadaia" / "states" / "spec_contexts.json"
+    if not path.exists():
+        return []
+    contexts = json.loads(read_text(path)).get("contexts", {})
+    return [c["name"] for c in contexts] if isinstance(contexts, list) else list(contexts)
+
+
+@pytest.fixture()
+def ws(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    root = tmp_path / "ws"
+    root.mkdir()
+    WorkspaceService(
+        public_assets=FileSystemPublicAssetManager(),
+        python_env=VenvPythonEnvironmentManager(),
+    ).init(root, harnesses=L1_ENTRY_HARNESSES)
+    monkeypatch.chdir(root)
+    monkeypatch.setenv("DADAIA_SESSION_ID", _SID)
+    return root
+
+
+def _create(*args: str) -> tuple[int, str]:
+    result = _runner.invoke(app, ["context", "create", *args])
+    return result.exit_code, result.output
+
+
+@pytest.mark.parametrize(
+    ("url", "slug"),
+    [
+        ("https://h.test/org/my.repo.git", "my-repo"),
+        ("git@h.test:org/app.git", "app"),
+        ("/srv/git/tools/", "tools"),
+        ("https://h.test/a b+c", "a-b-c"),
+    ],
+)
+def test_one_slug_rule(url: str, slug: str) -> None:
+    """Every char outside [A-Za-z0-9_-] becomes '-'."""
+    assert slug_from_url(url) == slug
+
+
+def test_create_clones_hooks_alives_and_leaves_the_repo_untouched(ws: Path, tmp_path: Path) -> None:
+    """The name defaults to the slug; porcelain clean; HEAD equals the remote's."""
+    main = _remote(tmp_path, "my.app.git")
+    assoc = _remote(tmp_path, "lib.git")
+
+    code, out = _create("--main-repo", main.as_uri(), "--associated-repo", assoc.as_uri())
+
+    assert code == 0, out
+    repo = ws / "repos" / "my-app"
+    record = json.loads(_runner.invoke(app, ["context", "show", "my-app", "--json"]).stdout)
+    assert record["state"] == "alive"
+    assert [r["slug"] for r in record["associated_repos"]] == ["lib"]
+    assert session_store.read_session(ws, _SID) is None
+    assert "bound" not in out and "export DADAIA_" not in out
+    for checkout in (repo, ws / "repos" / "lib"):
+        assert (checkout / ".git" / "hooks" / "pre-push").is_file()
+        assert _git("status", "--porcelain", cwd=checkout) == ""
+    assert _git("rev-parse", "HEAD", cwd=repo) == _git("rev-parse", "main", cwd=main)
+
+
+def test_a_failed_clone_leaves_nothing_and_the_same_command_then_succeeds(
+    ws: Path, tmp_path: Path
+) -> None:
+    """Rollback leaves no dir or record; the fix line keeps every repo; the retry succeeds."""
+    main = _remote(tmp_path, "core.git")
+    ok_assoc = _remote(tmp_path, "one.git")
+    missing = tmp_path / "two.git"
+    argv = ["proj", "--main-repo", main.as_uri()]
+    argv += ["--associated-repo", ok_assoc.as_uri(), "--associated-repo", missing.as_uri()]
+
+    code, out = _create(*argv)
+
+    assert code == 1
+    assert (
+        f"{command(*cli_words(ws, 'context', 'create', *argv))}` "
+        f"with a reachable clone URL in place of {missing.as_uri()}"
+    ) in out.replace("\n", "")
+    assert "proj" not in _names(ws)
+    assert sorted(p.name for p in (ws / "repos").iterdir()) == []
+
+    _remote(tmp_path, "two.git")
+    code, out = _create(*argv)
+    assert code == 0, out
+    assert sorted(p.name for p in (ws / "repos").iterdir()) == ["core", "one", "two"]
+
+
+def test_only_a_checkout_of_the_url_is_adopted(ws: Path, tmp_path: Path) -> None:
+    """A checkout of the URL is adopted; a plain dir or another origin is refused untouched."""
+    main = _remote(tmp_path, "adopt.git")
+    _git("clone", "-q", main.as_uri(), str(ws / "repos" / "adopt"))
+    (ws / "repos" / "squat").mkdir()
+    other = _remote(tmp_path, "other")
+    _git("clone", "-q", other.as_uri(), str(ws / "repos" / "app"))
+    wanted = _remote(tmp_path, "app.git")
+
+    assert _create("--main-repo", _remote(tmp_path, "squat.git").as_uri())[0] == 1
+    code, out = _create("--main-repo", wanted.as_uri())
+    assert code == 1
+    assert f"repos/app exists but is not a checkout of {wanted.as_uri()}" in out.replace("\n", "")
+    assert "fix: " in out
+    assert _names(ws) == []
+    assert (ws / "repos" / "squat").is_dir()
+    assert _git("remote", "get-url", "origin", cwd=ws / "repos" / "app") == other.as_uri()
+    assert not (ws / "repos" / "app" / ".git" / "hooks" / "pre-push").exists()
+
+    code, out = _create("--main-repo", main.as_uri())
+    assert code == 0, out
+    assert (ws / "repos" / "adopt" / ".git" / "hooks" / "pre-push").is_file()
+
+
+def test_refusal_fix_lines_never_repeat_the_failing_command(ws: Path, tmp_path: Path) -> None:
+    """A bad URL fixes to an agent action naming it, an owned slug to
+    its owner."""
+    bad = tmp_path / "nothere.git"
+    code, out = _create("bad", "--main-repo", bad.as_uri())
+    assert code == 1
+    assert out.replace("\n", "").endswith(
+        f"{command(*cli_words(ws, 'context', 'create', 'bad', '--main-repo', bad.as_uri()))}` "
+        f"with a reachable clone URL in place of {bad.as_uri()}"
+    )
+
+    second = _remote(tmp_path, "second.git")
+    assert _create("--main-repo", second.as_uri())[0] == 0
+    code, out = _create("bad", "--main-repo", second.as_uri())
+    assert code == 1
+    last = out.splitlines()[-1]
+    assert last.endswith("coordinate with 'second'")
+    assert "context list" not in last
+
+
+def test_the_created_line_is_one_line_and_the_next_step_is_the_new_contexts(
+    ws: Path, tmp_path: Path
+) -> None:
+    """The success line is one line and names the new context's own next step."""
+    assert _create("--main-repo", _remote(tmp_path, "second.git").as_uri())[0] == 0
+    code, out = _create("--main-repo", _remote(tmp_path, "a-rather-long-repo-name.git").as_uri())
+    assert code == 0, out
+    assert any(ln.endswith("(main repo: repos/a-rather-long-repo-name)") for ln in out.splitlines())
+    assert "specs init --context a-rather-long-repo-name" in out  # a session, unbound
+    assert "'second'" not in out

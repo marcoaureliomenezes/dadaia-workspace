@@ -1,0 +1,306 @@
+"""The derived onboarding step list — one fixture per step, plus its invariant.
+
+Size: SMALL (unit): the
+two git reads (``published``, ``work_version``) are patched at the adapter; the real-git behaviour is the property test's.
+"""
+
+from __future__ import annotations
+
+import json
+import shutil
+from collections.abc import Callable
+from pathlib import Path
+
+import pytest
+
+from dadaia_workspace.core import workspace_layout
+from dadaia_workspace.core.cli_line import fix_line
+from dadaia_workspace.core.exceptions import DadaiaError
+from dadaia_workspace.core.gitflow import SeveralWorkBranches
+from dadaia_workspace.core.specs_version import CANONICAL_SPECS_VERSION, state
+from dadaia_workspace.features.specs.rules import RULES
+from dadaia_workspace.features.workspace.onboarding import next_step
+from tests.helpers.oslib import write_text
+from tests.helpers.oslib import write_text as os_write_text
+
+_CLIENT = "dadaia_workspace.infrastructure.git_subprocess.GitSubprocessClient"  # by name: importing it would size the module medium
+_SCAFFOLD = workspace_layout.public_scripts_dir().parent / "scaffold"
+
+
+@pytest.fixture(autouse=True)
+def _git(monkeypatch: pytest.MonkeyPatch) -> dict[str, bool]:
+    remote = {"published": False}
+    monkeypatch.setattr(f"{_CLIENT}.published", lambda _s, _p: remote["published"])
+    monkeypatch.setattr(f"{_CLIENT}.work_version", lambda _s, _p: "0.1.0")
+    return remote
+
+
+def _specs(tmp_path: Path, name: str = "app", *, audited: bool = False) -> Path:
+    specs = tmp_path / "repos" / name / "specs"
+    (specs / "memory" / "product").mkdir(parents=True)
+    stamp = f"---\nspecs_pattern_version: {CANONICAL_SPECS_VERSION}\n---\n# c\n"
+    os_write_text(specs / "constitution.md", stamp)
+    for stub in ("ARCHITECTURE.md", "QUALITY.md", "product/index.md"):
+        shutil.copyfile(_SCAFFOLD / "memory" / stub, specs / "memory" / stub)
+    if audited:
+        for stub in ("ARCHITECTURE.md", "QUALITY.md"):
+            os_write_text(specs / "memory" / stub, f"# {stub}\n\nreal content\n")
+        os_write_text(
+            specs / "memory" / "product" / "catalog.json", json.dumps({"features": [{"slug": "x"}]})
+        )
+        os_write_text(specs / "memory" / "product" / "x.md", _ATOM)
+        os_write_text(specs / "memory" / "product" / "index.md", "# Product\n\nReal vision.\n")
+    return specs
+
+
+def _bare(tmp: Path) -> dict[str, Path]:
+    return {"app": tmp / "repos" / "app" / "specs"}
+
+
+def _foreign(tmp: Path) -> dict[str, Path]:
+    (tmp / "repos" / "app" / "specs" / "features").mkdir(parents=True)
+    return _bare(tmp)
+
+
+def _typo(tmp: Path) -> dict[str, Path]:
+    specs = _specs(tmp, audited=True)
+    write_text(
+        specs / "constitution.md", "---\nspecs_pattern_version: 7\ngitflow: {principal: main\n---\n"
+    )
+    return {"app": specs}
+
+
+def _v047(tmp: Path) -> dict[str, Path]:
+    specs = _specs(tmp, audited=True)
+    os_write_text(specs / "constitution.md", "---\nspecs_pattern_version: 7\n---\n# c\n")
+    return {"app": specs}
+
+
+_CMD = "command"
+_ATOM = "---\nslug: x\ntitle: x\ntldr: x\nsummary: x\n---\n\n# x\n"
+
+
+# fmt: off
+@pytest.mark.parametrize(("trees", "kwargs", "published", "expected", "command", "in_command"), [
+    pytest.param(lambda t: {}, {}, False, ("context", "agent"), None, ["Agent action: run {} with a context name and --main-repo set to the main repo's clone URL"], id="zero-contexts"),
+    pytest.param(_bare, {}, False, ("specs", _CMD), ("specs", "init", "--context", "app"), [], id="S1-no-identity-no-bind-step"),
+    pytest.param(_bare, {"bound": False}, False, ("specs", _CMD), ("specs", "init", "--context", "app"), [], id="unbound-session-with-no-specs-inits-first"),
+    pytest.param(lambda t: {"app": _specs(t)}, {"bound": False}, False, ("bind", _CMD), ("context", "bind", "app"), [], id="S1-unbound-session-with-specs-ready-binds"),
+    pytest.param(_bare, {"bound": True}, False, ("specs", _CMD), ("specs", "init", "--context", "app"), [], id="S1-bound-is-past-bind"),
+    pytest.param(_foreign, {}, False, ("specs", _CMD), ("specs", "init", "--context", "app", "--replace-foreign"), [], id="B28-4-foreign-tree-replace-foreign"),
+    pytest.param(_v047, {}, False, ("specs", _CMD), ("specs", "init", "--context", "app"), [], id="upgrade-leaves-project-specs-unmigrated-and-silent-0.4.7-tree"),
+    pytest.param(_typo, {}, False, ("constitution", "agent"), None, ["repos/app/specs/constitution.md"], id="ADR0047-yaml-typo-is-an-agent-repair"),
+    pytest.param(lambda t: {"app": _specs(t)}, {}, False, ("first-pass", "agent"), None,
+                 ["then run the dd-audit-project first pass in it", "memory/QUALITY.md", "no atom"], id="shipped-stubs-first-pass"),
+    pytest.param(lambda t: {"app": _specs(t, audited=True)}, {}, False, ("publish", _CMD), ("context", "baseline", "app"), [], id="publish-until-on-a-remote"),
+    pytest.param(lambda t: {"app": _specs(t, audited=True)}, {}, True, None, None, [], id="published-is-done"),
+    pytest.param(lambda t: {"app": _specs(t, audited=True), "other": t / "repos" / "other" / "specs"}, {"focus": "app", "bound": True}, True, None, None, [], id="onboarding-next-step-names-another-context"),
+    pytest.param(lambda t: {"new": t / "repos" / "new" / "specs", "app": _specs(t)}, {}, False, None, None, [], id="two-contexts-no-focus-judges-none"),
+    pytest.param(lambda t: {"new": t / "repos" / "new" / "specs", "app": _specs(t)}, {"bound": False}, False, None, None, [], id="two-contexts-unbound-names-no-bind-target"),
+    pytest.param(lambda t: {"y": _specs(t, "y")}, {"focus": "x"}, False, None, None, [], id="missing-focus-never-falls-back"),
+    pytest.param(lambda t: {"new": t / "repos" / "new" / "specs", "app": _specs(t)}, {"focus": "app"}, False, ("first-pass", "agent"), None, [], id="focus-context-answers-first"),
+])
+# fmt: on
+def test_next_step_is_derived_from_the_workspace_state(
+    tmp_path: Path, _git: dict[str, bool], trees: Callable[[Path], dict[str, Path]], kwargs: dict[str, object],
+    published: bool, expected: tuple[str, str] | None, command: tuple[str, ...] | None, in_command: list[str],
+) -> None:  # fmt: skip
+    """The ``bind`` step judges the caller's Bind (no identity, no step). The specs fix is
+    state()'s; a typo is never a move."""
+    _git["published"] = published
+    step = next_step(tmp_path, trees(tmp_path), **kwargs)  # type: ignore[arg-type]
+    assert (step and (step.id, step.kind)) == expected
+    if step is None:
+        return
+    if command:
+        assert step.command == fix_line(tmp_path, *command)
+    create = fix_line(tmp_path, "context", "create")  # the binary every OS prints, {} in a row
+    assert all(part.format(create) in step.command.replace("\\", "/") for part in in_command)
+
+
+def test_a_refused_bind_with_no_specs_still_names_specs_init(tmp_path: Path) -> None:
+    """The relaunch waits behind the steps the session needs no binding for."""
+    relaunch = "Operator action: relaunch the session at the workspace root"
+
+    step = next_step(tmp_path, _bare(tmp_path), bound=False, refusal=("why", relaunch))
+
+    assert step is not None
+    assert (step.id, step.kind) == ("specs", "command")
+    assert step.command == fix_line(tmp_path, "specs", "init", "--context", "app")
+
+
+def test_a_pending_bind_prints_the_refusal_the_caller_gives_instead_of_the_bind(
+    tmp_path: Path,
+) -> None:
+    """The bind step prints the caller's refusal, message and fix, when its session cannot bind;
+    an Operator-action fix makes it an operator step."""
+    relaunch = "Operator action: relaunch the session at the workspace root"
+    why = "This session was launched where no workspace hook loaded, so it stands in for no role."
+
+    step = next_step(tmp_path, {"app": _specs(tmp_path)}, bound=False, refusal=(why, relaunch))
+
+    assert step is not None
+    assert step.text() == f"Next (operator step bind): {why}\nfix: {relaunch}"
+
+
+@pytest.mark.parametrize("catalog", ['{"features": []}', "{not json"], ids=["empty", "unreadable"])
+def test_the_first_pass_counts_the_atom_files_not_the_catalog(tmp_path: Path, catalog: str) -> None:
+    """A catalog that holds no feature, or does not parse, never hides an atom file: the files
+    are the owner's answer, so no atom is pending."""
+    specs = _specs(tmp_path, audited=True)
+    write_text(specs / "memory" / "product" / "catalog.json", catalog)
+
+    step = next_step(tmp_path, {"app": specs})
+
+    assert step is None or step.id != "first-pass", step and step.command
+
+
+def test_the_first_pass_names_no_atom_when_only_the_catalog_claims_one(tmp_path: Path) -> None:
+    """The catalog names feature x, but no atom file exists: the files answer, and the first
+    pass is pending with the no-atom finding."""
+    specs = _specs(tmp_path, audited=True)
+    (specs / "memory" / "product" / "x.md").unlink()
+    write_text(
+        specs / "memory" / "product" / "catalog.json", json.dumps({"features": [{"slug": "x"}]})
+    )
+
+    step = next_step(tmp_path, {"app": specs})
+
+    assert step is not None and (step.id, step.kind) == ("first-pass", "agent")
+    assert "(no atom)" in step.command
+
+
+_SCAFFOLD_INDEX = (_SCAFFOLD / "memory" / "product" / "index.md").read_text(encoding="utf-8")
+
+
+@pytest.mark.parametrize(
+    ("index", "pending"),
+    [
+        (_SCAFFOLD_INDEX, True),
+        (_SCAFFOLD_INDEX.replace("_No features found._", "### product\n\n| `x` | X | x |"), True),
+        (_SCAFFOLD_INDEX.replace("The product vision is not documented yet.", "Real vision."), False),
+    ],
+    ids=["scaffold", "scaffold-with-generated-catalog", "hand-written"],
+)
+def test_the_first_pass_judges_the_product_index_apart_from_its_generated_catalog(
+    tmp_path: Path, index: str, pending: bool
+) -> None:
+    """With an atom and filled stubs, the index is pending exactly while what the catalog
+    section leaves is still the shipped scaffold text."""
+    specs = _specs(tmp_path, audited=True)
+    write_text(specs / "memory" / "product" / "index.md", index)
+
+    step = next_step(tmp_path, {"app": specs})
+
+    assert step is not None
+    assert (step.id == "first-pass") == pending
+    assert (str(specs / "memory" / "product" / "index.md") in step.command) == pending
+
+
+def test_the_first_pass_fix_opens_the_backlog_first_pass_lane(tmp_path: Path) -> None:
+    specs = _specs(tmp_path, "proj")  # the repo slug differs from the context name
+    step = next_step(tmp_path, {"app": specs})
+    memory = specs / "memory"
+    pending = f"{memory / 'ARCHITECTURE.md'}, {memory / 'QUALITY.md'}, {memory / 'product' / 'index.md'}, {memory / 'product'} (no atom)"
+    lane = fix_line(tmp_path, "worktree", "new", "proj", "0.1.0/wt-backlog-first-pass")
+    assert step is not None
+    assert step.command == (
+        f"Agent action: open the lane {lane}, then run the dd-audit-project first pass in it — {pending}"
+    )
+
+
+def test_the_specs_step_reports_state_and_the_doctor_has_no_specs_version_code(tmp_path: Path) -> None:
+    """ONBOARDING reports the state; the doctor has no SPECS-VERSION code."""
+    specs = _foreign(tmp_path)["app"]
+    step = next_step(tmp_path, {"app": specs})
+    assert step is not None and step.command == state(specs, root=tmp_path, context="app")[1]
+    assert "specs tree is foreign" in step.reason
+    assert not any("SPECS-VERSION" in rule.codes for rule in RULES)
+
+
+def test_i1_an_audits_histo_stamp_changes_no_step(tmp_path: Path) -> None:
+    specs = _specs(tmp_path)
+    before = next_step(tmp_path, {"app": specs})
+    histo = specs / "audits" / "_archive" / "audits_histo.jsonl"
+    histo.parent.mkdir(parents=True)
+    write_text(histo, '{"id": "first"}\n')
+    assert next_step(tmp_path, {"app": specs}) == before
+
+
+def test_the_text_names_the_kind_and_carries_one_fix_line(tmp_path: Path) -> None:
+    step = next_step(tmp_path, {})
+    assert step is not None
+    head, fix = step.text().split("\n")
+    assert head.startswith("Next (agent step context): ") and fix == f"fix: {step.command}"
+
+
+def test_several_work_branches_make_the_first_pass_the_refusals_own_fix(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    first = "run `x`, then run `y`, then run `z`"
+    several = SeveralWorkBranches("2 work branches", first, "0.2.0")
+
+    def refuse(_s: object, _p: object) -> str:
+        raise several
+
+    monkeypatch.setattr(f"{_CLIENT}.work_version", refuse)
+    step = next_step(tmp_path, {"app": _specs(tmp_path, "proj")})
+    assert step is not None and (step.id, step.kind) == ("first-pass", "agent")
+    assert step.command == f"Agent action: {first}"
+    assert step.reason == "2 work branches"
+    assert step.text().count("fix:") == 1
+
+
+def test_a_main_repo_git_cannot_read_makes_the_first_pass_the_refusals_own_fix(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    specs = _specs(tmp_path, "proj")
+    refusal = DadaiaError("git cannot read it", "Agent action: run `git status`")
+
+    def refuse(_s: object, _p: object) -> str:
+        raise refusal
+
+    monkeypatch.setattr(f"{_CLIENT}.work_version", refuse)
+    step = next_step(tmp_path, {"app": specs})
+    assert step is not None and (step.id, step.kind) == ("first-pass", "agent")
+    assert step.command == refusal.fix
+    assert step.reason == "git cannot read it"
+    assert step.text().count("fix:") == 1
+
+
+def test_a_pending_check_that_git_refuses_is_the_step_with_the_refusals_message_and_fix(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    refusal = DadaiaError("git could not run in x", "Operator action: make git runnable here")
+
+    def refuse(_s: object, _p: object) -> bool:
+        raise refusal
+
+    monkeypatch.setattr(f"{_CLIENT}.published", refuse)
+    step = next_step(tmp_path, {"app": _specs(tmp_path, "proj", audited=True)})
+    assert step is not None and (step.id, step.kind) == ("publish", "operator")
+    assert (step.reason, step.command) == ("git could not run in x", refusal.fix)
+
+
+def test_the_context_create_step_renders_the_cli_words_inline(
+    tmp_path: Path, sentence: Callable[..., str]
+) -> None:
+    root = tmp_path / "a b"
+    step = next_step(root, {})
+
+    assert step is not None
+    assert step.command == (
+        f"Agent action: run {sentence(root, 'context', 'create')} with a context name "
+        "and --main-repo set to the main repo's clone URL"
+    )
+
+
+def test_the_first_pass_lane_renders_the_cli_words_inline(
+    tmp_path: Path, sentence: Callable[..., str]
+) -> None:
+    root = tmp_path / "a b"
+    step = next_step(root, {"app": _specs(tmp_path, "proj")})
+
+    assert step is not None
+    lane = sentence(root, "worktree", "new", "proj", "0.1.0/wt-backlog-first-pass")
+    assert f"Agent action: open the lane {lane}, then run the dd-audit-project" in step.command

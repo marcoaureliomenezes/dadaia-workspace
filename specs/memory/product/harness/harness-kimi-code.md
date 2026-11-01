@@ -14,20 +14,19 @@ sources:
 
 - Kimi Code is an entry harness and an operator-installed external CLI (`kimi`), never a Python dependency.
 - It reads the root `AGENTS.md` map, the root->cwd `AGENTS.md` chain, `.agents/skills/` and `.agents/agents/` (Claude-style Markdown) natively, so its workspace projection is empty; scoped law outside the chain reaches it by skill procedure ([[agentic-entities]]).
-- Without a workspace, the standalone `dd-` skills reach a Kimi user through `npx skills add` into `.agents/skills` ([[public-asset-distribution]]).
 
 ## Hooks
 
-- Kimi Code has no project-level hook config, so registration is a managed, marker-delimited block in the user-level `$KIMI_CODE_HOME/config.toml` (default `~/.kimi-code/config.toml`); content outside the markers is never touched.
-- Five shims under `$KIMI_CODE_HOME/hooks/dadaia-kimi-*.sh` carry the four hook behaviours ([[agentic-entities]]): `PreToolUse` (`^(Edit|Write|Bash)$`) the merged pre-gate, `PostToolUse` the throttled reaper, `UserPromptSubmit` ctx-inject, `PostCompact` bootstrap re-emission, `SessionStart` `dadaia doctor --fix --expired-only --quiet`.
-- Each shim resolves the nearest `.dadaia/.venv/bin/python` up from the hook cwd, so one global block serves every workspace and fails open outside one; a gate block exits 2 with the reason on stderr ([[sdd-gate-v3]]).
+- Kimi Code has no project-level hook config, so registration is a managed, marker-delimited block in the user-level `$KIMI_CODE_HOME/config.toml` (default `~/.kimi-code/config.toml`); content outside the markers is never touched. Kimi runs each rule's `command` as a shell string, so it is the shim's path spelled as one word for the host shell (on Windows Kimi hands it to `cmd /d /s /c`, which keeps a quoted head; a path with no spelling stays the raw path), written as a TOML string by the one encoder, which round-trips.
+- Five shims under `$KIMI_CODE_HOME/hooks/`, rendered from the `HOOK_DIALECTS` table — `dadaia-kimi-*.sh` sh scripts, and on Windows `dadaia-kimi-*.cmd` batch files (CRLF, command extensions on, delayed expansion off) — carry the hook behaviours ([[agentic-entities]]): `PreToolUse` (`^(Edit|Write)$`) the merged pre-gate, `PostToolUse` the post-gate (session heartbeat), `UserPromptSubmit` ctx-inject, `PostCompact` bootstrap re-emission, `SessionStart` `dadaia doctor --fix --expired-only --quiet`.
+- Each shim walks up from the hook cwd to the nearest workspace and runs its venv interpreter, so one global block serves every workspace and exits 0 outside one or without a venv; the shared translator module `dadaia_workspace.hooks.translate` turns a gate deny into exit 2 with the reason on stderr ([[sdd-gate-v3]]).
 - The shims and the block are the only dadaia assets installed outside the workspace tree; `dadaia public doctor` compares them with their renderers.
 - `dadaia certify`'s `kimi-code-live-probe` checks that `kimi` answers `--version`, reporting SKIP `UNVERIFIED` when it is absent.
 
 ## Binding
 
-- Kimi Code exposes no native session id, so its binding is `DADAIA_CONTEXT` exported into the launching environment ([[context-management]]).
-- `dadaia context bind` in a shell with neither a native session id nor `DADAIA_CONTEXT` warns and names the export (`eval $(dadaia context bind <ctx> --print-env)`).
+- Kimi Code exposes no native session id, so its binding is `DADAIA_CONTEXT` exported into the launching environment, or `DADAIA_SESSION_ID` exported before the session opens and then `dadaia context bind` ([[context-management]]).
+- `dadaia context bind` in a shell with no session id exits 1, its fix line naming the `DADAIA_SESSION_ID` export.
 
 ## Dependencies
 

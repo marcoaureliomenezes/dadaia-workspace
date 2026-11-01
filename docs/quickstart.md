@@ -1,115 +1,133 @@
 # Quickstart
 
-A bare machine to a workspace whose first project is cloned, ALIVE and bound,
-compliance checked, one backlog entry filed and one release live. Terms are defined in
-[concepts](concepts.md); the long walkthrough is [getting started](getting-started.md).
+A bare machine to a workspace whose first project is cloned and ALIVE (a session binds
+it with `context bind`), its `specs/` on the canon, compliance checked, one backlog entry filed and one release
+live. Terms are defined in [concepts](concepts.md); the long walkthrough is
+[getting started](getting-started.md).
 
-## 1. Install
+## 1. The three levels in one block
 
-<!-- derived-from: pypi-distribution sha256:c4d89365ff10 -->
-<!-- derived-from: workspace-init sha256:ca5c835e94af -->
-
-```bash
-uvx dadaia-workspace init demo --harness claude --repo https://github.com/<you>/<your-repo>.git
-```
-
-One command, nothing installed globally (needs uv); or install once with pip:
+Set `REPO_URL` to your repository's clone URL; everything else runs as printed (needs
+uv and network access):
 
 ```bash
-python -m venv .venv && .venv/bin/pip install dadaia-workspace
-```
-
-`pip install dadaia-workspace` installs the library and one CLI under two
-console-script names, `dadaia` and `dadaia-workspace`, so the name a reader knows from
-PyPI works as a command. The wheel ships the full public asset tree, so `init` works
-offline; the workspace it creates keeps its own virtualenv at `.dadaia/.venv`.
-
-## 2. Provision the workspace and its first project
-
-<!-- derived-from: workspace-init sha256:ca5c835e94af -->
-
-```bash
-dadaia init demo --harness claude --repo https://github.com/<you>/<your-repo>.git
+REPO_URL=https://github.com/<you>/<your-repo>.git
+SLUG=$(basename "$REPO_URL" .git)
+uvx dadaia-workspace init demo --harness claude --repo "$REPO_URL"
 cd demo
+.dadaia/.venv/bin/dadaia specs init --context "$SLUG"
+.dadaia/.venv/bin/dadaia doctor --context "$SLUG"
 ```
+
+After the 3b first pass (below), publish and file the first entry in a backlog lane,
+the worktree `<v>/wt-backlog-<slug>` — only `context create` (the `--repo` clone) and the first `specs init` write
+`specs/` directly (ADR 0154). `V` is the work branch's version, read from the repo:
+
+```bash
+V=$(git -C "repos/$SLUG" branch --list 'feature/*' --format='%(refname:short)' | sed 's|^feature/||')
+.dadaia/.venv/bin/dadaia context baseline "$SLUG"
+B=$(.dadaia/.venv/bin/dadaia worktree new "$SLUG" "$V/wt-backlog-my-first-idea" | sed 's/^\[ok\] //')
+python3 .agents/skills/dd-backlog-definition/scripts/backlog.py new my-first-idea \
+  --specs "$B/specs" --title "What I want" --description "Why I want it"
+git -C "$B" commit -qam "chore(backlog): new my-first-idea"
+```
+
+After an APPROVED `dd-code-reviewer` verdict, `.dadaia/.venv/bin/dadaia worktree merge "$B"` lands it
+on the work branch. The release is born in its `<M.m.p>/rc-<N>/wt-rc` worktree, the rc's
+integration branch that its jobs' `job-<n>/wt-main` trees merge into; the block keeps the
+default origin, because `--origin backlog:my-first-idea` names an entry that is not on the work
+branch until that merge lands:
+
+```bash
+V=$(git -C "repos/$SLUG" branch --list 'feature/*' --format='%(refname:short)' | sed 's|^feature/||')
+R=$(.dadaia/.venv/bin/dadaia worktree new "$SLUG" "$V/rc-1/wt-rc" | sed 's/^\[ok\] //')
+python3 .agents/skills/dd-release-implementation/scripts/release.py new "$V" --specs "$R/specs"
+```
+
+- **Level 1 — workspace.** `uvx dadaia-workspace init` provisions `demo/` with its own
+  virtualenv; every later command runs through the workspace's CLI,
+  `.dadaia/.venv/bin/dadaia`, which `init` prints by its absolute path.
+- **Level 2 — project.** `--repo` clones the repo into `repos/<slug>/`, installs the
+  pre-push and reference-transaction hooks and makes the context (named after the slug) ALIVE.
+- **Level 3 — specs.** 3a `specs init` brings the repo's `specs/` to the canon and, on a
+  repo with no work branch, cuts the local one and commits only the scaffold on it; a foreign
+  `specs/` is refused until `--replace-foreign` moves it to `specs-bkp/` (to
+  `specs-bkp/<UTC>/` when a backup already exists); then `context bind` binds a session
+  (*The bind*, below).
+  3b the `dd-audit-project` first pass fills memory in the `wt-backlog-first-pass` lane — done when it holds real content,
+  never by a stamp. 3c `context baseline <slug>` publishes the specs. `doctor` prints the
+  next pending step with its `fix:` line at every point.
+
+**Upgrade:** re-run the same `uvx dadaia-workspace init demo --harness claude` line
+from the parent directory; it prints `upgraded A -> B`, `repaired -> B` when the venv's
+build could not be read, or `already at A` when current. A venv whose python cannot start
+is refused with a fix that deletes `.dadaia/.venv` and reruns the init line.
+Then `.dadaia/.venv/bin/dadaia specs init --context <ctx>` refreshes the project's specs law.
+To carry a workspace to another machine, `.dadaia/.venv/bin/dadaia export` writes the artifact
+and `uvx dadaia-workspace init --from <artifact> <dir>` restores it (contexts come back DEAD;
+`context alive` clones them).
+
+## 2. What the init line provisioned
 
 `--harness` names one registered harness: `claude` | `codex` | `kimi-code` | `cursor` |
-`devin` | `copilot`. The directory is required, a re-run is idempotent, and a directory
-holding a foreign tree is refused with one `fix:` line.
-
-What the one line produces:
+`devin` | `copilot`. The directory is required and a directory holding a foreign tree
+is refused with one `fix:` line.
 
 - `.dadaia/.venv`, the `.dadaia/` zones init and install create, `.agents/skills`, and
   the named harness's projection.
-- the seeded state documents and the harness roster, never overwriting existing data.
+- the seeded state documents, the harness roster and an absent root `.dadaiaignore`
+  and `prompt.md` (the operator's files), never overwriting existing data.
 - the staged and installed public assets, the one writer of every hook wiring;
-  `--skip-assets` leaves the workspace ungated until `dadaia public install` runs, and
-  the output says so.
-- with `--repo <url>`, the repo cloned into `repos/<slug>/`, a context created with
-  that slug as its main repo, made ALIVE and bound — `init` prints the `--print-env`
-  line — and the pre-push hook installed.
+  `--skip-assets` leaves the workspace ungated until
+  `.dadaia/.venv/bin/dadaia public install` runs, and the output says so.
+- with `--repo <url>` (and any repeatable `--associated-repo <url>`), the project
+  cloned and ALIVE, and the pre-push and reference-transaction hooks installed — never bound.
 
-Without `--repo`, `init` prints the `dadaia context create <name> --main-repo <slug>`
-that makes the first project instead.
+Without `--repo`, a later project is one step:
+`.dadaia/.venv/bin/dadaia context create --main-repo <url> [--associated-repo <url>]`
+clones every repo, installs the hook and makes the context ALIVE; `context bind` binds.
 
-## 3. Bind the session
-
-<!-- derived-from: context-management sha256:0227a5e43894 -->
+## 3. The bind
 
 ```bash
-eval "$(dadaia context bind demo --print-env)"
-dadaia context show demo --json
+.dadaia/.venv/bin/dadaia context bind <your-repo>
+.dadaia/.venv/bin/dadaia context show <your-repo> --json
 ```
 
 `bind` writes one record, `.dadaia/sessions/<session-id>.json` (context, runtime, pid,
-`bound_at`), and acquires nothing; `--print-env` emits `DADAIA_CONTEXT` and
-`DADAIA_SESSION_ID` for the `eval $(…)` flow. The bind names the session's scope — the
+`bound_at`, `bind_id`, `last_seen_at`), and acquires nothing; the CLI verbs read the session id from the environment, and the hooks also take the
+hook payload's id where the harness's registry row names a session variable. The bind names the session's scope — the
 context's main repo plus its associated repos — and the bound context's memory is
-injected once into the session. The bind is read from `DADAIA_CONTEXT` then the session
-record, never the cwd: sitting inside a repository is not a binding.
+injected once into the session. The bind is read from the session's own record when it has an
+id, else `DADAIA_CONTEXT`, never the cwd: sitting inside a repository is not a binding.
 
-## 4. Check compliance
-
-<!-- derived-from: workspace-doctor sha256:ef9c81d0d181 -->
-
-```bash
-dadaia doctor --context demo
-```
+## 4. Compliance
 
 `doctor` is the one instance validator; three sections run in fixed order —
 `workspace`, `specs`, `ledgers`. Every finding prints as one `<CODE> <verdict>
-<message>` line, every error-class finding carries one `fix: <command>` line, and any
-error-class finding exits 1. There is no score: the findings and the exit code are the
-run. `--fix` moves slop to `.dadaia/reaped/` and deletes only what a TTL expired.
+<message>` line, every error-class finding carries one fix line (its forms are the root `AGENTS.md` map's
+*What is enforced* section), and any error-class finding exits 1. There is no score: the findings and the exit code are the
+run. `--fix` moves slop to `.dadaia/reaped/`; a TTL expiry acts by zone class, an OUTPUT
+entry held, an EPHEMERAL one deleted.
 
-## 5. File the first backlog entry
+## 5. The first backlog entry
 
-<!-- derived-from: backlog-ledger sha256:46382434daf2 -->
-
-```bash
-python3 .agents/skills/dd-backlog-definition/scripts/backlog.py new my-first-idea \
-  --title "What I want" --description "Why I want it"
-```
-
-It appends one entry, born `idea`, to `specs/backlog/BACKLOG.json`'s `active[]` — the
-operator's demand queue; `--specs <path>` points it at a specs tree. The script is the
+`backlog.py new` appends one entry, born `idea`, to `specs/backlog/BACKLOG.json`'s
+`active[]` — the operator's demand queue; from the workspace root `--specs` names the
+context's specs tree, since no `specs/` sits at or above the cwd. The script is the
 document's one writer and validator: every write validates the bytes it is about to
-commit. Only the operator creates demand.
+commit. Only the operator creates demand, and the document is written in a `<v>/wt-backlog-<slug>`
+lane.
 
-## 6. Open the first release
+## 6. The first release
 
-<!-- derived-from: release-lifecycle sha256:09607348cc88 -->
-
-```bash
-python3 .agents/skills/dd-release-implementation/scripts/release.py new 0.1.0 \
-  --origin backlog:my-first-idea
-```
-
-One birth act, all or nothing: a `SPEC.md` stub plus `_RELEASE.json` in `DEFINITION`
-under `specs/releases/<id>/`, refusing a second live release or a non-SemVer id with a
-`fix:` line. From there, author `SPEC.md`, `PLAN.md` and `TASKS.md` at the release
-root; `release.py phase IMPLEMENTATION --sha <sha>` opens implementation once all three
-carry `**Status:** Approved`.
+`release.py new` is one birth act, all or nothing: a `SPEC.md` stub in
+`specs/releases/<id>/rc-1/` plus `_RELEASE.json` in `DEFINITION` at the release root, refusing a second live
+release or a non-SemVer id with a `fix:` line; the stub opens with `## Bug window review`. From there, author
+`SPEC.md`, `PLAN.md` and one job file per job, `tasks/job<n>.md`, in that `rc-<N>/`, `PLAN.md`
+opening with the As-is review table (`unit | today | bugs | verdict | why`) and carrying the
+`## DAG` of jobs with waves and exact write sets; `release.py phase IMPLEMENTATION --specs <specs-dir>` opens
+implementation once SPEC and PLAN carry `**Status:** Approved` and every job file is well formed.
 
 Next: [positioning](positioning.md) for why this shape, [the bug loop](bug-loop.md)
 for the path a defect takes.

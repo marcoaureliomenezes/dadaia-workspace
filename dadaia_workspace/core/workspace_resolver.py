@@ -12,71 +12,93 @@ from within any sub-repo resolve to the workspace root correctly.
 
 from __future__ import annotations
 
+import os
+import sys
+from collections.abc import Callable
 from pathlib import Path
 
 from dadaia_workspace.core.exceptions import WorkspaceNotInitializedError
+from dadaia_workspace.core.platform import act
+from dadaia_workspace.core.skill_owner import load_owner
 
-#: The sentinel file whose presence marks a properly initialized workspace.
-_SENTINEL = Path(".dadaia") / "states" / "spec_contexts.json"
+_root = load_owner("dd-bug-resolution", "_root")
+_workspace_of: Callable[..., Path | None] = _root.workspace_of
+_fenced: Callable[[], frozenset[Path]] = _root.fenced_roots
+is_workspace: Callable[[Path], bool] = _root.is_workspace
+
+#: ``os.pathsep``-separated roots never resolved — by the walk, the CLI's own venv or an
+#: explicit ``--workspace`` — so no dadaia process nor child inheriting it acts on one
+#: The suite and every mutating probe set it.
+FENCE_ENV = "DADAIA_FENCED_ROOTS"
+
+
+def fenced_env(sandbox: Path) -> dict[str, str]:
+    """This environment with every root above *sandbox* fenced: a child started with it
+    acts on *sandbox* only, never on the workspace owning its venv or enclosing it."""
+    fence = [os.environ.get(FENCE_ENV, ""), *map(str, sandbox.resolve().parents)]
+    return {**os.environ, FENCE_ENV: os.pathsep.join(p for p in fence if p)}
 
 
 def resolve_workspace_root(cwd: Path | None = None) -> Path:
-    """Walk up from *cwd* to find the first directory containing ``.dadaia/states/spec_contexts.json``.
+    """The workspace owning the running venv (only when *cwd* is None), else the first of
+    *cwd* (default: the process cwd) and its ancestors holding ``.dadaia/states/
+    spec_contexts.json`` — a sub-repo's bare ``.dadaia/`` is skipped. A fenced root is
+    never returned; none found raises :class:`WorkspaceNotInitializedError`."""
+    own = own_workspace_root() if cwd is None else None
+    if own is not None:
+        return own
+    start = (cwd or Path.cwd()).resolve()
+    root = _workspace_of(start)
+    if root is None:
+        fenced = _fenced()
+        raise not_initialized(
+            start,
+            [d for d in (start, *start.parents) if (d / ".dadaia").exists() and d not in fenced],
+        )
+    return root
 
-    Parameters
-    ----------
-    cwd:
-        Starting directory. Defaults to ``Path.cwd()`` when *None*.
 
-    Returns
-    -------
-    Path
-        Absolute path to the workspace root.
+def acting_root(path: Path) -> Path | None:
+    """The unfenced workspace holding *path* — where a process may act."""
+    return _workspace_of(path)
 
-    Raises
-    ------
-    WorkspaceNotInitializedError
-        If no qualifying directory is found before reaching the filesystem
-        root. The error message names the starting *cwd* that was inspected
-        and every directory that was skipped because it contained ``.dadaia/``
-        without ``states/spec_contexts.json``.
 
-    Notes
-    -----
-    **Backward-compat guarantee:** for any workspace where ``.dadaia/states/
-    spec_contexts.json`` exists at the true workspace root, the function
-    returns exactly the same path as the old ``_resolve_workspace()``
-    helper — because the old helper also walked up looking for ``.dadaia/``
-    and the real root is the first (and only) directory satisfying both
-    criteria.
+def owning_root(path: Path) -> Path | None:
+    """The workspace holding *path*, fenced or not — the gate's question "which root
+    protects this target" alone: the fence stops a process ACTING on a root, never the
+    protection of that root."""
+    return _workspace_of(path, fenced=frozenset())
 
-    **Sub-repo behaviour:** sub-repos that ship ``.dadaia/`` for public
-    asset projections are deliberately ignored. Only a directory that also
-    has ``states/spec_contexts.json`` is accepted as a workspace root.
-    """
-    start: Path = (cwd or Path.cwd()).resolve()
 
-    skipped: list[Path] = []
+def own_workspace_root() -> Path | None:
+    """The workspace owning the running CLI's venv (``<ws>/.dadaia/.venv``), else ``None``:
+    the first rung, so a fix line runs from any cwd — outside any workspace or inside
+    another one. A fenced root (:data:`FENCE_ENV`) is never its own."""
+    venv = Path(sys.prefix).resolve()
+    root = venv.parent.parent
+    owned = venv.parent.name == ".dadaia" and is_workspace(root)
+    return root if owned and root not in _fenced() else None
 
-    for candidate in [start, *start.parents]:
-        dadaia_dir = candidate / ".dadaia"
-        if dadaia_dir.exists():
-            sentinel = candidate / _SENTINEL
-            if sentinel.exists():
-                return candidate.resolve()
-            # Has .dadaia/ but not the sentinel — sub-repo or partial init.
-            skipped.append(candidate)
 
-    # Nothing found.
-    skipped_msg = ""
-    if skipped:
-        skipped_list = ", ".join(str(p) for p in skipped)
-        skipped_msg = f" Skipped (partial .dadaia/, no states/): {skipped_list}."
-
-    raise WorkspaceNotInitializedError(
-        f"No initialized workspace found from '{start}'."
-        f"{skipped_msg}"
-        f" Run 'dadaia init' at your workspace root."
+def not_initialized(
+    searched: Path, skipped: list[Path] | None = None
+) -> WorkspaceNotInitializedError:
+    """THE workspace-not-found error: the searched directory, any skipped partial
+    ``.dadaia/``, and one ``fix:`` — the uvx bootstrap (a CLI owning a workspace never
+    gets here: :func:`own_workspace_root` is the walk's first rung)."""
+    partial = (
+        f" Skipped (partial .dadaia/, no states/): {', '.join(str(p) for p in skipped)}."
+        if skipped
+        else ""
+    )
+    holder = _workspace_of(searched)
+    fix = (
+        act("agent", f"run the verb again with `--workspace {holder}`")
+        if holder
+        else load_owner("dd-bug-resolution", "_jsonl").reinstall_fix(searched)
+    )
+    return WorkspaceNotInitializedError(
+        f"No initialized workspace found from '{searched}'.{partial}", fix=fix
     )
 
 
@@ -87,23 +109,19 @@ def resolve_cli_workspace_root(workspace: Path | None, cwd: Path | None = None) 
     given *workspace* is AUTHORITATIVE — it is used as given and must itself hold
     ``.dadaia/``; it is never re-resolved through the ancestor walk, which would
     silently target an enclosing workspace when the path is an uninitialized
-    directory nested inside one (bug
-    ``import-export-workspace-flag-re-resolves-through-ancestor-walk``).
+    directory nested inside one.
 
     ``None`` keeps the cwd ancestor walk of :func:`resolve_workspace_root`.
 
     Raises
     ------
     WorkspaceNotInitializedError
-        When *workspace* is given but holds no ``.dadaia/``, or when the walk
+        When *workspace* is given but holds no sentinel or is fenced, or when the walk
         finds no initialized workspace.
     """
     if workspace is None:
         return resolve_workspace_root(cwd)
     root = workspace.resolve()
-    if not (root / ".dadaia").is_dir():
-        raise WorkspaceNotInitializedError(
-            f"'{root}' is not an initialized workspace (no .dadaia/). "
-            f"Run 'dadaia init --workspace {root}' first."
-        )
+    if not is_workspace(root) or root in _fenced():
+        raise not_initialized(root)
     return root

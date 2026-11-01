@@ -10,58 +10,43 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from dadaia_workspace.core.model_registry import (
-    codex_effort_for_tier,
-    codex_tier_views,
-    registry_by_claude_id,
-)
-from dadaia_workspace.infrastructure.public_assets_common import _toml_escape
+from dadaia_workspace.core import platform
+from dadaia_workspace.core.frontmatter import Frontmatter, parse
+from dadaia_workspace.core.model_registry import TIER_CODEX
+from dadaia_workspace.core.workspace_layout import render_registry_tables
+from dadaia_workspace.infrastructure.public_assets_common import toml_escape
 
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
 
-# Parallel workflow detection
-_FRONTMATTER_PARALLEL_GROUP_RE = re.compile(r"^\s*parallel_group:\s*\S", re.MULTILINE)
-
-# Fallback reasoning effort when an agent's ``model:`` is unknown to the registry
-# (defensive only — every canonical agent's model id is registry-backed).
-_CODEX_DEFAULT_EFFORT = "medium"
 # Every name/prefix here gates which backtick-quoted skill references
 # ``dcx7_codex_skill_refs`` (D-CX-7) even bothers checking for existence, resolved
 # against the shared ``.agents/skills/`` tree Codex reads natively (codex_doctor.py).
 # Each entry must be an exact name or leading-hyphen prefix of a real
 # ``public/skills/<name>/SKILL.md`` SOURCE skill. A name that resolves to nothing is a phantom
-# prefix: it gates nothing real and would let D-CX-7 silently stop protecting the
-# family it was meant to cover (A22.6; a test derives this whole tuple from the
-# on-disk inventory — ``tests/contract/test_codex_skill_ref_prefixes.py``).
+# prefix: it gates nothing real and would silently stop protecting the family it was
+# meant to cover (a test derives this whole tuple from the on-disk inventory —
+# ``tests/infrastructure/runtime_transforms/test_codex_assets.py``).
 _CODEX_SKILL_REF_PREFIXES = ("dd-",)
 
-# Whitelist of agent frontmatter fields that may be emitted to codex config.toml.
-_TOML_SAFE_AGENT_FIELDS: frozenset[str] = frozenset(
-    {"name", "description", "model", "tools", "activity_class"}
-)
 
-# Matches a YAML list item under `tools:` (e.g. "  - Read")
-_AGENT_FM_TOOLS_ITEM_RE = re.compile(r"^  - (.+)$", re.MULTILINE)
-# Matches a simple `key: value` line in frontmatter (single-line value)
-_AGENT_FM_SIMPLE_RE = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*): (.+)$", re.MULTILINE)
-# Matches a folded/literal scalar intro: `key: >` or `key: |`
-_AGENT_FM_BLOCK_SCALAR_RE = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*): [>|]$", re.MULTILINE)
+def codex_model(alias: str) -> str:
+    """The Codex model id for the tier *alias*; ``ValueError`` names an unknown alias."""
+    if alias not in TIER_CODEX:
+        raise ValueError(f"No Codex mapping for model alias: {alias!r}")
+    return TIER_CODEX[alias]
+
 
 # ---------------------------------------------------------------------------
-# FR22 / A22.1 — Codex persona compaction (shared-law de-duplication)
+# Codex persona compaction (shared-law de-duplication)
 # ---------------------------------------------------------------------------
 #
 # The canonical law (the root AGENTS.md map) reaches every Codex agent context — the parent
 # session AND any delegated custom agent alike — through Codex's NATIVE
 # per-directory ``AGENTS.md`` discovery (`ai-harness-codex` skill §1), a
 # mechanism that is entirely independent of the SessionStart/UserPromptSubmit
-# hooks (live-verified, codex-cli 0.147.0, T-043-33: a parent `codex exec`
-# session AND a delegated `agent_type="dd-software-engineer"` subagent both
-# quoted the literal opening words of the projected root AGENTS.md from their
-# own context, unprompted by any tool call). Before this compaction, every
-# persona body ALSO restated fragments of that same law inline — the generic
+# hooks. Each persona body ALSO restated fragments of that same law inline — the generic
 # H1 report/protocol pointer blockquotes, the Step-0 memory-bootstrap
 # pointer, the `dd-handoff-emitter` artifact-emission paragraph, the
 # `dd-task-manager` review-gate paragraph, and the generic `dadaia CLI`
@@ -71,8 +56,8 @@ _AGENT_FM_BLOCK_SCALAR_RE = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*): [>|]$", re.M
 # inline restatements — pure shared-law / cross-role repetition, already
 # covered by `AGENTS.md` (natively) or by the named skill (loaded on demand,
 # still listed in the agent's `skills:` frontmatter) — so the law loads
-# exactly once (A22.2). Role identity, role-specific decisions, authority and
-# write/refusal boundaries are never touched by these patterns.
+# exactly once. Role identity, role-specific decisions, authority and write/refusal
+# boundaries are never touched by these patterns.
 
 _CODEX_COMPACT_H1_PROTOCOL_POINTER_RE = re.compile(
     r"> This agent follows the shared workspace protocol: `AGENTS\.md` and the "
@@ -101,7 +86,7 @@ _CODEX_COMPACT_REVIEW_GATE_SECTION_RE = re.compile(
 )
 
 # "## dadaia CLI" (never "## dadaia CLI reference", which carries the
-# distinct D-1 shell-less routing content for `dd-product-engineer` and is
+# distinct shell-less routing content for `dd-product-engineer` and is
 # never matched here) — the generic command-reference block duplicated from
 # the `dadaia-cli` skill. Matched up to the next top-level heading (or EOF)
 # so a persona that appends unrelated content after this heading (e.g.
@@ -120,11 +105,9 @@ _CODEX_COMPACT_PATTERNS: tuple[re.Pattern[str], ...] = (
 
 
 def _compact_codex_developer_instructions(body: str) -> str:
-    """Strip shared-law / cross-role boilerplate from a Codex persona body (A22.1).
+    """Strip shared-law / cross-role boilerplate from a Codex persona body.
 
-    *body* is the already Codex-transformed persona body (post
-    :func:`~dadaia_workspace.infrastructure.runtime_transforms.codex.transform_for_codex`,
-    frontmatter already stripped). Every pattern in :data:`_CODEX_COMPACT_PATTERNS`
+    *body* is the persona body, frontmatter already stripped. Every pattern in :data:`_CODEX_COMPACT_PATTERNS`
     targets content that restates law or protocol Codex already delivers
     elsewhere in the effective context — never role identity, role-specific
     decisions, authority, or write/refusal boundaries, which ship untouched.
@@ -143,69 +126,13 @@ def _compact_codex_developer_instructions(body: str) -> str:
 # ---------------------------------------------------------------------------
 
 
-def _render_agents_into_codex_config(agents_dir: Path) -> str:
-    """Scan *agents_dir* for ``.md`` agent files and render TOML ``[agents.*]`` blocks.
-
-    For each ``.md`` file (sorted for determinism):
-    1. Parse YAML frontmatter via ``_parse_agent_frontmatter()``.
-    2. If the result is non-empty (i.e., ``name`` key present), render via
-       ``_render_agent_toml_block()``.
-    3. Agents whose frontmatter cannot be parsed or are missing ``name`` are
-       silently skipped (defensive — never breaks install).
-
-    Returns the concatenated block string (may be empty string when no agents
-    are found).
-    """
-    if not agents_dir.exists():
-        return ""
-    blocks: list[str] = []
-    for md_file in sorted(agents_dir.glob("*.md")):
-        try:
-            text = md_file.read_text(encoding="utf-8")
-            fm = _parse_agent_frontmatter(text)
-            if not fm:
-                continue
-            name = str(fm.get("name", ""))
-            if not name:
-                continue
-            blocks.append(_render_agent_toml_block(name, fm))
-        except (OSError, ValueError):
-            continue
-    return "\n".join(blocks) + ("\n" if blocks else "")
-
-
-def _codex_reasoning_effort_for_model(claude_model: str | None) -> str:
-    """Resolve the Codex ``model_reasoning_effort`` from an agent's ``model:``.
-
-    The effort is derived from the registry tier view (the single source of
-    truth) rather than a hand-maintained per-agent table: the frontmatter
-    ``model:`` (a Claude id) resolves to its registry tier, which the
-    per-runtime view maps to a Codex reasoning effort (``deep`` -> ``high``,
-    everything else -> ``medium``). This call also exercises
-    :func:`codex_tier_views`, so a tier collapse (two distinct tiers resolving
-    to one (model, effort) pair) fails loudly at projection time.
-
-    Returns ``_CODEX_DEFAULT_EFFORT`` when *claude_model* is ``None`` or not in
-    the registry (defensive — never breaks install).
-    """
-    # Invariant guard: raises loudly if the live registry collapses two tiers.
-    codex_tier_views()
-    if not claude_model:
-        return _CODEX_DEFAULT_EFFORT
-    entry = registry_by_claude_id().get(claude_model)
-    if entry is None:
-        return _CODEX_DEFAULT_EFFORT
-    return codex_effort_for_tier(entry.tier)
-
-
 def _render_codex_agent_toml(
     name: str,
     model: str,
     developer_instructions: str,
+    *,
+    reasoning_effort: str,
     description: str | None = None,
-    claude_model: str | None = None,
-    reasoning_effort: str | None = None,
-    read_only: bool = False,
 ) -> str:
     """Serialize an agent as a TOML file for the Codex runtime.
 
@@ -213,25 +140,14 @@ def _render_codex_agent_toml(
     - ``name`` — basic string
     - ``description`` — basic string when available
     - ``model`` — basic string
-    - ``sandbox_mode`` — ``read-only`` when *read_only* (the persona's
-      ``activity_class: ADDITIVE``, the same source the Claude render uses), else
-      ``workspace-write``
-    - ``model_reasoning_effort`` — explicit reasoning profile: *reasoning_effort*
-      when supplied (the D-3 clamp of the RESOLVED agent-model-policy effort,
-      v0.1.65 FR5); otherwise derived from the registry tier of *claude_model*
-      via the per-runtime tier view (legacy path — staged bodies without a
-      resolved policy)
+    - ``sandbox_mode`` — always ``workspace-write``
+    - ``model_reasoning_effort`` — *reasoning_effort*, as named by
+      ``install_helpers.resolve_codex_agent_model`` (the one effort authority)
     - ``developer_instructions`` — triple-quoted multiline basic string
 
-    The function avoids external TOML serialiser dependencies; it builds the
-    content manually and is safe for all printable Unicode in instructions text.
+    Every string goes through :func:`toml_escape`, the one TOML encoder.
 
-    In a TOML triple-quoted basic string, backslashes are escape characters.
-    All literal backslashes in the body must be doubled (``\\``), and any
-    embedded triple-double-quote sequences must be escaped character-by-character
-    to prevent premature string termination.
-
-    *developer_instructions* is compacted (A22.1, FR22b) before serialization:
+    *developer_instructions* is compacted before serialization:
     :func:`_compact_codex_developer_instructions` strips inline shared-law /
     cross-role boilerplate that Codex already delivers via native ``AGENTS.md``
     discovery or a named skill — see that function's docstring for the full
@@ -239,24 +155,17 @@ def _render_codex_agent_toml(
     write/refusal boundaries pass through unchanged.
     """
     developer_instructions = _compact_codex_developer_instructions(developer_instructions)
-    # Step 1: escape backslashes first (must precede triple-quote escaping).
-    escaped = developer_instructions.replace("\\", "\\\\")
-    # Step 2: escape any embedded triple-double-quote sequences.
-    escaped = escaped.replace('"""', '\\"\\"\\"')
     lines: list[str] = [
-        f"name = {_toml_escape(name)}\n",
+        f"name = {toml_escape(name)}\n",
     ]
     if description:
-        lines.append(f"description = {_toml_escape(description)}\n")
-    sandbox_mode = "read-only" if read_only else "workspace-write"
-    if reasoning_effort is None:
-        reasoning_effort = _codex_reasoning_effort_for_model(claude_model)
+        lines.append(f"description = {toml_escape(description)}\n")
     lines.extend(
         [
-            f"model = {_toml_escape(model)}\n",
-            f"sandbox_mode = {_toml_escape(sandbox_mode)}\n",
-            f"model_reasoning_effort = {_toml_escape(reasoning_effort)}\n",
-            f'developer_instructions = """\n{escaped}\n"""\n',
+            f"model = {toml_escape(model)}\n",
+            'sandbox_mode = "workspace-write"\n',
+            f"model_reasoning_effort = {toml_escape(reasoning_effort)}\n",
+            f"developer_instructions = {toml_escape(developer_instructions + '\n')}\n",
         ]
     )
     return "".join(lines)
@@ -269,50 +178,37 @@ def _render_codex_command_policy_rules() -> str:
     Markdown guidance in AGENTS.md, skills, agents, and workflows; only command
     approval/denial belongs in ``.codex/rules/*.rules``.
     """
-    return """# Generated by "dadaia harness add codex".
+    return render_registry_tables("""# Generated by "dadaia harness add codex".
 
 prefix_rule(
-    pattern = [["rg", "ls", "find", "cat", "sed"]],
+    pattern = [["ls", "cat"]],
     decision = "allow",
-    justification = "Read-only local inspection commands are safe in the dadaia workspace.",
-    match = ["rg Codex", "ls -la", "find specs -maxdepth 2 -type f", "cat AGENTS.md", "sed -n 1,80p AGENTS.md"],
-)
-
-prefix_rule(
-    pattern = ["git", ["status", "diff", "log", "show"]],
-    decision = "allow",
-    justification = "Local git inspection is safe and needed for review.",
-    match = ["git status --short", "git diff", "git log --oneline", "git show HEAD"],
-    not_match = ["git push", "git commit"],
-)
-
-prefix_rule(
-    pattern = ["git", "push"],
-    decision = "prompt",
-    justification = "Publishing branches requires explicit operator approval after review gates.",
-    match = ["git push origin feature/x"],
+    justification = "Allows only the argv-closed readers ls and cat.",
+    match = ["ls -la", "cat AGENTS.md"],
+    not_match = ["sed -n 1,80p AGENTS.md", "rg --pre ./x.sh pat ."],
 )
 
 # prefix_rule matches the argv prefix LITERALLY (no PATH lookup, no basename
 # normalization). The workspace mandates the venv-absolute invocation
 # `.dadaia/.venv/bin/dadaia ...` (bare `dadaia` is intentionally off-PATH), so a
 # pattern whose first token is `dadaia` would never fire in a compliant session.
-# We therefore gate BOTH the venv-relative argv0 form actually used in this
-# workspace's docs AND the bare name (for any non-compliant PATH invocation), and
-# prove the real form in `match=`.
+# The ordinary install inherits the host's execution and approval policy. Only
+# `--force` needs a dadaia prompt, in BOTH the documented venv-relative argv0
+# form and the bare-name fallback.
 prefix_rule(
-    pattern = [".dadaia/.venv/bin/dadaia", "public", "install"],
+    pattern = [".dadaia/.venv/bin/dadaia", "public", "install", "--force"],
     decision = "prompt",
-    justification = "Public install rewrites generated runtime projections.",
-    match = [".dadaia/.venv/bin/dadaia public install", ".dadaia/.venv/bin/dadaia public install --force"],
-    not_match = [".dadaia/.venv/bin/dadaia public doctor"],
+    justification = "Forcing public install overwrites generated runtime projections.",
+    match = [".dadaia/.venv/bin/dadaia public install --force"],
+    not_match = [".dadaia/.venv/bin/dadaia public install"],
 )
 
 prefix_rule(
-    pattern = ["dadaia", "public", "install"],
+    pattern = ["dadaia", "public", "install", "--force"],
     decision = "prompt",
-    justification = "Public install rewrites generated runtime projections (bare-name fallback).",
-    match = ["dadaia public install", "dadaia public install --force"],
+    justification = "Forcing public install overwrites generated runtime projections (bare-name fallback).",
+    match = ["dadaia public install --force"],
+    not_match = ["dadaia public install"],
 )
 
 prefix_rule(
@@ -336,7 +232,7 @@ prefix_rule(
     justification = "Potentially destructive or host-affecting commands require review.",
     match = ["rm -rf tmp", "mv a b", "cp a b", "chmod 600 file", "sudo systemctl status app"],
 )
-"""
+""")
 
 
 def _render_agents_config_file_blocks(agents_dir: Path) -> str:
@@ -357,179 +253,13 @@ def _render_agents_config_file_blocks(agents_dir: Path) -> str:
     blocks: list[str] = []
     for md_file in sorted(agents_dir.glob("*.md")):
         try:
-            text = md_file.read_text(encoding="utf-8")
-            fm = _parse_agent_frontmatter(text)
-            if not fm:
-                continue
-            name = str(fm.get("name", ""))
+            fm = parse(platform.read_text(md_file))
+            name = str(fm.data.get("name", "")) if isinstance(fm, Frontmatter) else ""
             if not name:
                 continue
             key_escaped = name.replace("\\", "\\\\").replace('"', '\\"')
             blocks.append(f'[agents."{key_escaped}"]\n')
             blocks.append(f'config_file = "agents/{name}.toml"\n')
-        except (OSError, ValueError):
+        except (OSError, ValueError, platform.Undecodable):
             continue
     return "".join(blocks)
-
-
-def _render_agent_toml_block(name: str, fm: dict[str, object]) -> str:
-    """Render a ``[agents."<name>"]`` TOML table block from parsed frontmatter *fm*.
-
-    Keys are always quoted for safety (required for hyphenated names like
-    ``dd-software-engineer``). Missing or None fields are omitted. The ``tools``
-    field, if present, is emitted as a TOML array of basic strings.
-
-    Names containing ``]`` or newline characters are rejected (cannot appear
-    safely inside a TOML table header, even with quoting). Double-quotes and
-    backslashes are escaped with a leading backslash so the header is valid
-    TOML (e.g. a name like ``a"b`` becomes ``[agents."a\\"b"]``).
-    """
-    if "]" in name:
-        raise ValueError(f"Agent name contains invalid character ']': {name!r}")
-    if "\n" in name:
-        raise ValueError(f"Agent name contains newline character: {name!r}")
-    # Escape backslash first (must precede quote escape to avoid double-escaping)
-    key_escaped = name.replace("\\", "\\\\").replace('"', '\\"')
-    lines: list[str] = [f'[agents."{key_escaped}"]\n']
-    for field in ("name", "description", "model"):
-        val = fm.get(field)
-        if val is None:
-            continue
-        lines.append(f"{field} = {_toml_escape(val)}\n")
-    tools_val = fm.get("tools")
-    if tools_val is not None and isinstance(tools_val, list):
-        items = ", ".join(_toml_escape(t) for t in tools_val)
-        lines.append(f"tools = [{items}]\n")
-    return "".join(lines)
-
-
-def _parse_agent_frontmatter(text: str) -> dict[str, object]:
-    """Parse YAML frontmatter from an agent .md file using stdlib regex only.
-
-    Extracts the block between the first pair of ``---`` fences. Supports:
-    - Simple ``key: value`` scalar fields (string values).
-    - Folded scalar ``key: >`` — continuation lines are joined with a space.
-    - YAML list under ``tools:`` — items prefixed with ``  - `` (two-space indent).
-
-    Unknown fields (outside ``_TOML_SAFE_AGENT_FIELDS``) are silently dropped.
-    Returns an empty dict if ``name`` is missing or frontmatter is absent.
-    """
-    if not text.startswith("---\n"):
-        return {}
-    end_idx = text.find("\n---\n", 4)
-    if end_idx == -1:
-        return {}
-    frontmatter = text[4 : end_idx + 1]
-
-    result: dict[str, object] = {}
-    lines = frontmatter.splitlines()
-    i = 0
-    while i < len(lines):
-        line = lines[i]
-        # Detect block scalar (folded `>` or literal `|`)
-        block_m = _AGENT_FM_BLOCK_SCALAR_RE.match(line)
-        if block_m:
-            key = block_m.group(1)
-            # Collect continuation lines (indented)
-            body_lines: list[str] = []
-            i += 1
-            while i < len(lines) and (lines[i].startswith("  ") or lines[i] == ""):
-                body_lines.append(lines[i].strip())
-                i += 1
-            # Join non-empty continuation lines with a space (folded scalar semantics)
-            value = " ".join(part for part in body_lines if part)
-            if key in _TOML_SAFE_AGENT_FIELDS:
-                result[key] = value
-            continue
-
-        # Detect tools list  (`tools:\n  - item\n  - item`)
-        if line == "tools:":
-            items: list[str] = []
-            i += 1
-            while i < len(lines) and _AGENT_FM_TOOLS_ITEM_RE.match(lines[i]):
-                m = _AGENT_FM_TOOLS_ITEM_RE.match(lines[i])
-                if m:
-                    items.append(m.group(1).strip())
-                i += 1
-            if "tools" in _TOML_SAFE_AGENT_FIELDS:
-                result["tools"] = items
-            continue
-
-        # Simple scalar
-        simple_m = _AGENT_FM_SIMPLE_RE.match(line)
-        if simple_m:
-            key = simple_m.group(1)
-            value_str = simple_m.group(2).strip()
-            if key in _TOML_SAFE_AGENT_FIELDS:
-                result[key] = value_str
-        i += 1
-
-    # Require `name` — without it, the block cannot be rendered
-    if "name" not in result:
-        return {}
-    return result
-
-
-def _parse_write_allowlist(text: str) -> list[str]:
-    """Extract ``paths.write_allowlist`` globs from agent .md frontmatter (stdlib only).
-
-    Used to pre-compile ``.dadaia/agentic/agents.index.json`` (T-016-00) so the SDD
-    gate's RULE D performs an O(1) JSON lookup instead of an inline YAML parse on
-    every PreToolUse. Returns ``[]`` when the agent declares no write_allowlist.
-    """
-    if not text.startswith("---\n"):
-        return []
-    end_idx = text.find("\n---\n", 4)
-    if end_idx == -1:
-        return []
-
-    in_paths = False
-    in_wl = False
-    items: list[str] = []
-    for line in text[4 : end_idx + 1].splitlines():
-        if not line.strip():
-            continue
-        stripped = line.strip()
-        indent = len(line) - len(line.lstrip())
-        if indent == 0:
-            in_paths = stripped == "paths:"
-            in_wl = False
-            continue
-        if not in_paths:
-            continue
-        if in_wl and stripped.startswith("- "):
-            items.append(stripped[2:].strip())
-            continue
-        # A sub-key under `paths:` (write_allowlist:, read_allowlist:, …).
-        in_wl = stripped == "write_allowlist:"
-    return items
-
-
-def _parse_skills_from_frontmatter(text: str) -> list[str]:
-    """Extract the ``skills:`` list from agent YAML frontmatter.
-
-    Locates the ``skills:`` key inside the opening ``---`` block and collects
-    indented ``  - <name>`` list items, stopping at the next top-level key or
-    end of the frontmatter block.  Returns an empty list when frontmatter is
-    absent or contains no ``skills:`` key.
-    """
-    if not text.startswith("---\n"):
-        return []
-    end_idx = text.find("\n---\n", 4)
-    if end_idx == -1:
-        return []
-    frontmatter = text[4 : end_idx + 1]
-
-    skills: list[str] = []
-    in_skills = False
-    for line in frontmatter.splitlines():
-        if line.rstrip() == "skills:":
-            in_skills = True
-            continue
-        if in_skills:
-            stripped = line.strip()
-            if stripped.startswith("- "):
-                skills.append(stripped[2:].strip())
-            elif line and not line.startswith(" ") and not line.startswith("\t"):
-                in_skills = False  # next top-level key — skills block ended
-    return skills

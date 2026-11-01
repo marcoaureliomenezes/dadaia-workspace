@@ -3,25 +3,36 @@
 from __future__ import annotations
 
 import sys
+from dataclasses import replace
+from datetime import UTC, datetime
 from pathlib import Path
+from typing import NoReturn
 
 import typer
 
-from dadaia_workspace.cli._specs_resolution import resolve_specs_dir_for_cli
-from dadaia_workspace.features.specs.scaffolder import scaffold
+from dadaia_workspace import container
+from dadaia_workspace.cli._fail import fail
+from dadaia_workspace.cli._specs_resolution import (
+    resolve_context_for_cli,
+    resolve_context_specs_dir_for_cli,
+    resolve_specs_dir_for_cli,
+)
+from dadaia_workspace.core import gitflow, specs_version
+from dadaia_workspace.core.atomic_write import SymlinkRefusedError
+from dadaia_workspace.core.cli_line import cli_words, fix_line, materialize_line, spell_fix
+from dadaia_workspace.core.doctor_rules import SectionFinding
+from dadaia_workspace.core.gitflow import DEFAULT, Gitflow, from_mapping, work_branch
+from dadaia_workspace.core.platform import act, inline
+from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
+from dadaia_workspace.features.migrate import upgrade as upgrade_feature
+from dadaia_workspace.features.migrate.upgrade import UpgradeRefused, UpgradeResult
+from dadaia_workspace.features.spec_context import sweep
+from dadaia_workspace.features.spec_context.service import ONBOARDING
+from dadaia_workspace.features.specs import SpecsDoctor, canon
+from dadaia_workspace.features.specs.doctor_types import finding_path
+from dadaia_workspace.infrastructure.ledger_scripts import script_repairs
 
 app = typer.Typer(help="SDD release-lifecycle structural checks and helpers.")
-
-# `specs release open` / `specs segment open` RETIRED (v0.5.0 FR4/T-050-21A): both
-# wrote ACTIVE.md via `_write_active`; the phase is now read from RELEASE.json and no
-# file stands in ACTIVE.md's place, so both verbs are dead the moment there is nothing
-# left for them to write. `scaffold_release_segment` (features.specs.scaffolder)
-# stays — it still scaffolds the SPEC/PLAN/TASKS stubs of a dir-based segment
-# (ADR-1/ADR-5) and is exercised directly by its own unit tests.
-
-
-def _resolve_specs_dir(specs_dir: str | None) -> Path:
-    return resolve_specs_dir_for_cli(specs_dir)
 
 
 @app.command("upgrade")
@@ -29,107 +40,228 @@ def upgrade(
     specs_dir: str | None = typer.Option(
         None, "--specs-dir", help="Path to specs/ directory. Default: bound context."
     ),
-    target: int | None = typer.Option(
-        None, "--target", help="Target pattern version. Default: the canonical version."
-    ),
     dry_run: bool = typer.Option(False, "--dry-run", help="Plan only — no writes."),
 ) -> None:
     """Upgrade a specs/ tree to the canonical pattern version.
 
-    v0.5.1 T-051-16 (K10) retired the versioned migration chain this command used to
-    walk (backup-first, apply steps, re-stamp, doctor pre/post-diff) — see
-    ``features/migrate/registry.py``'s docstring for why. A tree below the target
-    now refuses immediately, no filesystem write, naming the dadaia-workspace 0.4.x
-    prerequisite. A tree already at (or above) the target is idempotent: only the
-    unconditional template-artifact repair runs.
+    An absent, malformed or foreign tree refuses, writing nothing, with the one state
+    fix (``specs_version.state``). An upgradable tree (stamp v6 or later) is re-stamped
+    to the canonical version; every tree gets the doctor's repair set, so the doctor
+    ends clean.
     """
-    from dadaia_workspace.core import specs_version as _ver
-    from dadaia_workspace.features.migrate import upgrade as _upgrade_feat
-    from dadaia_workspace.features.migrate.registry import UpgradeRefused
-
-    resolved = _resolve_specs_dir(specs_dir)
-    current = _ver.read_pattern_version(resolved)
-    goal = _ver.CANONICAL_SPECS_VERSION if target is None else target
-
+    resolved = resolve_specs_dir_for_cli(specs_dir)
     try:
-        result = _upgrade_feat.upgrade(resolved, target=target, dry_run=dry_run)
+        result = upgrade_feature.upgrade(
+            resolved, remove=lambda p: sweep.remove(resolved, p, p.name), dry_run=dry_run
+        )
+    except SymlinkRefusedError as exc:
+        _refuse_symlink(exc)
     except UpgradeRefused as exc:
-        typer.echo(f"[refused] {exc}", err=True)
-        sys.exit(1)
+        fail(exc)
+    sys.exit(1 if _echo_upgrade(resolved, result) else 0)
 
-    verb = "would remove" if dry_run else "removed"
-    for path in result.placeholder_removed:
-        typer.echo(f"[placeholder-repair] {verb} {path}")
-    rewrote = "would rewrite" if dry_run else "rewrote"
+
+def _refuse_symlink(exc: SymlinkRefusedError) -> NoReturn:
+    fail(exc, materialize_line(exc.path, exc.path.resolve()))
+
+
+def _repair(specs: Path, *, dry_run: bool) -> tuple[list[SectionFinding], list[SectionFinding]]:
+    """The doctor's one repair set: `specs upgrade` keeps no second writer of its own.
+    Returns what it repaired and every error left (the promise: clean)."""
+    public = canon.default_public_dir()
+    doctor = SpecsDoctor(specs, public_dir=public, templates_dir=public / "templates")
+    fixable = [issue for issue in doctor.check() if issue.fixable]
+    if dry_run:
+        return fixable, []
+    fixed = doctor.fix(fixable)
+    return fixed, [i for i in doctor.check() if i.error]
+
+
+def _echo_upgrade(specs: Path, result: UpgradeResult) -> bool:
+    """Echo the upgrade; True when an error the repair could not clear remains."""
+    will = "would " if result.dry_run else ""
+    for path in result.ideas_removed:
+        typer.echo(f"[ideas-repair] {will}remove {path}")
     for path in result.status_rewritten:
-        typer.echo(f"[status-vocabulary] {rewrote} {path}")
+        typer.echo(f"[status-vocabulary] {will}rewrite {path}")
+    for path in result.tech_stack_folded:
+        typer.echo(f"[tech-stack] {will}fold {path} into memory/ARCHITECTURE.md")
+    for path in result.trio_folded:
+        typer.echo(f"[candidate] {will}move {path} into the next rc-<N>/")
+    fixed, refused = _repair(specs, dry_run=result.dry_run)
+    for issue in fixed:
+        typer.echo(f"[repair] {will}fix {issue.code} {finding_path(issue)}")
+    for issue in refused:
+        typer.echo(
+            f"[refused] {issue.code} {finding_path(issue)}: {issue.message}\n{spell_fix(issue.fix)}"
+        )
+    for action in [] if result.dry_run else script_repairs(specs):
+        typer.echo(f"[repair] {action}")
+    if result.stamped:
+        typer.echo(f"[stamp] {will}stamp {specs / 'constitution.md'} -> {result.to_version}")
     if result.no_op:
-        typer.echo(f"[ok] {resolved} already at pattern version {current} (target {goal}) — no-op.")
-    sys.exit(0)
+        typer.echo(f"[ok] {specs} already at pattern version {result.to_version} — no-op.")
+    return bool(refused)
 
 
-# Canonical templates directory — inside the installed package
-_TEMPLATES_DIR = Path(__file__).parent.parent.parent / "public" / "templates"
+def _init_fix(*argv: str) -> str:
+    """The fix re-running ``specs init`` with the running CLI (it resolves its own root)."""
+    return fix_line(None, "specs", "init", *argv)
+
+
+_BACKUP = "specs-bkp"
 
 
 @app.command("init")
 def init(
+    context: str | None = typer.Option(
+        None, "--context", help="Spec Context whose main repo gets specs/. Default: bound."
+    ),
     specs_dir: str | None = typer.Option(
-        None,
-        "--specs-dir",
-        help="Path to target specs/ directory. Default: ./specs/",
+        None, "--specs-dir", help="Explicit specs/ directory instead of a context's."
     ),
     name: str | None = typer.Option(
-        None,
-        "--name",
-        help="Project name for rendered templates. Default: parent directory name.",
+        None, "--name", help="Project name for the constitution. Default: the repo name."
     ),
-    force: bool = typer.Option(
+    replace_foreign: bool = typer.Option(
         False,
-        "--force",
-        help="Overwrite existing files. Without this flag, existing files are skipped.",
+        "--replace-foreign",
+        help=f"Consent to move a foreign specs/ to {_BACKUP}/ (tracked files via git mv, staged).",
+    ),
+    principal: str | None = typer.Option(
+        None, "--principal", help="Principal branch. Default: kept, else origin/HEAD, else main."
+    ),
+    integration: str | None = typer.Option(
+        None, "--integration", help="Integration branch. Default: kept, else develop."
+    ),
+    work_prefix: str | None = typer.Option(
+        None,
+        "--work-prefix",
+        help="Work-branch prefix before <M.m.p>. Default: kept, else feature/.",
     ),
 ) -> None:
-    """Bootstrap a SDD release-lifecycle specs/ directory structure."""
-    # Resolve specs_dir. An explicit --specs-dir routes through the same resolver seam
-    # every other resolver-driven verb shares (T-044-40, `core.invocation
-    # .resolve_specs_dir`) so a symlinked target is refused here too — reusing that
-    # seam's existing refusal, not adding a second one (T-045-21/FR8, A8.2). `None`
-    # keeps init's own default (cwd/specs, guarded by the Root Law check below) rather
-    # than falling into that seam's unrelated context-resolution fallback.
-    target = _resolve_specs_dir(specs_dir) if specs_dir else Path.cwd() / "specs"
+    """Bring a repo's specs/ to the canon, committing only the scaffold on a new work branch.
 
-    # Coherence with `specs doctor` (validation-027 F-04/F-10): the doctor refuses the
-    # workspace-root specs/ fallback (Root Law), so init must refuse to CREATE it there.
-    # An explicit --specs-dir is a deliberate operator choice and always wins.
-    if specs_dir is None and (Path.cwd() / ".dadaia").is_dir():
-        typer.secho(
-            "Error: refusing to scaffold 'specs/' at the workspace root: the Workspace "
-            "Root Law forbids a top-level specs/ directory (and 'specs doctor' would "
-            "refuse it). Run inside a repo, or pass --specs-dir repos/<slug>/specs.",
-            err=True,
-            fg=typer.colors.RED,
-        )
-        raise typer.Exit(1)
+    Absent: scaffold. Upgradable or canonical: upgrade, then fill missing files. Foreign:
+    after consent, move specs/ to specs-bkp/ (tracked files staged) and scaffold.
+    """
+    rerun: tuple[str, ...] = ("--specs-dir", str(specs_dir))
+    if specs_dir is None:
+        try:
+            ctx = resolve_context_for_cli(context)
+        except ValueError as exc:
+            init = inline(*cli_words(None, "specs", "init", "--context"))
+            fail(exc, act("agent", f"choose a registered context and run `{init}` with it"))
+        tree = resolve_context_specs_dir_for_cli(workspace := resolve_workspace_root(), ctx)
+        if tree is None:  # a name the registry does not know owns no tree to write
+            fail(f"no registered context {ctx!r}", fix_line(workspace, "context", "list"))
+        specs_dir = str(tree)
+        rerun = ("--context", ctx)
+    target = resolve_specs_dir_for_cli(specs_dir)
+    kind, fix = specs_version.state(target)
+    if kind in ("malformed", "file"):
+        fail("nothing written", fix or "")
+    flow = _gitflow(target, principal, integration, work_prefix, rerun)
+    if kind == "foreign" and not replace_foreign:  # a refusal writes nothing, the cut included
+        _move_foreign(target, rerun, replace_foreign)
+    cut = _enter_work_branch(target.parent, flow)
+    kind, fix = specs_version.state(target)
+    refused = False  # an unrelated error the repair left never blocks the gitflow write
+    if kind == "foreign":
+        _move_foreign(target, rerun, replace_foreign)
+    elif kind in ("upgradable", "canonical"):
+        try:
+            refused = _echo_upgrade(
+                target,
+                upgrade_feature.upgrade(target, remove=lambda p: sweep.remove(target, p, p.name)),
+            )
+        except SymlinkRefusedError as exc:
+            _refuse_symlink(exc)
 
-    # Resolve project name
-    project_name = name or target.parent.name
-
-    result = scaffold(
-        specs_dir=target,
-        project_name=project_name,
-        force=force,
-        templates_dir=_TEMPLATES_DIR,
+    project = name or target.parent.name
+    written = canon.scaffold(target, project_name=project)
+    for path in [*written, *canon.scaffold_repo_law(target.parent, project_name=project)]:
+        typer.echo(f"[created] {path}")
+    for action in script_repairs(target):
+        typer.echo(f"[created] {action}")
+    gitflow.merge_frontmatter(target, gitflow=flow)
+    typer.echo(
+        f"[gitflow] principal {flow.principal}, integration {flow.integration}, "
+        f"work {flow.work_pattern}"
     )
+    if refused:
+        raise typer.Exit(1)
+    if cut:
+        _commit_scaffold(target.parent, cut)
+    if kind in ("absent", "foreign"):
+        typer.echo(f"[ok] {target} at pattern version {specs_version.CANONICAL_SPECS_VERSION}")
 
-    # Print created/skipped/error summary
-    for path in result.created:
-        action = "[overwrite]" if force else "[created]"
-        typer.echo(f"{action} {path}")
-    for path in result.skipped:
-        typer.echo(f"[skip] {path}")
-    for error in result.errors:
-        typer.echo(f"[error] {error}", err=True)
 
-    if result.errors:
-        sys.exit(1)
+def _enter_work_branch(repo: Path, flow: Gitflow) -> str:
+    """The first step of init, before anything is written: a local work branch switches
+    nothing; an absent one is cut from ``origin/<work>``, else the integration branch (local,
+    else ``origin``), else HEAD. Returns its name when it was cut, else ``""``."""
+    git = container.build_git_client()
+    if not repo.is_dir() or not git.is_git_root(repo):
+        return ""
+    work = work_branch(repo, flow, repo.name)
+    refs = set(git.git(repo, "for-each-ref", "--format=%(refname)").split())
+    if f"refs/heads/{work}" in refs:
+        return ""
+    order = (f"origin/{work}", flow.integration, f"origin/{flow.integration}")
+    start = next(
+        (r for r in order if f"refs/remotes/{r}" in refs or f"refs/heads/{r}" in refs), None
+    )
+    git.git(repo, "switch", "-c", work, *([start] if start else []))
+    return work
+
+
+def _commit_scaffold(repo: Path, work: str) -> None:
+    """Commit only the scaffold paths on the checked-out work branch, when any differ."""
+    git = container.build_git_client()
+    paths = [p for p in ONBOARDING if (repo / p).exists()]
+    if git.git(repo, "status", "--porcelain", "--", *paths):
+        git.commit_paths(repo, "chore: scaffold the dadaia specs", paths)
+        typer.echo(f"[committed] {work}")
+
+
+def _gitflow(
+    target: Path,
+    principal: str | None,
+    integration: str | None,
+    work_prefix: str | None,
+    rerun: tuple[str, ...],
+) -> Gitflow:
+    """Flags over the tree's own valid block, over detection (the git client's
+    ``principal``); an invalid result refuses, its fix naming the kept values."""
+    kept, absent = gitflow.read_gitflow(target)  # a malformed block refused upstream
+    if absent is not None:
+        kept = replace(DEFAULT, principal=container.build_git_client().principal(target.parent))
+    try:
+        return from_mapping(
+            {
+                "principal": principal or kept.principal,
+                "integration": integration or kept.integration,
+                "work": work_prefix or kept.work_prefix,
+            }
+        )
+    except ValueError as exc:
+        fixed = ("--principal", kept.principal, "--integration", kept.integration)
+        fail(exc, _init_fix(*rerun, *fixed, "--work-prefix", kept.work_prefix))
+
+
+def _move_foreign(target: Path, rerun: tuple[str, ...], replace_foreign: bool) -> None:
+    """``specs/`` -> ``specs-bkp/`` (``specs-bkp/<UTC>/`` when that exists: the one
+    backup location baseline publishes) under ``--replace-foreign``; exits on a
+    refusal, writing nothing."""
+    if not replace_foreign:
+        fail(
+            f"{target} is a foreign specs tree; nothing written.",
+            _init_fix(*rerun, "--replace-foreign"),
+        )
+    backup = target.parent / _BACKUP
+    if backup.exists():
+        backup = backup / f"{datetime.now(UTC):%Y%m%dT%H%M%SZ}"
+    rel = backup.relative_to(target.parent).as_posix()
+    container.build_git_client().move(target.parent, target.name, rel)
+    typer.echo(f"[moved] {target} -> {backup} (tracked files staged)")

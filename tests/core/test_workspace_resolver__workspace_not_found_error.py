@@ -1,0 +1,89 @@
+"""A verb run outside any workspace runs in the CLI's own workspace (fix lines run
+from any cwd); with none, it names the searched directory and prints ONE runnable
+``fix:`` line — the uvx bootstrap.
+
+The CLI's own workspace is derived from ``sys.prefix`` (the venv lives at
+``<root>/.dadaia/.venv``) — patched here as the interpreter boundary.
+"""
+
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+import pytest
+from typer.testing import CliRunner
+
+from dadaia_workspace.cli.main import app
+from dadaia_workspace.core.skill_owner import load_owner
+from dadaia_workspace.core.workspace_resolver import (
+    FENCE_ENV,
+    WorkspaceNotInitializedError,
+    resolve_cli_workspace_root,
+    resolve_workspace_root,
+)
+from tests.helpers.oslib import write_text
+
+_runner = CliRunner()
+
+
+def _workspace(root: Path) -> Path:
+    (root / ".dadaia" / "states").mkdir(parents=True)
+    write_text(root / ".dadaia" / "states" / "spec_contexts.json", "{}")
+    return root
+
+
+@pytest.mark.parametrize(
+    "fenced",
+    [
+        pytest.param(False, id="S1-own-wins-over-cwd"),
+        pytest.param(True, id="S11-fenced-own-falls-back-to-cwd"),
+    ],
+)
+def test_the_cli_resolves_its_own_workspace_unless_fenced(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, fenced: bool
+) -> None:
+    """The CLI's own workspace wins over the cwd;
+    a fenced root is never the CLI's own workspace; an explicit start always walks."""
+    own, other = _workspace(tmp_path / "a"), _workspace(tmp_path / "b")
+    monkeypatch.setattr(sys, "prefix", str(own / ".dadaia" / ".venv"))
+    if fenced:
+        monkeypatch.setenv(FENCE_ENV, str(own))
+    monkeypatch.chdir(other)
+    assert resolve_workspace_root() == (other if fenced else own).resolve()
+    assert resolve_workspace_root(other) == other.resolve()
+
+
+def test_fix_bootstraps_when_the_cli_has_no_workspace(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(sys, "prefix", str(tmp_path / "venv"))
+    monkeypatch.chdir(tmp_path)
+
+    result = _runner.invoke(app, ["doctor"])
+
+    fixes = [line for line in result.output.splitlines() if line.startswith("fix: ")]
+    assert fixes == [
+        "fix: Agent action: run `uvx dadaia-workspace init` with the workspace's directory as its first argument"
+    ], result.output
+
+
+def test_a_path_inside_a_workspace_is_told_to_point_workspace_at_its_root(tmp_path: Path) -> None:
+    """The enclosing workspace is initialized: re-initing it would refuse again."""
+    root = _workspace(tmp_path / "ws")
+    nested = root / "repos" / "sub"
+    nested.mkdir(parents=True)
+
+    with pytest.raises(WorkspaceNotInitializedError) as exc:
+        resolve_cli_workspace_root(nested)
+
+    assert exc.value.fix.startswith("Agent action: ")
+    assert f"--workspace {root.resolve()}" in exc.value.fix
+    assert "init" not in exc.value.fix
+
+
+def test_a_path_outside_every_workspace_is_repaired_by_the_init_act(tmp_path: Path) -> None:
+    with pytest.raises(WorkspaceNotInitializedError) as exc:
+        resolve_cli_workspace_root(tmp_path / "nowhere")
+
+    assert exc.value.fix == load_owner("dd-bug-resolution", "_jsonl").reinstall_fix(tmp_path)

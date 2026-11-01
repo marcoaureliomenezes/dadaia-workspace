@@ -1,18 +1,19 @@
-"""Memory-canon facts — ONE home (F011, 20260830-design-bug-surface-audit).
+"""Memory-canon facts, one home.
 
-Leaf module (stdlib only): the memory tree's shape facts were multiplied across
-``canon.py`` (CanonEntry rows), ``doctor_structural.py`` (TREE-3 list),
-``doctor_memory.py`` (top-level trio + forbidden-heading regex + wikilink regex),
-``memory_lint.py`` (already-divergent exact-match heading frozenset + wikilink
-regex) and ``catalog.py`` (wikilink regex). Every consumer now imports these objects; a re-typed copy is the duplicated-decider class the bug ledger's fix-induced
-chains grew from.
+Leaf module (stdlib only). Every consumer of the memory tree's shape facts imports these
+objects: the canon rows, the structural list, the top-level trio, the forbidden-heading
+regex and the wikilink regex. A re-typed copy would be a second decider.
 """
 
 from __future__ import annotations
 
 import re
+from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
+from dadaia_workspace.core import platform
+from dadaia_workspace.core.cli_line import reinstall_fix
 from dadaia_workspace.core.fixed_sections import (
     FIXED_SECTIONS,
     extract_fixed_section,
@@ -21,25 +22,29 @@ from dadaia_workspace.core.fixed_sections import (
 from dadaia_workspace.core.workspace_layout import (
     MEMORY_TOPLEVEL_FILES as _MEMORY_TOPLEVEL_FILES,
 )
+from dadaia_workspace.infrastructure.ledger_scripts import load_owner
 
-#: Top-level memory files (.md canonical source; v7 canon).
-#: Re-exported from the one canonical-name registry (0.4.7 FR5) — the canon rows that
-#: admit these files are built from the SAME tuple.
+#: Top-level memory files, re-exported from the one canonical-name registry; the canon
+#: rows that admit these files are built from the same tuple.
 MEMORY_TOPLEVEL_FILES = _MEMORY_TOPLEVEL_FILES
 
-#: Memory files that must exist (TREE-3): the canonical pair plus the product index.
+#: Memory files that must exist: the canonical pair plus the product index.
 MEMORY_REQUIRED_FILES: tuple[str, ...] = (*MEMORY_TOPLEVEL_FILES, "product/index.md")
 
-#: Forbidden memory H2 headings: changelog/history sections violate the atomicity
-#: contract (specs/memory/AGENTS.md §3) regardless of prose policy. Prefix match,
-#: case-insensitive, accented and unaccented forms — the ONE matcher (the retired
-#: memory_lint frozenset silently passed singular 'Version' and 'Historico').
+#: Forbidden memory H2 headings: changelog and history sections, which break the
+#: atomicity contract (specs/memory/AGENTS.md §4). Prefix match, case-insensitive,
+#: accented and unaccented forms.
 FORBIDDEN_MEMORY_HEADING_RE = re.compile(
     r"^(Changelog|History|Hist[óo]rico|Versions?)\b", re.IGNORECASE
 )
 
+
+#: The one atom grammar: the stdlib reader ``memory.py`` ships.
+_GRAMMAR = load_owner("dd-spec-navigator", "_memory_schema")
+#: ``(frontmatter | None, body, error | None)`` for one atom's text.
+parse_atom: Callable[[str], tuple[dict[str, Any] | None, str, str | None]] = _GRAMMAR.parse
 #: Wikilink grammar for memory atoms: ``[[slug]]``.
-WIKILINK_RE = re.compile(r"\[\[([^\]]+)\]\]")
+WIKILINK_RE: re.Pattern[str] = _GRAMMAR.WIKILINK_RE
 
 #: ``specs/``-relative file -> fixed-section id, the lookup view of :data:`FIXED_SECTIONS`.
 FIXED_SECTION_BY_PATH: dict[str, str] = dict(FIXED_SECTIONS)
@@ -53,14 +58,18 @@ __all__ = [
     "WIKILINK_RE",
     "extract_fixed_section",
     "is_forbidden_memory_heading",
+    "parse_atom",
     "read_fixed_fragment",
     "render_fixed_section",
 ]
 
 
 def read_fixed_fragment(public_dir: Path, section_id: str) -> str:
-    """The library fragment of *section_id*: ``<public_dir>/data/fixed/<id>.md``."""
-    return (public_dir / "data" / "fixed" / f"{section_id}.md").read_text(encoding="utf-8")
+    """The library fragment of *section_id*: ``<public_dir>/data/fixed/<id>.md``.
+
+    Raises Undecodable, carrying the reinstall act, when the file is not UTF-8."""
+    path = public_dir / "data" / "fixed" / f"{section_id}.md"
+    return platform.read_text(path, reinstall_fix(public_dir))
 
 
 def is_forbidden_memory_heading(heading: str) -> bool:

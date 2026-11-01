@@ -1,57 +1,42 @@
 ---
 slug: release-lifecycle
 title: release-lifecycle
-tldr: One live release grown by closed-scope candidates; release.py moves _RELEASE.json; closure is gated on a memory reconciliation; promote merges the release PR.
-summary: The release lifecycle — one live release directory whose _RELEASE.json state document is written by release.py (new, phase, memory, check), candidates that each define, implement and close a SPEC/PLAN/TASKS trio at the release root, the memory reconciliation gate at closure, and promotion by merging the release PR release-please opens.
-tags: [sdd, release, candidate, lifecycle, memory]
+tldr: One live release grows through closed-scope candidates; _RELEASE.json holds current phase, milestones and a lean append-only narrative.
+summary: Candidate birth, approval, task and job structure, phase transitions, authoritative memory drift, closure records, open-bug ship authorization and archival.
+tags: [release, candidate, sdd, state, closure]
 sources:
-  - dadaia_workspace/public/skills/dd-release-implementation/**
   - dadaia_workspace/public/skills/dd-release-definition/**
-  - dadaia_workspace/public/skills/dd-spec-navigator/scripts/**
-  - dadaia_workspace/public/schemas/releases/**
-  - dadaia_workspace/core/release_state.py
-  - dadaia_workspace/features/specs/release_tree.py
+  - dadaia_workspace/public/skills/dd-release-implementation/**
   - dadaia_workspace/features/specs/doctor_release.py
 ---
 
-## Release and candidate
+## State and candidate shape
 
-- Exactly one release directory is live, `specs/releases/<M.m.p>/`, with open scope; it grows by candidates, each a closed-scope cycle whose `SPEC.md`, `PLAN.md` and `TASKS.md` sit flat at the release root and are replaced by the next candidate's, the closed trio staying in git.
-- `_RELEASE.json` is one mutable `release-state-v1` document `{schema, release, phase, defined, implemented, shipped, log}`; `phase` is `DEFINITION | IMPLEMENTATION | CLOSURE | ARCHIVED`, and the gate never reads it ([[sdd-gate-v3]]).
-- `log` is append-only, oldest first, entries `{ts, agent, kind, text}` with `kind` one of `note summary size drifts dispositions test-dispositions artifact-gc reviews merge memory`; it is the closure narrative's only home.
-- Every SPEC carries `**Origin:** operator-demand | backlog:<slug>[,..] | bugs:<id>[,..]`; `SPEC-DOC-048` requires it on the live SPEC and resolves each cited slug or bug id ([[backlog-ledger]], [[bug-ledger]]).
-- `specs/releases/_archive/` holds published versions below the live one and `releases_histo.jsonl`; it is read, never rewritten.
+- Exactly one bare-SemVer release directory is live. `_RELEASE.json` contains `phase`, `defined`, `implemented`, `shipped` and an append-only `log`; a milestone stores its timestamp and never a sha (an older state's `sha` key stays valid and unread).
+- New log entries use only `note`, `milestone`, `summary` and closure-only `memory`; historical kinds remain readable.
+- One reader serves the live release to `phase`, `drift`, `memory`, `ship` and `check`'s tree rules: it refuses a state that breaks the release schema (a log entry that is not an object, lacks `ts` or names a candidate not shaped `rc-<N>`) with `check`'s first finding and its fix line, so no reader meets a refused shape. The write verbs `new`, `phase`, `memory` and `ship` first ask the kernel's `require_governed`, so a judged session with no live record is refused with the CLI's own message and fix; `check`, `drift` and `origin` are not asked ([[context-management]]).
+- Each candidate lives in `rc-<N>/` with approved `SPEC.md`, `PLAN.md` and one `tasks/job<n>.md` per job. The highest candidate is live.
+- PLAN carries the as-is review, job DAG, waves and complete write sets. Each job file carries lean task rows with task id, `who` (`sr`, `jr`, `pe` or `cr`, the dispatched persona, [[agent-orchestration]]), AC and exact write set; no stage grammar and no done marker exist. A task whose write set names `specs/memory` is an error until the candidate reaches CLOSURE, where its rows are history; memory is reconciled in the `wt-rc`'s last commits.
 
-## The writer — `release.py`
+## Lifecycle
 
-- `python3 .agents/skills/dd-release-implementation/scripts/release.py <verb> [--specs <path>]` is the state document's one writer and validator; each write validates the new bytes before replacing the file atomically, and every refusal carries one `fix:` line.
-- `new <id> [--origin <origin>]` mints the live release: a `SPEC.md` stub plus `_RELEASE.json` in `DEFINITION`, all or nothing; on a live release already in `CLOSURE` with the same id it stacks the next candidate, reopening `DEFINITION` and deleting the closed `PLAN.md`/`TASKS.md`; a second live release, a non-SemVer id or a symlinked path is refused; `--origin bugs:<ids>` seeds one scope clause per bug with its repro line.
-- `phase IMPLEMENTATION --sha <sha>` requires all three trio files `**Status:** Approved` and stamps `defined`; `phase CLOSURE --sha <sha> [--pr <n>]` requires no `[ ]` or `[-]` task marker and stamps `implemented`, `--pr` recording the merged release PR in its note; each phase follows its predecessor exactly once, and `ARCHIVED` is written by no verb.
-- `memory --reviewed <slugs> --changed <slugs>` derives its window from the state document — the previous `kind: memory` entry's `until`, else `defined.sha` — to `HEAD`, computes the worklist itself and appends the closure's `kind: memory` log entry carrying `since`, `until`, `reviewed` and `changed`; it refuses outside `CLOSURE`, a worklist entry named in neither list, a name outside the worklist, and a `changed` atom git reports unmoved over the window.
-- `check [--json]` validates every state document, live and archived, and the ship ledger; on a live release in `CLOSURE` it also re-judges the latest `kind: memory` entry over its own `since`..`until` with the `memory` verb's rules and requires that no atom's sources moved after its `until`; `dadaia doctor`'s `ledgers` section runs it (`LEDGER-RELEASE-SCHEMA`) and its `specs` section runs the `RELEASE-TREE-*` rules ([[workspace-doctor]]).
+- `release.py new` creates a release or stacks the next candidate and writes the definition stub atomically. One rule names the next candidate, shared by `new`, the closure fence and the upgrade fold: the last `milestone` entry's candidate plus one, else the highest `rc-<N>` folder plus one, so a drafted `rc-<N>/SPEC.md` with no milestone is adopted, never skipped.
+- `release.py origin <spec>` prints the ids a SPEC's first `**Origin:**` line carries, one `<kind> <id>` per line; the backlog exit reads a pick through it.
+- `phase IMPLEMENTATION` requires approved SPEC and PLAN plus structurally valid PLAN and job files, then stamps the defined milestone and prints the subject its commit carries, `chore(release): rc-<N> phase <PHASE>`; `check` and `phase` judge the PLAN DAG and the job files through one decider, so a DAG `check` admits is one `phase` admits.
+- Each behavior begins with a RED-test task and continues in a fresh source-only implementation task. A candidate is defined, implemented and closed on its `wt-rc` tree: each job merges into it after its one independent review and tracked repository verification, and the `wt-rc` merges into the work branch through the same gate plus the ledger checks; a push reruns none of them ([[worktrees]]).
+- `phase CLOSURE` refuses while the worktree owner lists any row of the repo (a tree, an orphan `wt/*` branch, a paused, foreign or stray row, old grammar included) except a `wt-rc` and the tree it runs from (the one holding the specs it was given); that refusal prints the owner row's `exit`, else its `fix`, and authors no line of its own. A specs tree in no git checkout is one refusal with the `Agent action:` to close from a repo's checkout. A spawn of the owner that cannot start is a refusal with the owner's `list` fix. Otherwise it stamps the implemented milestone.
+- The reconcile is the closure's whole scope: after `phase CLOSURE` a confirmed bug in code the work branch holds still takes the version's hotfix lane and reaches the `wt-rc` by `worktree sync`; in code only the `wt-rc` holds, only a block-list bug lands, as commits on the `wt-rc` itself; any other work is a job of the next candidate, born at once ([[bug-ledger]]). Its order is the `measured_by` repairs, the disposition sweep and artifact GC, then the memory pass last.
+- A milestone or memory-window bound is a commit found by its subject on a commit touching `specs/releases/<version>/`: `chore(release): rc-<N> (phase|enters) <PHASE>` for a milestone, `chore(release): rc-<N> memory pass recorded` for a memory pass; `_memory_drift.by_subject` is the one reader. In closure, `release.py drift` opens the window at the newest memory-pass commit of any candidate of any release, the live candidate's own passes excepted (product memory is one per repo, so commits landed between candidates fall in the next window), else at the live candidate's IMPLEMENTATION commit, the first HEAD reaches, else the root commit; its worklist comes from the kernel's one drift decider, the same one `memory.py drift` runs. The product pass reads every matched source diff, reconciles atoms and derived documents, generates the catalog, and records one `memory` entry per pass at a new HEAD (`release.py memory` prints the subject its commit carries); the latest entry governs, and `drift` still exits by its worklist after it, since the entry, not the worklist, proves the pass.
+- The closure summary is the last `summary` entry at or after the defined timestamp: one line that `release.py check` fullmatches against `delivered: …; carried: …; backlog exits: …`, each field non-empty, `none` standing for an empty one; with the closure memory entries it is the only closure narrative (a closed SPEC and PLAN are never edited). The main thread's closure report to the operator, never the summary, carries the readout table `verdict.py stats <M.m.p>-rc<N>` prints (local metrics 1, 2, 4, 6, 7 and 9, each with its target; metrics 1 and 9 count the bugs closed from the previous candidate's CLOSURE to this one's, the closure bound is the candidate's CLOSURE subject commit, metric 4 reads the first first-parent integration merge holding it, else `n/a`, metric 6 reads `n/a (no closure commit)` for a closed candidate whose CLOSURE commit is gone, and an unknown or malformed candidate reads `n/a` throughout; stats refuses any tree `release.py check` refuses, so in CLOSURE the readout runs after the memory pass is recorded) and the batch of operator-reserved acts and bug proposals ([[agent-comms]], [[agent-orchestration]]). Ledgers and git retain their own detailed evidence; closure does not reconstruct it into extra log kinds.
 
-## The candidate arc
+## Checks and shipping
 
-- Definition: the picked backlog and bug set, the mandatory grill, the SPEC by `dd-product-engineer`, PLAN and TASKS by `dd-software-engineer`, one definition commit on `feature/<M.m.p>` ([[agent-orchestration]]).
-- Implementation: one task reserved `[-]` at a time in its own commit, TDD, local CI preflight, `[x]` only after the reviewer's `APPROVED` on the same commit.
-- Closure, in order: `phase CLOSURE`, memory reconciliation, closure `log` entries, disposition sweep (`backlog.py exit`, `audit.py disposition`/`close`, `bugs.py archive`), artifact GC, the `feature -> develop` PR merged green, then the operator's promote-or-continue choice ([[audits-canon]]).
-- `SPEC-DOC-047` refuses a task whose write set names `specs/memory`: memory is closure procedure, never a task.
-
-## The memory reconciliation gate
-
-- `python3 .agents/skills/dd-spec-navigator/scripts/memory.py drift --since <sha> [--json]` lists the atoms whose `sources` globs match a path changed over `<sha>..HEAD` and every feature package or hook module no atom covers; `--since` is required and has no default window.
-- Each listed atom is reconciled from its sources' diff — delete, update, then add — and `memory.py catalog generate` regenerates the catalog pair ([[workspace-doctor]]).
-- `RELEASE-TREE-MEMORY` keeps a live release in `CLOSURE` red until a `kind: memory` entry stamped after `implemented.ts` carries `since`, `until`, `reviewed` and `changed`, its `since` equal to the state-derived window start.
-
-## Promote
-
-- Promote is merging `develop` into `main`, then merging the release PR release-please opens there; that PR owns the version, the CHANGELOG section and the tag, and the publish jobs run on it ([[pypi-distribution]]).
-- Release ids are bare SemVer; the live version is the last published version plus one patch and moves only at an operator-approved deploy.
-
-## Runtime state
-
-`specs/releases/<M.m.p>/{_RELEASE.json,SPEC.md,PLAN.md,TASKS.md}`, `specs/releases/_archive/**`.
+- `release.py check` is the release-state validator. It checks tree shape, the PLAN DAG against the job files and the presence of a closure memory entry after the implemented timestamp; in DEFINITION it refuses a closure entry logged after the candidate's birth note. Each id of the live SPEC's Origin line is one row: a traced id, or an untraced one before the candidate logs its closure summary (or ships), is an info row; an untraced id after it is an error carrying the owning script's verb that writes its exit, else an `Agent action:`; an unknown id carries the `Agent action:` to name a live id or rule it out of the Origin line. The live SPEC's first `## ` heading must be the bug-window review: in DEFINITION that is an error with the `Agent action:` to open it, past DEFINITION an info row. An info row carries no fix. It prints each other finding with its `fix:` line, and a release file that is not UTF-8 is one finding carrying the `Agent action:` to re-encode the failing line as UTF-8 in place, every other line kept.
+- The memory writer requires every worklist atom in `--reviewed` or `--changed` and refuses while a worklist unit is covered by no atom; it accepts a name only for an atom the worklist lists or whose own file moved in the window, refuses `--changed` for an atom whose file did not move, prints each refusal with the act that clears it, and records the derived `since` and `until`.
+- Ship requires CLOSURE and a clean release check. Every open bug needs one `--allow-open <id>`, a `note` whose text starts `Operator authorization verbatim:` and names the id, and the id in the carried field of the live candidate's closure summary — the last `summary` entry since its definition, read by one reader that `check` shares; otherwise ship refuses.
+- Ship records the promote merge: `shipped` with its timestamp and, when the host has one, the promote PR's number (`--pr`), appends the delivered history record and moves the full release directory to the archive.
+- At promote the main thread asks one question, promote or continue, and for promote the next release id or none. Both merges that advance the integration and principal branches pass the merge gate, which is discipline: the repo's `verify:` green and the reviewer's `APPROVED`, security lens included, on the merged head, through a PR when the host has one, the main thread quoting the verdict in it; the project's own pipeline PR into the principal stays outside that gate; the work → integration merge runs only on the operator's order. Promote is the integration → principal merge; when the project's own release pipeline then opens a PR into the principal, that pipeline PR is the promote PR whose merge deploys, else the integration → principal merge is. After the promote merges, the old work tip is tagged `archive/<work><old>` and the work branch is renamed to the next id (`git branch -m <work><old> <work><id>`, and `git push -u origin <work><id> :<work><old>` when it has a remote), never cut anew or deleted, so every commit on it, the ship record included, reaches integration with the next work → integration merge; the ship is recorded from a backlog lane on that branch ([[worktrees]]).
 
 ## Dependencies
 
-[[backlog-ledger]], [[bug-ledger]], [[audits-canon]], [[workspace-doctor]], [[pypi-distribution]], [[sdd-gate-v3]], [[agent-orchestration]].
+[[worktrees]], [[bug-ledger]], [[backlog-ledger]], [[audits-canon]], [[workspace-doctor]], [[agent-orchestration]], [[agent-comms]].

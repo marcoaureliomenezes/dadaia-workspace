@@ -1,22 +1,6 @@
-"""JsonInstallLedgerStore — JSON adapter for the projection install ledger (schema v1).
+"""JSON adapter for ``.dadaia/states/install_ledger.json`` (atomic, no-op on identical bytes).
 
-The ``infrastructure`` adapter for
-:class:`~dadaia_workspace.core.protocols.install_ledger_store.InstallLedgerStore`,
-(stateless, per-call ``states_dir``, atomic write,
-idempotent no-op on identical bytes). Persists to
-``.dadaia/states/install_ledger.json``:
-
-    {"schema_version": "1",
-     "entries": [{"relpath": ".codex/AGENTS.md", "sha256": "…", "family": "law",
-                  "kind": "file"}]}
-
-``kind`` distinguishes a projected file from a symlink into the authored ``.agents/``
-set (and from that link's copy fallback); an entry persisted before ``kind`` existed
-migrates as ``"file"`` on read.
-
-A malformed/unreadable ledger reads as ``None`` — reconciliation then runs bootstrap
-semantics (record everything, prune nothing): a corrupt record must degrade to inaction,
-never to deletion.
+A malformed ledger reads as ``None``: a corrupt record degrades to inaction, never deletion.
 """
 
 from __future__ import annotations
@@ -24,6 +8,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from dadaia_workspace.core import platform
 from dadaia_workspace.core.atomic_write import atomic_write
 from dadaia_workspace.core.models.install_ledger import InstallLedger
 
@@ -46,11 +31,11 @@ class JsonInstallLedgerStore:
         if not path.exists():
             return None
         try:
-            data = json.loads(path.read_text(encoding="utf-8"))
+            data = json.loads(platform.read_text(path))
             if not isinstance(data, dict):
                 return None
             return InstallLedger.from_dict(data)
-        except (OSError, ValueError):
+        except (OSError, ValueError, platform.Undecodable):
             return None
 
     def write(self, states_dir: Path, ledger: InstallLedger) -> None:
@@ -60,7 +45,7 @@ class JsonInstallLedgerStore:
         new_text = json.dumps(ledger.to_dict(), indent=2)
         if path.exists():
             try:
-                if path.read_text(encoding="utf-8") == new_text:
+                if platform.read_text(path) == new_text:
                     return
             except OSError:
                 pass

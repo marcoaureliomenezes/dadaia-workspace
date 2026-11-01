@@ -1,48 +1,49 @@
 #!/usr/bin/env python3
-"""The backlog's ONE writer and validator — `specs/backlog/BACKLOG.json` and its
-append-only exit ledger, stdlib only.
+"""The backlog ledger CLI and validator — `specs/backlog/BACKLOG.json` and its
+append-only exit ledger, stdlib only. Live-entry authoring authority is
+`specs/backlog/AGENTS.md` §2.
 
 ``backlog.py <verb> --specs <path>``. Every write builds the new document bytes, runs
-`check` over them, and only then replaces the file atomically — so this script's writer
-and its validator cannot disagree about what a valid backlog is.
-
-``subjects`` lists what this script can see bound: the operator alias map and the
-subjects the live document already carries. Deriving the ~5k code/doc/cli anchors from
-the source tree stays where its reader lives — the doctor's `BL-SCHEMA` registry — so
-there is one derivation, not a second copy of it inside a skill script.
+`check` over them, and only then replaces the file atomically — so its write paths
+and its validator cannot disagree about what a valid backlog is; resolving a subject is the
+doctor's alone.
 """
 
 from __future__ import annotations
 
 import argparse
-import json
 import sys
 from pathlib import Path
-from typing import Any
 
 # A projected skill folder is not a package dir to litter: the sibling modules below
 # import without leaving a `__pycache__` beside them.
 sys.dont_write_bytecode = True
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+#: One bootstrap line: this folder and the kernel, at the front (source tree before stage).
+sys.path[:0] = [
+    str(Path(__file__).resolve().parent),
+    str(Path(__file__).resolve().parents[2] / "dd-bug-resolution" / "scripts"),
+]
 
-import _backlog_exit as ex  # noqa: E402
-import _backlog_subjects as sj  # noqa: E402
-import _backlog_write as wr  # noqa: E402
-from _backlog_check import check  # noqa: E402
-from _backlog_schema import CODE, DISPOSITIONS, HISTO, LEDGER, find_specs  # noqa: E402
-from _backlog_store import Refusal, append_histo, commit, read_active  # noqa: E402
+import _backlog_exit as ex
+import _backlog_write as wr
+import _findings
+import _jsonl
+from _backlog_check import check
+from _backlog_schema import DISPOSITIONS, HISTO, LEDGER
+from _backlog_store import commit, read_active
+from _platform import use_utf8_stdio
+from _refusal import Refusal
+from _specs import find_specs, refuse, require_governed, workspace_of
 
 _HELP = {
     "new": "append one brand-new active[] entry, born at status 'idea'",
     "exit": "retire one live entry and append its one terminal histo record",
-    "subjects": "list the bindable canonical subjects, or resolve one",
     "check": "validate BACKLOG.json and backlog_histo.jsonl",
 }
-_ALIAS_DEFAULT = ".dadaia/states/backlog_subject_aliases.txt"
 
 
 def _parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     sub = parser.add_subparsers(dest="verb", required=True)
     for verb, help_text in _HELP.items():
         command = sub.add_parser(verb, help=help_text)
@@ -50,66 +51,49 @@ def _parser() -> argparse.ArgumentParser:
         if verb in ("new", "exit"):
             command.add_argument("slug", help="the backlog entry's slug")
         if verb == "new":
-            for option in ("--title", "--description", "--provenance"):
+            for option in ("--title", "--description", "--provenance", "--relates"):
                 command.add_argument(option)
             command.add_argument("--intent", action="append", metavar="KIND:REF=CHANGE",
-                                 help="one typed intent (repeatable)")  # fmt: skip
+                                 help=f"one typed intent (repeatable); KIND is one of {'|'.join(wr.KINDS)}")  # fmt: skip
         if verb == "exit":
             command.add_argument("--disposition", required=True,
                                  help=f"one of {'|'.join(DISPOSITIONS)}")  # fmt: skip
-            for option in ("--release", "--reason", "--summary", "--ts"):
+            for option in ("--release", "--reason", "--summary"):
                 command.add_argument(option)
-        if verb == "subjects":
-            command.add_argument("--alias-map", type=Path, default=None,
-                                 help=f"alias map (default: <workspace>/{_ALIAS_DEFAULT})")  # fmt: skip
-            command.add_argument("--kind", help="filter to one subject kind")
-            command.add_argument("--resolve", help="resolve one proposed subject ref and exit")
         if verb == "check":
             command.add_argument("--json", action="store_true", help="emit findings as JSON")
     return parser
 
 
-def _values(args: argparse.Namespace, names: tuple[str, ...]) -> dict[str, Any]:
-    return {name: getattr(args, name) for name in names}
-
-
 def _new(args: argparse.Namespace, specs: Path) -> int:
-    values = _values(args, ("title", "description", "provenance", "intent"))
-    commit(specs / LEDGER, lambda active: wr.new_entry(active, args.slug, values))
+    values = _jsonl.values(args, ("title", "description", "provenance", "intent", "relates"))
+    commit(specs, lambda active: wr.new_entry(active, args.slug, values))
     print(f"[ok] appended {args.slug!r} -> {specs / LEDGER}")
     return 0
 
 
 def _exit(args: argparse.Namespace, specs: Path) -> int:
-    """The atomic pair: the terminal record, then the removal. Every refusal has already
-    run, so the only ordering left is the one whose crash is recoverable — a record with
-    the entry still live is a re-runnable exit; a removal with no record is a lost item.
-    """
-    values = _values(args, ("disposition", "release", "reason", "summary", "ts"))
+    """The pair: the terminal record, then the removal, both checked before either write;
+    a crash between them leaves an exited-but-live slug `check` names, never a lost item."""
+    values = _jsonl.values(args, ("disposition", "release", "reason", "summary"))
     entry = ex.check_exit(specs, read_active(specs / LEDGER), args.slug, values)
-    append_histo(specs / HISTO, ex.histo_record(entry, values))
-    commit(specs / LEDGER, lambda active: [i for i in active if i.get("id") != args.slug])
+    commit(specs, lambda active: [i for i in active if i.get("id") != args.slug], ex.histo_record(entry, values))  # fmt: skip
     print(f"[ok] exited {args.slug!r} ({values['disposition']}) -> {specs / HISTO}")
     return 0
 
 
 def main(argv: list[str] | None = None) -> int:
+    use_utf8_stdio()
     args = _parser().parse_args(argv)
-    specs = args.specs if args.specs is not None else find_specs(Path.cwd())
+    specs = find_specs(args.specs, ledger=None if args.verb == "check" else f"specs/{LEDGER}")
     if args.verb == "check":
-        findings = check(specs)
-        print(json.dumps(findings, indent=2)) if args.json else [
-            print(f"{CODE} error {f['path']}:{f['line']} {f['message']}") for f in findings
-        ]
-        return 1 if findings else 0
+        return _findings.run_check(check(specs), as_json=args.json)
     try:
-        if args.verb == "subjects":
-            return sj.subjects(args, specs, _ALIAS_DEFAULT)
+        if root := workspace_of(specs):
+            require_governed(root)
         return _new(args, specs) if args.verb == "new" else _exit(args, specs)
     except Refusal as refusal:
-        print(f"[error] {refusal}", file=sys.stderr)
-        print(f"fix: {refusal.fix}", file=sys.stderr)
-        return 1
+        return refuse(refusal, specs)
 
 
 if __name__ == "__main__":

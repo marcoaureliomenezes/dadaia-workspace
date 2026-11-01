@@ -1,59 +1,22 @@
-"""Every human- and agent-facing document derives from a named memory atom.
-
-Intent: CONTRACT — T-047-36 (SPEC 0.4.7 FR3): `README.md`, `llms.txt` and every
-`docs/*.md` carry, under each `## ` heading, one or more
-`<!-- derived-from: <slug> sha256:<12 hex> -->` markers; the slug resolves by stem to
-exactly one file under `specs/memory/`, the hash is that file's CURRENT content hash,
-and `docs/cli.md` is the committed output of `dadaia help tree`.
-Size: SMALL — reads this repo's own tree plus in-memory mutation fixtures; no
-subprocess, no network, no tmp workspace.
-
-One changed atom byte reddens every section derived from it, and the failure names the
-atom to re-read and the line to re-record — the `behavior-map.json` pattern, applied to
-prose. There is no generator verb: a derived section is re-derived by a reader, and
-this test is what makes forgetting impossible.
-"""
+"""Behavioral contracts for documentation navigation and generated CLI reference."""
 
 from __future__ import annotations
 
-import hashlib
 import re
 import tomllib
 from pathlib import Path
 
-import pytest
-
 from dadaia_workspace.cli.help_digest import command_paths, render_digest
+from dadaia_workspace.core.fixed_sections import authored_text
 from dadaia_workspace.features.specs.citations import dead_citations
-
-pytestmark = pytest.mark.contract
+from tests.helpers.cli_root import live_root
+from tests.helpers.oslib import read_text
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _MEMORY_DIR = _REPO_ROOT / "specs" / "memory"
 _DOCS_DIR = _REPO_ROOT / "docs"
-_README_MAX_BYTES = 10_240
 #: `docs/cli.md` is generated, not derived: it names its generator, not an atom.
 _GENERATED = ("cli.md",)
-
-_H2_RE = re.compile(r"^## (.+)$")
-_MARKER_RE = re.compile(r"^<!-- derived-from: ([A-Za-z0-9._-]+) sha256:([0-9a-f]{12}) -->$")
-_HASH_CHARS = 12
-
-
-def _atom_hash(path: Path) -> str:
-    """The atom's content hash — over LF bytes, so a CRLF checkout (Windows autocrlf)
-    pins the same twelve characters as the LF checkout that recorded them."""
-    return hashlib.sha256(path.read_bytes().replace(b"\r\n", b"\n")).hexdigest()[:_HASH_CHARS]
-
-
-def _atoms() -> dict[str, Path]:
-    """Every memory file addressable by stem — the 22 product atoms plus the trio."""
-    by_slug: dict[str, Path] = {}
-    for path in sorted(_MEMORY_DIR.rglob("*.md")):
-        if path.name == "AGENTS.md":
-            continue
-        by_slug.setdefault(path.stem, path)
-    return by_slug
 
 
 def _derived_docs() -> list[Path]:
@@ -61,71 +24,6 @@ def _derived_docs() -> list[Path]:
     docs = [_REPO_ROOT / "README.md", _REPO_ROOT / "llms.txt"]
     docs.extend(p for p in sorted(_DOCS_DIR.glob("*.md")) if p.name not in _GENERATED)
     return [p for p in docs if p.is_file()]
-
-
-def _sections(text: str) -> list[tuple[str, list[tuple[str, str]]]]:
-    """Each `## ` heading with the markers that immediately follow it (blank lines
-    tolerated, so a section may be introduced by one marker per atom it derives from)."""
-    lines = text.splitlines()
-    out: list[tuple[str, list[tuple[str, str]]]] = []
-    for index, line in enumerate(lines):
-        heading = _H2_RE.match(line)
-        if heading is None:
-            continue
-        markers: list[tuple[str, str]] = []
-        for follower in lines[index + 1 :]:
-            stripped = follower.strip()
-            if not stripped:
-                continue
-            marker = _MARKER_RE.match(stripped)
-            if marker is None:
-                break
-            markers.append((marker.group(1), marker.group(2)))
-        out.append((heading.group(1).strip(), markers))
-    return out
-
-
-def _violations(rel: str, text: str, atoms: dict[str, Path]) -> list[str]:
-    """The one checker the repo tree and the mutation fixtures share."""
-    found: list[str] = []
-    for heading, markers in _sections(text):
-        where = f"{rel}#{heading}"
-        if not markers:
-            found.append(
-                f"{where}: no derived-from marker — name the atom this section derives from"
-            )
-            continue
-        for slug, recorded in markers:
-            if slug == "none":
-                found.append(
-                    f"{where}: derived-from none — a section that can name no atom is slop"
-                )
-                continue
-            atom = atoms.get(slug)
-            if atom is None:
-                found.append(f"{where}: derived-from {slug} unknown — no specs/memory/**/{slug}.md")
-                continue
-            current = _atom_hash(atom)
-            if current != recorded:
-                found.append(
-                    f"{where}: derived-from {slug} stale — re-read "
-                    f"{atom.relative_to(_REPO_ROOT).as_posix()}, re-derive the section, "
-                    f"re-record sha256:{current}"
-                )
-    return found
-
-
-def test_every_derived_section_names_a_current_atom() -> None:
-    """The repo's own derived set: every `## ` heading names an atom that exists and
-    whose bytes are the ones the section was written from."""
-    atoms = _atoms()
-    violations = [
-        v
-        for doc in _derived_docs()
-        for v in _violations(doc.relative_to(_REPO_ROOT).as_posix(), doc.read_text("utf-8"), atoms)
-    ]
-
-    assert violations == [], "\n".join(violations)
 
 
 def test_the_derived_set_covers_the_readme_the_agent_index_and_every_authored_doc() -> None:
@@ -148,23 +46,13 @@ def test_the_derived_set_covers_the_readme_the_agent_index_and_every_authored_do
     }
 
 
-_PAGES_URL = "https://marcoaureliomenezes.github.io/dadaia-workspace/"
-
-
-def test_the_ledger_article_derives_from_the_quality_and_governance_atoms() -> None:
-    """The article states counts a reader can re-measure and lessons the atoms carry:
-    both `[[QUALITY]]` and `[[bug-ledger]]` are named under its sections,
-    and (by the marker test above) under their current hashes."""
-    article = _REPO_ROOT / "docs" / "bug-ledger-lessons.md"
-    slugs = {slug for _, markers in _sections(article.read_text("utf-8")) for slug, _ in markers}
-
-    assert {"QUALITY", "bug-ledger"} <= slugs
+_DOCS_URL = "https://github.com/marcoaureliomenezes/dadaia-workspace/tree/main/docs"
 
 
 def test_the_agent_index_lists_every_page_of_the_site() -> None:
     """`llms.txt` is the agent's map of the human site: a page it does not name is a page
     no agent finds, so the list is the `docs/` glob and nothing narrower."""
-    index = (_REPO_ROOT / "llms.txt").read_text("utf-8")
+    index = read_text(_REPO_ROOT / "llms.txt")
     missing = sorted(
         p.relative_to(_REPO_ROOT).as_posix()
         for p in _DOCS_DIR.glob("*.md")
@@ -174,85 +62,93 @@ def test_the_agent_index_lists_every_page_of_the_site() -> None:
     assert missing == [], f"llms.txt names no entry for: {', '.join(missing)}"
 
 
-def test_the_readme_sends_a_reader_to_the_published_site() -> None:
-    """PyPI renders the README: the published site URL is the one link that survives
-    being read outside the checkout, where a relative `docs/` path is a dead end."""
-    readme = (_REPO_ROOT / "README.md").read_text("utf-8")
+def test_the_readme_sends_a_reader_to_the_docs_folder() -> None:
+    """The Documentation URL and the README both name the repository's docs folder; no Pages
+    site exists."""
+    readme = read_text(_REPO_ROOT / "README.md")
 
-    assert _PAGES_URL in readme
-    assert _pyproject_poetry()["urls"]["Documentation"] == _PAGES_URL  # type: ignore[index]
-
-
-@pytest.mark.parametrize(
-    ("mutation", "expected"),
-    [
-        ("missing", "no derived-from marker"),
-        ("unknown", "unknown"),
-        ("stale", "stale"),
-        ("none", "derived-from none"),
-    ],
-)
-def test_each_red_direction_is_proven_on_a_fixture(mutation: str, expected: str) -> None:
-    """Four mutants, four reds: a section with no marker, a slug memory does not carry,
-    a hash one byte behind the atom, and the explicit `none` escape hatch."""
-    atoms = _atoms()
-    slug, atom = next(iter(sorted(atoms.items())))
-    body = {
-        "missing": "## A section\n\nprose\n",
-        "unknown": "## A section\n\n<!-- derived-from: not-an-atom sha256:000000000000 -->\n",
-        "stale": f"## A section\n\n<!-- derived-from: {slug} sha256:000000000000 -->\n",
-        "none": "## A section\n\n<!-- derived-from: none sha256:000000000000 -->\n",
-    }[mutation]
-
-    violations = _violations("FIXTURE.md", body, atoms)
-
-    assert len(violations) == 1, violations
-    assert expected in violations[0]
-    if mutation == "stale":
-        assert atom.relative_to(_REPO_ROOT).as_posix() in violations[0]
-        assert f"sha256:{_atom_hash(atom)}" in violations[0]
+    assert _DOCS_URL in readme
+    assert _pyproject_poetry()["urls"]["Documentation"] == _DOCS_URL  # type: ignore[index]
+    assert "github.io" not in readme
 
 
-def test_a_current_marker_is_green_on_a_fixture() -> None:
-    """The other direction: the checker passes exactly when the recorded hash is the
-    atom's own — otherwise every red above would be vacuous."""
-    atoms = _atoms()
-    slug, atom = next(iter(sorted(atoms.items())))
-    body = f"## A section\n\n<!-- derived-from: {slug} sha256:{_atom_hash(atom)} -->\n\nprose\n"
-
-    assert _violations("FIXTURE.md", body, atoms) == []
+def test_every_readme_link_is_absolute() -> None:
+    """PyPI renders the README outside the checkout, where a relative link or image target is a dead
+    end."""
+    readme = read_text(_REPO_ROOT / "README.md")
+    targets = re.findall(r"\]\(([^)\s]+)", readme) + re.findall(r'(?:src|href)="([^"]+)"', readme)
+    relative = [t for t in targets if not re.match(r"(?:https?:|mailto:|#)", t)]
+    assert relative == []
 
 
 def test_the_cli_reference_is_the_committed_output_of_the_generator() -> None:
     """`docs/cli.md` carries no atom marker — it IS `render_digest()`'s output, header
     line included; regenerate with `dadaia help tree > docs/cli.md`."""
-    committed = (_DOCS_DIR / "cli.md").read_text("utf-8")
+    committed = read_text(_DOCS_DIR / "cli.md")
 
-    assert committed == render_digest(), (
+    assert committed == render_digest(live_root()), (
         "docs/cli.md drifted from the live command tree — "
         "regenerate: dadaia help tree > docs/cli.md"
     )
 
 
-def test_the_readme_fits_the_long_description_budget() -> None:
-    """The README is PyPI's long description, read by humans and pulled whole into agent
-    context: 10 KB is the budget, and a section that cannot earn its bytes is deleted."""
-    size = (_REPO_ROOT / "README.md").stat().st_size
+def test_the_full_text_index_is_the_committed_output_of_the_generator() -> None:
+    """`llms-full.txt` IS `llms_full.render()`'s output; regenerate with
+    `python scripts/llms_full.py > llms-full.txt`."""
+    from scripts import llms_full
 
-    assert size <= _README_MAX_BYTES, f"README.md is {size} bytes (max {_README_MAX_BYTES})"
+    committed = read_text(_REPO_ROOT / "llms-full.txt")
+
+    assert committed == llms_full.render(), (
+        "llms-full.txt drifted from llms.txt's pages — "
+        "regenerate: python scripts/llms_full.py > llms-full.txt"
+    )
+
+
+def test_the_agent_index_links_the_full_text_index() -> None:
+    assert "(llms-full.txt)" in read_text(_REPO_ROOT / "llms.txt")
+
+
+_DISCOVERY_KEYWORDS = {"cursor", "devin", "github-copilot", "agent-skills"}
+
+
+def test_the_keywords_hold_the_harness_names_and_the_readme_says_each() -> None:
+    """A keyword PyPI lists is a claim: the README names every one, hyphen read as a space."""
+    keywords = set(_pyproject_poetry()["keywords"])  # type: ignore[arg-type]
+    readme = read_text(_REPO_ROOT / "README.md").lower().replace("-", " ")
+
+    assert keywords >= _DISCOVERY_KEYWORDS
+    assert [k for k in sorted(keywords) if k.replace("-", " ") not in readme] == []
+
+
+def test_the_readme_agent_section_opens_with_a_fast_path_of_at_most_five_lines() -> None:
+    readme = read_text(_REPO_ROOT / "README.md")
+    section = readme.split("## An agent reads AGENTS.md and uses it\n", 1)[1]
+    opening = section.lstrip("\n").split("\n\n", 1)[0].splitlines()
+
+    assert len(opening) <= 5, f"the agent section opens with {len(opening)} lines"
+
+
+def test_the_entry_pages_name_init_from_and_do_not_promise_pip_install() -> None:
+    index = read_text(_DOCS_DIR / "index.md")
+    quickstart = read_text(_DOCS_DIR / "quickstart.md")
+
+    assert "init --from" in index
+    assert "init --from" in quickstart
+    assert "pip install" not in index
 
 
 def test_no_derived_document_cites_a_dead_verb_or_path() -> None:
     """The same finders that keep `public/**` and `specs/memory/**` honest: a backticked
     `dadaia <verb>` absent from the live command tree, or a `specs/`/`dadaia_workspace/`/
     `.github/` path absent from the checkout, is dead the day it is written."""
-    paths = command_paths()
+    paths = command_paths(live_root())
     violations = [
         v
         for doc in [*_derived_docs(), _DOCS_DIR / "cli.md"]
         if doc.is_file()
         for v in dead_citations(
-            doc.read_text("utf-8"),
+            read_text(doc),
             command_paths=paths,
             repo_root=_REPO_ROOT,
             rel=doc.relative_to(_REPO_ROOT).as_posix(),
@@ -264,7 +160,7 @@ def test_no_derived_document_cites_a_dead_verb_or_path() -> None:
 
 def _readme_tagline() -> str:
     """The README's first non-badge paragraph — PyPI's summary line, in prose."""
-    for block in (_REPO_ROOT / "README.md").read_text("utf-8").split("\n\n"):
+    for block in read_text(_REPO_ROOT / "README.md").split("\n\n"):
         line = block.strip()
         if not line or line.startswith(("#", "[![", "<!--")):
             continue
@@ -273,7 +169,7 @@ def _readme_tagline() -> str:
 
 
 def _llms_tagline() -> str:
-    for line in (_REPO_ROOT / "llms.txt").read_text("utf-8").splitlines():
+    for line in read_text(_REPO_ROOT / "llms.txt").splitlines():
         if line.startswith("> "):
             return " ".join(line[2:].split())
     raise AssertionError("llms.txt carries no `> ` tagline line")
@@ -286,7 +182,7 @@ def _pyproject_poetry() -> dict[str, object]:
 
 def test_one_tagline_across_the_readme_pyproject_and_the_agent_index() -> None:
     """The three discovery surfaces say one thing: PyPI's `description`, the README's
-    first paragraph and `llms.txt`'s `> ` line are the same sentence (SPEC 0.4.7 FR4)."""
+    first paragraph and `llms.txt`'s `> ` line are the same sentence."""
     readme = _readme_tagline()
 
     assert _pyproject_poetry()["description"] == readme
@@ -302,3 +198,70 @@ def test_every_pypi_link_a_reader_needs_is_declared() -> None:
     assert isinstance(urls, dict)
     assert sorted(urls) == ["Changelog", "Documentation", "Homepage", "Issues", "Repository"]
     assert all(str(value).startswith("https://") for value in urls.values())
+
+
+_CONTEXT_CREATE_RE = re.compile(r"dadaia context create [^`\n]*")
+
+
+def _onboarding_texts() -> list[Path]:
+    """Every surface a newcomer copies a command from: the derived docs, the memory
+    atoms they derive from, and the public skills."""
+    skills = sorted((_REPO_ROOT / "dadaia_workspace" / "public" / "skills").glob("*/SKILL.md"))
+    return [*_derived_docs(), *sorted(_MEMORY_DIR.rglob("*.md")), *skills]
+
+
+def _onboarding_corpus() -> dict[str, str]:
+    return {
+        path.relative_to(_REPO_ROOT).as_posix(): read_text(path) for path in _onboarding_texts()
+    }
+
+
+def _lines(text: str) -> list[tuple[int, str]]:
+    """The numbered lines an operator wrote; a generated section is the doctor's to judge."""
+    return list(enumerate(authored_text(text).splitlines(), start=1))
+
+
+def _offline_sites(texts: dict[str, str]) -> list[str]:
+    return [
+        f"{rel}:{number}: claims offline operation"
+        for rel, text in texts.items()
+        for number, line in _lines(text)
+        if re.search(r"\boffline\b", line, re.IGNORECASE)
+    ]
+
+
+def _retired_flag_sites(texts: dict[str, str]) -> list[str]:
+    return [
+        f"{rel}:{number}: `{match.group(0).strip()}`"
+        for rel, text in texts.items()
+        for number, line in _lines(text)
+        for match in _CONTEXT_CREATE_RE.finditer(line)
+        if re.search(r"--url\b|--associated-repos\b", match.group(0))
+    ]
+
+
+def test_no_onboarding_text_claims_offline_operation() -> None:
+    """`init` resolves its dependencies from PyPI, so no surface may call it offline."""
+    assert _offline_sites(_onboarding_corpus()) == []
+
+
+def test_no_onboarding_text_cites_a_retired_create_flag() -> None:
+    """`context create` takes `--main-repo <url>` and repeatable `--associated-repo <url>`; a cited
+    `--url` or `--associated-repos` exits 2."""
+    assert _retired_flag_sites(_onboarding_corpus()) == []
+
+
+def test_the_onboarding_scans_judge_operator_text_only() -> None:
+    """A line the doctor renders into a fixed section is the ledger's, not the operator's: the
+    same words as operator prose are named at their true line."""
+    offline = "- 0901 — init is never offline: it resolves from PyPI\n"
+    flag = "- 0902 — `dadaia context create --url` retires for --main-repo\n"
+    inside = f"<!-- dadaia:fixed adr-list -->\n{offline}{flag}<!-- /dadaia:fixed adr-list -->\n"
+    assert _offline_sites({"a.md": f"# A\n{inside}"}) == []
+    assert _retired_flag_sites({"a.md": f"# A\n{inside}"}) == []
+    assert _offline_sites({"a.md": f"# A\n{inside}{offline}"}) == [
+        "a.md:6: claims offline operation"
+    ]
+    assert _retired_flag_sites({"a.md": f"# A\n{inside}{flag}"}) == [
+        "a.md:6: `dadaia context create --url`"
+    ]

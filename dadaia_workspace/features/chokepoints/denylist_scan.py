@@ -1,35 +1,39 @@
-"""Pure push-range denylist matcher (SPEC v0.9.0 FR3/FR5/FR6; SPEC v0.11.0 FR1).
+"""Pure push-range denylist matcher.
 
 Zero I/O, exactly like the rest of ``features/chokepoints/**``: this module NEVER
 imports ``infrastructure`` and NEVER spawns a subprocess. Term sources — the operator
-denylist, the packaged baseline patterns, and the foreign repo-slug set — are loaded by
-the CLI (``cli/commands/ci.py``) via ``infrastructure.privacy_check``'s public
+denylist and the packaged baseline patterns, which carry no repo or context name — are
+loaded by the CLI (``cli/commands/ci.py``) via ``infrastructure.privacy_check``'s public
 accessors and passed in here as plain data; :class:`BaselinePatternLike` is a
 structural Protocol so this module can accept those instances without importing the
 concrete type that produces them (features-no-infrastructure import-linter contract).
 
 Masking (``first…last``) happens INSIDE this module so an unmasked term never leaves it
-(FR5, CWE-532) — :attr:`Hit.masked_term` is the only term-shaped value this module ever
+(CWE-532): :attr:`Hit.masked_term` is the only term-shaped value this module ever
 returns; the source blob's raw text is never echoed anywhere.
 
-**v0.11.0 FR1 amnesty (supersedes the v0.9.0-era "a matched term always produces a
-hit" absolute).** A candidate is now suppressed IFF the exact matched VALUE occurs
-case-insensitively in the SAME path's published prior text, carried on
-``ScannedObject.prior_text`` — never derived from a list, dict, set or constant of
-sanctioned terms. Grill ADR #3b's invariant survives in its narrower, still-load-bearing
-form: **no amnesty/allowlist LIST exists anywhere in this module** (A4.1's source-scan
-contract test pins exactly that, unmodified) — the amnesty derives entirely from
-published git state the adapter resolves, never from a static exception list.
+A candidate is suppressed IFF the exact matched value occurs case-insensitively in the
+same path's published prior text, carried on ``ScannedObject.prior_text``. It is never
+derived from a list, dict, set or constant of sanctioned terms: the amnesty derives
+entirely from published git state the adapter resolves. No amnesty or allowlist list
+exists anywhere in this module.
 """
 
 from __future__ import annotations
 
 import re
 from collections.abc import Iterable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Protocol
 
 from dadaia_workspace.core.models.git_scan import ScannedObject
+from dadaia_workspace.core.redaction import (
+    UNSAFE_FORMAT_CHARS_RE,
+    fresh_matches,
+    mask,
+    published_matches,
+)
+from dadaia_workspace.core.skill_owner import load_owner
 
 __all__ = [
     "BaselinePatternLike",
@@ -37,13 +41,8 @@ __all__ = [
     "OversizedNote",
     "PathMasker",
     "ScanOutcome",
-    "compile_slug_patterns",
-    "operator_terms_match",
     "scan_objects",
 ]
-
-_SOURCE_OPERATOR = "operator denylist"
-_SOURCE_SLUG = "foreign repo slug"
 
 
 class BaselinePatternLike(Protocol):
@@ -69,10 +68,13 @@ class BaselinePatternLike(Protocol):
     @property
     def exclude(self) -> re.Pattern[str] | None: ...
 
+    @property
+    def skip_paths(self) -> re.Pattern[str] | None: ...
+
 
 @dataclass(frozen=True)
 class Hit:
-    """One offending blob's first denylist match (SPEC FR5 — one line per object)."""
+    """One offending blob's first denylist match."""
 
     path: str
     line: int
@@ -83,7 +85,7 @@ class Hit:
 
 @dataclass(frozen=True)
 class OversizedNote:
-    """One oversized blob's honest partial-coverage report (SPEC v0.11.0 FR4).
+    """One oversized blob's partial-coverage report.
 
     Distinct from the undecodable-binary skip count: an oversized blob whose scanned
     prefix decoded fine (``ScannedObject.decodable`` True) is genuinely partially
@@ -105,158 +107,23 @@ class ScanOutcome:
     oversized_notes: tuple[OversizedNote, ...] = ()
 
 
-def _mask(term: str) -> str:
-    """``first…last`` masking (FR5) — never returns the term unmasked."""
-    if not term:
-        return term
-    return f"{term[0]}…{term[-1]}"
-
-
-def compile_slug_patterns(slugs: Iterable[str]) -> list[tuple[str, re.Pattern[str]]]:
-    """Whole-token regex per slug (T-045-35) — a slug is a hit only as a whole token,
-    never a mere substring glued onto a longer hyphenated/dotted identifier. Python's
-    ``\\b`` treats ``-`` and ``.`` as non-word delimiters, so a plain ``\\bslug\\b``
-    anchor (the pre-fix shape) matches a hyphenated slug INSIDE ``<slug>-anything`` and
-    ``<slug>.ext`` — every ``repos/`` slug is itself hyphenated, so this flagged the
-    library's own tracked asset basenames and ledger bug ids as private-name
-    publications (architect ruling:
-    ``specs/releases/v0.4.5/reviews/T-045-35-foreign-slug-ruling.md``). The lookaround
-    bounds the match to token edges instead: not preceded by a word char or ``-``, not
-    preceded by a dotted continuation (``word.``), not followed by a word char or
-    ``-``, not followed by a dotted continuation (``.word``). A bare slug in prose or a
-    slug bounded by ``/`` still matches; ``<slug>-x``, ``x-<slug>``, ``<slug>.ext`` and
-    ``pkg.<slug>`` do not — those are other identifiers. Case-insensitive
-    (``re.IGNORECASE``), matching the operator-term layer's case-insensitive substring
-    match — a foreign slug referenced with different casing (``MyClient`` vs
-    ``myclient``) is still caught (code-reviewer LOW finding).
-
-    Public (SPEC v0.4.2 FR4/GRILL D3): the SAME compiled matcher the gate-side path
-    masker (``features.chokepoints.service._PathMasker``) consumes for
-    ``_segment_is_offending`` — parity with the detector becomes structural rather than
-    a second, narrower predicate promised to stay in sync by convention.
-    """
-    return [
-        (
-            slug,
-            re.compile(
-                r"(?<![\w-])(?<!\w\.)" + re.escape(slug) + r"(?![\w-])(?!\.\w)",
-                re.IGNORECASE,
-            ),
-        )
-        for slug in slugs
-        if slug
-    ]
-
-
-def _term_occurs(term: str, lowered_text: str) -> bool:
-    """FR3(1)'s definition of "occurs": a literal, case-insensitive substring — no
-    word-boundary restriction. The ONE predicate both :func:`_first_match`'s per-line
-    loop and the public :func:`operator_terms_match` route through."""
-    return bool(term) and term.lower() in lowered_text
-
-
-def operator_terms_match(term_values: Iterable[str], text: str) -> bool:
-    """True iff any of *term_values* occurs in *text* (FR3(1) semantics, case-
-    insensitive substring).
-
-    Public (SPEC v0.4.2 FR4/GRILL D3): the gate-side path masker's operator-term check
-    routes through this SAME predicate — never a second, case-sensitive, hyphen-as-
-    word-char copy (the pre-v0.4.2 defect, GRILL P8: ``core.redaction.compile_candidates``
-    never set ``re.IGNORECASE`` and treated ``-`` as a word character, so it silently
-    under-matched relative to the detector's own layers).
-    """
-    lowered = text.lower()
-    return any(_term_occurs(term, lowered) for term in term_values)
-
-
 def _first_match(
     obj: ScannedObject,
     terms: list[tuple[str, str]],
     patterns: list[BaselinePatternLike],
-    slug_patterns: list[tuple[str, re.Pattern[str]]],
 ) -> Hit | None:
-    """The earliest-line match across all three term sources, or ``None``.
+    """The earliest-line match of :func:`~dadaia_workspace.core.redaction.privacy_matches`
+    (the one matcher: operator terms, then baseline patterns), or ``None``.
 
-    Short-circuits at the first line that produces any candidate: lines are already
-    iterated in ascending order, so that line's own first candidate (insertion order —
-    operator terms, then baseline patterns, then foreign slugs) is the answer. Neither
-    the rest of the blob nor a global sort is needed to find it (code-reviewer LOW
-    performance finding: the previous version paid the full-blob cost plus an
-    O(n log n) sort for a result already known at the first hit).
-
-    SPEC v0.11.0 FR1 amnesty: a candidate is suppressed IFF the SAME layer's matcher,
-    RE-RUN against ``obj.prior_text`` (the SAME path's published prior content; ``None``
-    -> no base, nothing is ever suppressed, ADR D7), produces a matched occurrence whose
-    value EQUALS (case-normalized) the current matched value. Keying on the value (not
-    the source) is what stops the amnesty from becoming a smuggling path: a prior email
-    address must NOT amnesty a brand-new one of the same baseline pattern id (grill
-    R1/A1.3). Re-running the layer's own anchored matcher — rather than testing raw
-    substring containment — is what stops a DIFFERENT, longer prior-published home-path
-    value from amnestying an unrelated new value that merely happens to be one of its
-    substrings, or a prior superstring like ``acmecorp`` from amnestying a new
-    standalone ``acme`` that was never actually published at a word boundary
-    (code-reviewer MEDIUM finding, v0.11.0 pre-PR review). The matched value is used
-    for this predicate and then discarded — only ``masked_term`` leaves this module
-    (A5.2 unaffected). Suppression is per-CANDIDATE, so a line whose every candidate is
-    suppressed simply continues to the next line — the short-circuit property above is
-    unchanged."""
-    prior_text = obj.prior_text
-    prior_lower = prior_text.lower() if prior_text is not None else None
-
-    def _term_suppressed(term: str) -> bool:
-        """Operator-term layer: FR3(1) defines "occurs" as a literal, case-insensitive
-        substring — the SAME notion detection itself uses (``term.lower() in
-        lowered``), so re-using it against the prior text is not an anchoring mismatch;
-        it is the layer's own defined semantics, applied identically on both sides."""
-        return prior_lower is not None and term.lower() in prior_lower
-
-    def _pattern_suppressed(value: str, pattern: BaselinePatternLike) -> bool:
-        """Baseline-pattern layer: suppressed only when the SAME anchored regex,
-        re-run against the prior text, matches an occurrence whose value equals
-        *value* case-insensitively — never a raw substring test."""
-        if prior_text is None:
-            return False
-        value_lower = value.lower()
-        return any(
-            match.group(0).lower() == value_lower for match in pattern.regex.finditer(prior_text)
-        )
-
-    def _slug_suppressed(compiled: re.Pattern[str]) -> bool:
-        """Foreign-slug layer: *compiled* is ``\\bslug\\b`` (case-insensitive) — a
-        match against the prior text is already an anchored, exact-value occurrence of
-        this SAME slug (the pattern IS the value), so a boolean search doubles as the
-        value-equality check."""
-        return prior_text is not None and compiled.search(prior_text) is not None
-
-    for lineno, line_text in enumerate(obj.text.splitlines(), start=1):
-        line_candidates: list[Hit] = []
-        lowered = line_text.lower()
-        for term, _reason in terms:
-            if _term_occurs(term, lowered) and not _term_suppressed(term):
-                line_candidates.append(
-                    Hit(obj.path, lineno, obj.sha, _mask(term), _SOURCE_OPERATOR)
-                )
-        for pattern in patterns:
-            for match in pattern.regex.finditer(line_text):
-                value = match.group(0)
-                if pattern.exclude is not None and pattern.exclude.search(value):
-                    continue
-                if _pattern_suppressed(value, pattern):
-                    continue
-                line_candidates.append(
-                    Hit(
-                        obj.path,
-                        lineno,
-                        obj.sha,
-                        _mask(value),
-                        f"baseline pattern '{pattern.id}'",
-                    )
-                )
-        for slug, compiled in slug_patterns:
-            if compiled.search(line_text) and not _slug_suppressed(compiled):
-                line_candidates.append(Hit(obj.path, lineno, obj.sha, _mask(slug), _SOURCE_SLUG))
-        if line_candidates:
-            return line_candidates[0]
+    A candidate is suppressed IFF the SAME matcher, re-run over ``obj.prior_text`` (the
+    same path's published content; ``None`` suppresses nothing), yields the same value
+    (case-normalized) from the same source; keyed on the value, so a prior email never
+    amnesties a brand-new one. Only ``masked_term`` leaves this module."""
+    published = published_matches(obj.prior_text, terms, patterns)
+    # A control character never splits a term out of reach: stripped first.
+    for lineno, line_text in enumerate(UNSAFE_FORMAT_CHARS_RE.sub("", obj.text).splitlines(), 1):
+        for value, source, _reason in fresh_matches(line_text, published, terms, patterns):
+            return Hit(obj.path, lineno, obj.sha, mask(value), source)
     return None
 
 
@@ -264,34 +131,32 @@ def scan_objects(
     objects: Iterable[ScannedObject],
     terms: Iterable[tuple[str, str]],
     patterns: Iterable[BaselinePatternLike],
-    slugs: Iterable[str],
 ) -> ScanOutcome:
-    """Match *objects* against the three FR3 term sources.
+    """Match *objects* against the term sources.
 
     * ``terms`` — operator denylist entries (``(term, reason)``), case-insensitive
       substring match.
     * ``patterns`` — compiled baseline structural patterns, ``exclude_regex`` honored.
-    * ``slugs`` — foreign repo slugs (the pushed repo's own slug is expected to already
-      be excluded by the caller), word-boundary matched.
 
-    Undecodable (binary) objects are skipped and counted, never matched (FR6 row 3).
-    This class now ALSO covers an oversized blob whose scanned prefix failed to decode
-    (SPEC v0.11.0 A4.6) — there is nothing honest to report about a scan that never
-    ran, so it falls back to the SAME binary skip class, never a separate note. An
-    oversized blob whose scanned prefix DID decode is genuinely, partially scanned like
-    any other decodable object (v0.11.0 A4.1 — a match inside the scanned prefix still
-    produces a hit) AND additionally contributes an :class:`OversizedNote` reporting
-    the partial coverage, independent of whether a hit was found (A4.4). At most one
-    :class:`Hit` is returned per object — its first match by ascending line number —
-    matching FR5's one-line-per-offending-object refusal shape.
+    Undecodable (binary) objects are skipped and counted, never matched. An oversized
+    blob whose scanned prefix failed to decode falls in the same skip class. An
+    oversized blob whose prefix decoded is scanned like any other decodable object, and
+    also yields an :class:`OversizedNote` reporting the partial coverage, whether or not
+    a hit was found. At most one :class:`Hit` is returned per object: its first match by
+    ascending line number.
     """
     term_list = list(terms)
     pattern_list = list(patterns)
-    slug_patterns = compile_slug_patterns(slugs)
     hits: list[Hit] = []
     oversized_notes: list[OversizedNote] = []
     skipped = 0
     for obj in objects:
+        # A structural shape in the path refuses (a key file by its suffix, binary
+        # or not), line 0; an operator term there is masked by PathMasker, not refused.
+        path_hit = _first_match(replace(obj, text=obj.path, prior_text=None), [], pattern_list)
+        if path_hit is not None:
+            hits.append(replace(path_hit, line=0))
+            continue
         if not obj.decodable:
             skipped += 1
             continue
@@ -301,7 +166,10 @@ def scan_objects(
                     path=obj.path, size_bytes=obj.size_bytes, scanned_bytes=obj.scanned_bytes
                 )
             )
-        hit = _first_match(obj, term_list, pattern_list, slug_patterns)
+        content = load_owner("dd-bug-resolution", "_ledger").scanned_patterns(
+            pattern_list, obj.path
+        )
+        hit = _first_match(obj, term_list, content)
         if hit is not None:
             hits.append(hit)
     return ScanOutcome(
@@ -311,89 +179,36 @@ def scan_objects(
     )
 
 
-#: v0.11.0 FR6(b)/entry #23 resolution A — the path-segment masking placeholder shape.
-#: Deliberately distinct from the CLI's ``[REDACTED-CONTEXT-n]`` (``cli/redact.py``):
-#: this is a different channel (a blob PATH segment in a gate refusal/note, not a Spec
-#: Context name in a CLI render), even though both are built on the SAME
-#: ``core/redaction.py`` primitive.
+#: A masked blob-path segment in a gate refusal or note; distinct from the
+#: CLI's ``[REDACTED-CONTEXT-n]`` (``cli/redact.py``), a different channel.
 _PATH_PLACEHOLDER_FMT = "[REDACTED-PATH-{n}]"
 
 
 class PathMasker:
-    """v0.11.0 FR6(b) — masks only the blob-path segments that match one of the THREE
-    FR3 term sources ``push_gate.push_gate_decision`` receives (operator denylist,
-    baseline structural patterns, foreign repo slugs) — entry #23 resolution A (ADR
-    D1/D1-a). Every operator-facing string the gate emits that names a blob path routes
-    through :meth:`mask_path` before rendering (FR6's class rule, not a single call
-    site) — today that is the denylist refusal and the FR4 oversized-blob note.
-
-    v0.5.1 K7 ("one masking predicate"): this class used to be a private copy
-    (``features.chokepoints.service._PathMasker``) that merely CALLED this module's own
-    :func:`operator_terms_match`/:func:`compile_slug_patterns`. Moved here — the module
-    that already owns those two predicates — so there is exactly ONE masking
-    implementation, not a detector module plus a second class elsewhere that reaches
-    into it.
-
-    Construct ONE instance per push-gate invocation and reuse it across every rendered
-    string, so a repeated offending segment gets the SAME stable, first-appearance
-    ordinal placeholder.
-
-    SPEC v0.4.2 FR4/GRILL D3: the offending-segment TEST consumes the detector's OWN
-    compiled matchers (:func:`operator_terms_match` + :func:`compile_slug_patterns` —
-    the SAME predicates :func:`_first_match` uses, case-insensitive, whole-token
-    boundaries) instead of a second, narrower predicate built from
-    ``core.redaction.compile_candidates`` (case-SENSITIVE, and treats ``-`` as a word
-    character rather than a boundary — GRILL P8: a path segment like ``Acme-Corp`` that
-    the detector already flags for the lowercase term ``acme`` used to render
-    UNMASKED). Case-insensitivity and token-boundary treatment are identical by
-    construction: detector-hit implies masker-hit.
-
-    Masking happens at PATH-SEGMENT granularity: the path is split on ``/``, each
-    segment is tested, and only a matching segment is replaced wholesale — the line
-    number, the short blob sha, and every non-matching segment stay untouched, so the
-    operator can still locate the offending file (satisfiable diagnostics,
-    ``quality-assurance.md``). Where no segment matches, the path is returned
-    byte-identical to the input (A6.2).
-    """
+    """Masks the blob-path segments :func:`_first_match` flags; every gate string naming a
+    blob path routes through :meth:`mask_path`.
+    One instance per push-gate run: a repeated segment keeps its first-appearance
+    ordinal. A path with no offending segment is returned byte-identical."""
 
     def __init__(
         self,
         denylist_terms: Iterable[tuple[str, str]],
         baseline_patterns: Iterable[BaselinePatternLike],
-        foreign_slugs: Iterable[str],
     ) -> None:
-        self._term_values = [term for term, _reason in denylist_terms if term]
-        self._slug_patterns = compile_slug_patterns(foreign_slugs)
-        self._pattern_list = list(baseline_patterns)
+        self._terms = list(denylist_terms)
+        self._patterns = list(baseline_patterns)
         self._map: dict[str, str] = {}
 
-    def _segment_is_offending(self, segment: str) -> bool:
-        if not segment:
-            return False
-        if operator_terms_match(self._term_values, segment):
-            return True
-        if any(compiled.search(segment) for _slug, compiled in self._slug_patterns):
-            return True
-        for pattern in self._pattern_list:
-            for match in pattern.regex.finditer(segment):
-                value = match.group(0)
-                if pattern.exclude is not None and pattern.exclude.search(value):
-                    continue
-                return True
-        return False
-
     def mask_path(self, path: str) -> str:
-        """Return *path* with every offending segment replaced; byte-identical to
-        *path* when no segment matches any of the three term sources (A6.2)."""
-        segments = path.split("/")
+        """Return *path* with every offending segment replaced by its placeholder."""
         masked_segments: list[str] = []
-        for segment in segments:
-            if not self._segment_is_offending(segment):
+        for segment in path.split("/"):
+            probe = ScannedObject(path=segment, sha="", text=segment, decodable=True)
+            if _first_match(probe, self._terms, self._patterns) is None:
                 masked_segments.append(segment)
                 continue
-            placeholder = self._map.get(segment)
-            if placeholder is None:
-                placeholder = _PATH_PLACEHOLDER_FMT.format(n=len(self._map) + 1)
-                self._map[segment] = placeholder
+            placeholder = self._map.setdefault(
+                segment, _PATH_PLACEHOLDER_FMT.format(n=len(self._map) + 1)
+            )
             masked_segments.append(placeholder)
         return "/".join(masked_segments)

@@ -1,0 +1,196 @@
+"""A law or docstring
+sentence that restates a rule states what the code does, or cites the code instead.
+Size: SMALL — text reads, one AST walk, in-process gate calls; one pre-gate subprocess, as
+stdin is the only way an unreadable payload reaches the hook.
+"""
+
+from __future__ import annotations
+
+import ast
+import configparser
+import re
+import sys
+from pathlib import Path, PurePath
+from types import ModuleType
+
+import pytest
+
+from dadaia_workspace.core import context_registry
+from dadaia_workspace.features.spec_context import gate_policy
+from dadaia_workspace.hooks import pre_gate, root_whitelist, sdd_gate
+from dadaia_workspace.infrastructure.runtime_transforms import hook_wrappers
+from tests.helpers.oslib import read_text, run, write_text
+
+_REPO = Path(__file__).resolve().parents[3]
+_PKG = _REPO / "dadaia_workspace"
+_MAP = _PKG / "public" / "data" / "AGENTS.md"
+
+
+def _fail_open_rows(
+    law: dict[str, str], tmp: Path, monkeypatch: pytest.MonkeyPatch
+) -> dict[str, bool]:
+    """One row per fail-open path, keyed by the evidence the law names, each read from code."""
+    (tmp / ".dadaia/states").mkdir(parents=True)
+    write_text(tmp / ".dadaia/states/spec_contexts.json", "{trunc")
+    gate = [sys.executable, "-m", "dadaia_workspace.hooks.pre_gate"]
+    unreadable = run(gate, input="not json", cwd=tmp)  # fmt: skip
+
+    def raises(_: dict[str, object]) -> str:
+        raise RuntimeError
+
+    monkeypatch.setattr(pre_gate, "_POLICIES", (raises,))
+    worktree = {"root": PurePath("/ws"), "zone": "worktree", "repo": "r", "owner": "r"}
+    return {
+        "TOOL_TIMEOUT_S": f"past {hook_wrappers.TOOL_TIMEOUT_S} s" in law["TOOL_TIMEOUT_S"],
+        "gate_policy": gate_policy.evaluate("worktrees/r/w/x.py", has_id=False, **worktree)[0]
+        == gate_policy.Decision.ALLOW
+        != gate_policy.evaluate("worktrees/r/w/x.py", **worktree)[0],
+        "`pre_gate`": pre_gate.evaluate_payload({}) is None,
+        "`read_stdin_json`": unreadable.returncode == 0 and "deny" not in unreadable.stdout,
+        "registered_slugs": context_registry.registered_slugs(tmp) == ({"*"}, {"*"}),
+    }
+
+
+def test_the_map_lists_every_fail_open_path_the_code_has(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The map's fail-open list is
+    set-equal to the code's paths, each naming its evidence; no sentence pinned."""
+    line = next(ln for ln in read_text(_MAP).splitlines() if "fails open on:" in ln)
+    items = line.split("fails open on:")[1].rstrip(".").split(";")
+    named = {m[1]: i for i in items if (m := re.search(r"\(([^()]+)\)\s*$", i))}
+    rows = _fail_open_rows(named, tmp_path, monkeypatch)
+    assert len(named) == len(items) and sorted(named) == sorted(rows)
+    assert [k for k, held in rows.items() if not held] == []
+
+
+_BUG = "root-enforcement-section-states-false-blocks"
+
+
+def _block_rows(tmp: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, bool]:
+    """One row per block the code has, keyed by the evidence the law names, each read in-process."""
+    for name, registry in (("ok", '{"contexts": []}'), ("bad", "{trunc")):
+        (tmp / name / ".dadaia/states").mkdir(parents=True)
+        write_text(tmp / name / ".dadaia/states/spec_contexts.json", registry)
+
+    def write(name: str, rel: str, policy: ModuleType) -> str | None:
+        monkeypatch.chdir(tmp / name)
+        target = {"file_path": str(tmp / name / rel)}
+        payload = {"tool_name": "Write", "tool_input": target, "session_id": "s"}
+        return policy.evaluate_payload(payload)  # type: ignore[attr-defined,no-any-return]
+
+    away = {
+        "zone": "worktree",
+        "repo": "b",
+        "owner": "b",
+        "context": "a",
+        "repos": frozenset({"a"}),
+    }
+    return {
+        "root_whitelist": write("ok", "stray.txt", root_whitelist) is not None,
+        "PROTECTED": write("ok", "AGENTS.md", sdd_gate) is not None,
+        "out-of-scope": gate_policy.evaluate("worktrees/b/w/x.py", root=PurePath("/ws"), **away)[0]
+        == gate_policy.Decision.BLOCK,
+        "_MERGE_ONLY_MESSAGE": write("bad", "repos/r/src/x.py", sdd_gate) is not None,
+        "verdict_act": gate_policy.verdict_act(
+            "verdict.py t --verdict APPROVED", key="agent_type", subagent=None
+        )
+        is not None,
+    }
+
+
+def test_the_map_lists_every_block_the_code_has(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """§3's `blocks:` list is set-equal
+    to the code's blocks, each naming its evidence, merge-only included; the fail-open item
+    `(registered_slugs)` names the merge-only block; no §3 line claims a PR check, the line naming
+    APPROVED names `dadaia worktree merge`."""
+    section = read_text(_MAP).split("## 3.")[1].split("\n## ")[0].splitlines()
+    line = next((ln for ln in section if "blocks:" in ln), "")
+    items = line.partition("blocks:")[2].rstrip(".").split(";")
+    named = {m[1]: i for i in items if (m := re.search(r"\(([^()]+)\)\s*$", i))}
+    rows = _block_rows(tmp_path, monkeypatch)
+    assert line and len(named) == len(items) and sorted(named) == sorted(rows)
+    assert [k for k, held in rows.items() if not held] == []
+    assert any("merge-only" in ln for ln in section if "(registered_slugs)" in ln)
+    assert all("dadaia worktree merge" in ln for ln in section if "APPROVED" in ln)
+    assert not any("green" in ln for ln in section)
+
+
+def test_the_bind_resolution_contract_covers_every_verb_module() -> None:
+    """Every cli/commands/* module is a
+    source of the bind-resolution-seam contract, so a direct core.invocation import in any
+    verb (harness, reconcile, capabilities, certify included) breaks lint-imports."""
+    config = configparser.ConfigParser()
+    config.read(_REPO / "setup.cfg", encoding="utf-8")
+    sources = config["importlinter:contract:bind-resolution-seam-is-a-single-home"]
+    modules = sources["source_modules"].split()
+    verbs = sorted((_PKG / "cli" / "commands").glob("[!_]*.py"))
+    uncovered = [
+        v.stem for v in verbs
+        if not any(f"dadaia_workspace.cli.commands.{v.stem}".startswith(m) for m in modules)
+    ]  # fmt: skip
+    assert verbs and uncovered == []
+
+
+def test_os_name_is_read_only_through_the_platform_seam() -> None:
+    """No operating-system-name read in the package
+    outside core/platform (python_env branches on PLATFORM). Stdlib skill scripts under
+    public/ cannot import core and are out of this ratchet."""
+    reads = [
+        f"{path.relative_to(_REPO)}:{node.lineno}"
+        for path in sorted(_PKG.rglob("*.py"))
+        if "public" not in path.relative_to(_PKG).parts
+        for node in ast.walk(ast.parse(read_text(path)))
+        if isinstance(node, ast.Attribute) and node.attr == "name"
+        and isinstance(node.value, ast.Name) and node.value.id == "os"
+    ]  # fmt: skip
+    assert reads == []
+
+
+_SKILLS = _PKG / "public" / "skills"
+
+
+@pytest.mark.parametrize(
+    ("skill", "phrase"),
+    [
+        pytest.param("dd-bug-resolution/SKILL.md", "rewriting an old assert",
+                     id="root-law-says-fixes-never-rewrite-old-asserts"),
+        pytest.param("dd-audit-project/PILLAR-BUGS.md", "governance_events",
+                     id="the-bug-ledger-has-no-event-stream"),
+        pytest.param("dd-backlog-definition/SKILL.md", "merge a near-duplicate",
+                     id="the-backlog-writer-has-no-merge"),
+    ],
+)  # fmt: skip
+def test_a_skill_prescribes_no_act_its_own_laws_forbid_or_its_writer_cannot_do(
+    skill: str, phrase: str
+) -> None:
+    """The ledger laws (`specs/bugs/AGENTS.md`: no event stream; root map: fixes never rewrite old
+    asserts; `backlog.py`: new, exit, check) bind the skills that teach those ledgers."""
+    assert phrase not in read_text(_SKILLS / skill)
+
+
+def test_the_orchestration_skill_dispatches_a_task_never_a_job() -> None:
+    """The task is the dispatch unit, so step 6 of `dd-manager-orchestration` names no
+    job as a unit of dispatch."""
+    skill = read_text(_SKILLS / "dd-manager-orchestration/SKILL.md")
+    assert "unit of dispatch is a job" not in skill
+
+
+def test_the_map_cites_the_write_tools_and_a_bash_write_passes_where_a_file_tool_write_blocks(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The path-classes line cites `WRITE_TOOLS`, which omits Bash: a Write to a PROTECTED path
+    blocks, the same path written by Bash passes `pre_gate`; no sentence pinned."""
+    (tmp_path / ".dadaia/states").mkdir(parents=True)
+    write_text(tmp_path / ".dadaia/states/spec_contexts.json", '{"contexts": []}')
+    monkeypatch.chdir(tmp_path)
+    write = {"tool_name": "Write", "tool_input": {"file_path": "AGENTS.md"}, "session_id": "s"}
+    bash = {"tool_name": "Bash", "tool_input": {"command": "echo x > AGENTS.md"}, "session_id": "s"}
+    section = read_text(_MAP).split("## 3.")[1].split("\n## ")[0].splitlines()
+    cited = [ln for ln in section if ln.startswith("- Path classes:") and "`WRITE_TOOLS`" in ln]
+    assert "Bash" not in sdd_gate._common.WRITE_TOOLS
+    assert pre_gate.evaluate_payload(write) is not None
+    assert pre_gate.evaluate_payload(bash) is None
+    assert len(cited) == 1

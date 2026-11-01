@@ -13,84 +13,127 @@ import sys
 from pathlib import Path
 from typing import Any
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+import _bugs_store
+import _clock
+import _git
+from _backlog_schema import DISPOSITIONS, HISTO
+from _backlog_store import SCRIPT, Items
+from _platform import act, command, run
+from _refusal import Refusal, fix_of
 
-from _backlog_schema import DISPOSITIONS  # noqa: E402
-from _backlog_store import SCRIPT, Items, Refusal  # noqa: E402
-from _backlog_write import redact, today  # noqa: E402
-
-#: The status a release-lane exit requires: an item a release closed is an item a
-#: release picked. Exiting an 'idea' as delivered launders unworked scope as shipped.
-PICKED = "picked"
-#: Which evidence flag each terminal word must carry — the histo record is the only
-#: surviving trace of why the item left.
-REQUIRED_EVIDENCE = {"delivered": "release", "superseded": "release", "rejected": "reason"}
+#: `release.py`'s Origin parser, run as its own script: the one reader of the line.
+_RELEASE = (
+    Path(__file__).resolve().parents[2] / "dd-release-implementation" / "scripts" / "release.py"
+)
 
 
-def _known_release(specs: Path, release: str) -> bool:
+def _origin_ids(spec: Path) -> list[str]:
+    """The `backlog:` ids of *spec*'s first Origin line, as `release.py origin` prints them."""
+    fix = command(sys.executable, str(_RELEASE), "origin", str(spec))
+    try:
+        done = run([sys.executable, str(_RELEASE), "origin", str(spec)], env=_git.scrubbed_env())
+    except OSError as exc:
+        raise Refusal(f"Origin unreadable: {exc}", fix) from exc
+    if done.returncode:
+        lines = done.stderr.splitlines()
+        raise Refusal(
+            f"Origin unreadable: {lines[0] if lines else done.returncode}", fix_of(done.stderr, fix)
+        )
+    return [ln[len("backlog ") :] for ln in done.stdout.splitlines() if ln.startswith("backlog ")]
+
+
+def _release(specs: Path, slug: str, disposition: str, release: str | None) -> None:
+    """*release* must name a folder directly under `releases/`, and that folder's candidate SPECs
+    must name *slug* in an Origin's `backlog:` clause."""
     releases = specs / "releases"
-    return (releases / release).is_dir() or (releases / "_archive" / release).is_dir()
+    if release not in (
+        {p.name for p in releases.iterdir() if p.is_dir()} if releases.is_dir() else set()
+    ):
+        raise Refusal(
+            f"--release {release or '(none)'} names no folder directly under {releases}",
+            act(
+                "agent",
+                f"pass --release with the release folder under {releases} whose SPEC "
+                f"names {slug}, then rerun this exit with --disposition {disposition}.",
+            ),
+        )
+    folder = releases / release
+    if not any(slug in _origin_ids(s) for s in folder.glob("rc-*/SPEC.md")):
+        raise Refusal(
+            f"--release {release}: no {folder}/rc-<N>/SPEC.md first `**Origin:**` line "
+            f"picks {slug!r} — only a release that picked an item can exit it as {disposition!r}",
+            act(
+                "agent",
+                f"name {slug} in the backlog: clause of the first **Origin:** line "
+                f"of a SPEC under {folder}, then rerun this exit with --disposition {disposition}.",
+            ),
+        )
+
+
+def _reason(specs: Path, slug: str, disposition: str, reason: str | None) -> None:
+    """The one-line why of a rejection."""
+    if not (reason or "").strip():
+        raise Refusal(
+            f"{disposition!r} requires --reason: the histo record is the only trace of why {slug!r} left",
+            act(
+                "agent",
+                f"rerun `{SCRIPT.inline('exit', slug, '--disposition', disposition, specs=specs)}` with a "
+                f"one-line --reason saying why {slug} is refused.",
+            ),
+        )  # fmt: skip
+
+
+def _bug(specs: Path, slug: str, disposition: str, reason: str | None) -> None:
+    """The id of the BUGS.jsonl record the item is handed to, read by the bug store's reader."""
+    bugs = specs / "bugs" / "BUGS.jsonl"
+    ids = {record.get("id") for record in _bugs_store.read_records(bugs)}
+    if reason not in ids:
+        raise Refusal(
+            f"--reason {reason!r} names no record of {bugs}: `to-bug` hands {slug!r} to a registered bug",
+            act("operator", f"confirm {slug} as a bug (dd-bug-registration §2)"),
+        )  # fmt: skip
+
+
+#: Each terminal word -> the evidence flag it carries and its verifier; the histo record
+#: is the only surviving trace of why the item left.
+EVIDENCE = {
+    "delivered": ("release", _release),
+    "superseded": ("release", _release),
+    "rejected": ("reason", _reason),
+    "to-bug": ("reason", _bug),
+}
 
 
 def check_exit(specs: Path, active: Items, slug: str, values: dict[str, Any]) -> dict[str, Any]:
     """Refuse, before any write, an exit whose subject is not live or whose evidence does
     not match its disposition. Returns the entry the exit will remove."""
-    disposition, release, reason = values["disposition"], values["release"], values["reason"]
+    disposition = values["disposition"]
     entry = next((item for item in active if item.get("id") == slug), None)
     if entry is None:
         raise Refusal(
             f"{slug!r} does not name a live active[] entry — an item is retained forever, "
             "so a slug missing from active[] has already exited",
-            f"grep {slug} specs/backlog/_archive/backlog_histo.jsonl",
+            command("grep", slug, str(specs / HISTO)),
         )
-    if disposition not in DISPOSITIONS:
+    if disposition not in EVIDENCE:
         raise Refusal(
             f"unknown disposition {disposition!r}: a backlog item exits as one of "
             f"{'|'.join(DISPOSITIONS)}",
-            f"{SCRIPT} exit {slug} --disposition rejected --reason '<why it was refused>'",
+            act("agent", "a postponed item stays in active[] and needs no exit."),
         )
-    required = REQUIRED_EVIDENCE[disposition]
-    supplied = {"release": release, "reason": reason}[required]
-    if not (supplied or "").strip():
-        example = "--release <release-id>" if required == "release" else "--reason '<why>'"
-        raise Refusal(
-            f"disposition {disposition!r} requires --{required}: the histo record is the "
-            f"only surviving trace of why {slug!r} left active[]",
-            f"{SCRIPT} exit {slug} --disposition {disposition} {example}",
-        )
-    if required == "release":
-        _check_release_lane(specs, entry, slug, disposition, str(release))
+    flag, verify = EVIDENCE[disposition]
+    verify(specs, slug, disposition, values[flag])
     return entry
 
 
-def _check_release_lane(
-    specs: Path, entry: dict[str, Any], slug: str, disposition: str, release: str
-) -> None:
-    if not _known_release(specs, release):
-        raise Refusal(
-            f"release {release!r} names neither a live nor an archived release under "
-            f"specs/releases/ — a {disposition} item names the release that closed it",
-            f"ls {specs / 'releases'}",
-        )
-    if entry.get("status") != PICKED:
-        raise Refusal(
-            f"{slug!r} is {entry.get('status')!r}, not {PICKED!r}: only an entry a release "
-            f"picked can exit as {disposition!r}; an item no release took exits as 'rejected'",
-            f"{SCRIPT} exit {slug} --disposition rejected --reason '<why no release took it>'",
-        )
-
-
 def histo_record(entry: dict[str, Any], values: dict[str, Any]) -> dict[str, Any]:
-    """The one histo-record-v1 shape: ``entry`` IS the removed object, redacted."""
-    record: dict[str, Any] = redact(
-        {
-            "id": entry["id"],
-            "ts": values.get("ts") or today(),
-            "disposition": values["disposition"],
-            "release": values["release"],
-            "reason": values["reason"],
-            "summary": values.get("summary"),
-            "entry": entry,
-        }
-    )
-    return record
+    """The one histo-record-v1 shape: ``entry`` IS the removed object."""
+    return {
+        "id": entry["id"],
+        "ts": _clock.today(),
+        "disposition": values["disposition"],
+        "release": values["release"],
+        "reason": values["reason"],
+        "summary": values.get("summary"),
+        "entry": entry,
+    }

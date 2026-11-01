@@ -1,0 +1,168 @@
+"""Over random real-state starts (remote unborn / principal only / both, a tag or not, a
+session identity or not), the loop takes the printed step, executes its fix line (the
+``context`` step's agent action is played with a name and the bare remote's URL; the
+``agent`` step runs a scripted stand-in that fills memory) and asserts the step is no longer
+pending and the printed step's index strictly increases, so the loop ends within
+``len(STEP_IDS)`` iterations.
+
+MEDIUM: real git over ``file://`` bare remotes; the workspace pre-push hook is pointed
+at an empty hooks dir (the chokepoint is another contract's, not this one's).
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import tempfile
+from pathlib import Path
+
+import pytest
+from hypothesis import HealthCheck, given, settings
+from hypothesis import strategies as st
+from typer.testing import CliRunner
+
+from dadaia_workspace.cli.main import app
+from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES
+from dadaia_workspace.core.invocation import alive_context_trees, resolve_bind
+from dadaia_workspace.features.workspace.onboarding import STEP_IDS, Step, next_step
+from dadaia_workspace.features.workspace.service import WorkspaceService
+from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
+from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
+from tests.conftest import GIT_QUIET_INCLUDE
+from tests.helpers.oslib import cli_path, command, make_executable, run, write_text
+
+_runner = CliRunner()
+#: The words each command step prints as its fix.
+_WORDS = {
+    "bind": ("context", "bind", "proj"),
+    "specs": ("specs", "init", "--context", "proj"),
+    "publish": ("context", "baseline", "proj"),
+}
+
+
+def _git(cwd: Path, *args: str) -> None:
+    run(["git", *args], cwd=cwd, check=True)
+
+
+def _remote(parent: Path, branches: tuple[str, ...], tag: bool) -> Path:
+    bare = parent / "proj.git"
+    _git(parent, "init", "-q", "--bare", "-b", "main", str(bare))
+    if branches:
+        seed = parent / "seed"
+        _git(parent, "init", "-q", "-b", branches[0], str(seed))
+        write_text(seed / "README.md", "seed\n")
+        _git(seed, "add", "README.md")
+        _git(seed, "commit", "-qm", "seed")
+        for branch in branches[1:]:
+            _git(seed, "branch", branch)
+        if tag:
+            _git(seed, "tag", "v1.4.2")
+        _git(seed, "push", "-q", "--tags", bare.as_uri(), *branches)
+    return bare
+
+
+def _fill_memory(root: Path) -> None:
+    """The scripted stand-in for the ``agent`` step: an audit that writes real memory."""
+    for specs in alive_context_trees(root).values():
+        for stub in ("ARCHITECTURE.md", "QUALITY.md", "product/index.md"):
+            write_text(specs / "memory" / stub, f"# {stub}\n\naudited\n")
+        catalog = specs / "memory" / "product" / "catalog.json"
+        catalog.parent.mkdir(parents=True, exist_ok=True)
+        write_text(catalog, json.dumps({"features": [{"slug": "core"}]}))
+        write_text(
+            specs / "memory" / "product" / "core.md",
+            "---\nslug: core\ntitle: core\ntldr: core\nsummary: core\n---\n\n# core\n",
+        )
+
+
+def _run_fix(step: Step, root: Path, bare: Path) -> None:
+    if step.id == "context":  # an agent act: a context name and the clone URL
+        argv = ["context", "create", "proj", "--main-repo", bare.as_uri()]
+    elif step.kind == "agent":
+        _fill_memory(root)
+        return
+    else:
+        argv = list(_WORDS[step.id])
+        assert step.command == command(str(cli_path(root)), *argv), step.command
+    done = _runner.invoke(app, argv)
+    assert done.exit_code == 0, f"{step.command}\n{done.output}"
+
+
+@pytest.fixture(autouse=True)
+def _git_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    # The pre-push gate is installed where core.hooksPath points and runs on every push;
+    # its runner is stubbed out — the gate itself is proven by the push journeys.
+    hooks = tmp_path / "hooks"
+    hooks.mkdir()
+    runner = cli_path(tmp_path)  # the hook's venv walk
+    runner.parent.mkdir(parents=True)
+    write_text(runner, "#!/bin/sh\ncat >/dev/null\n")
+    make_executable(runner)
+    pairs = {"core.hooksPath": str(hooks), "user.name": "T", "user.email": "t@example.invalid"}
+    write_text(tmp_path / "gitconfig", GIT_QUIET_INCLUDE)
+    monkeypatch.setenv("GIT_CONFIG_GLOBAL", str(tmp_path / "gitconfig"))
+    monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")
+    base = int(os.environ.get("GIT_CONFIG_COUNT", "0"))
+    monkeypatch.setenv("GIT_CONFIG_COUNT", str(base + len(pairs)))
+    for n, (key, value) in enumerate(pairs.items(), start=base):
+        monkeypatch.setenv(f"GIT_CONFIG_KEY_{n}", key)
+        monkeypatch.setenv(f"GIT_CONFIG_VALUE_{n}", value)
+    for var in ("CLAUDE_CODE_SESSION_ID", "CODEX_SESSION_ID", "CODEX_THREAD_ID", "DADAIA_CONTEXT"):
+        monkeypatch.delenv(var, raising=False)
+
+
+def _bound(root: Path, session: str | None) -> bool | None:
+    """The caller's Bind as the CLI reads it."""
+    return (
+        None
+        if session is None
+        else resolve_bind(root, session, os.environ).context_name is not None
+    )
+
+
+@settings(
+    max_examples=12, deadline=None, suppress_health_check=[HealthCheck.function_scoped_fixture]
+)
+@given(
+    branches=st.sampled_from([(), ("main",), ("main", "develop")]),
+    tag=st.booleans(),
+    session=st.sampled_from([None, "sess_prop01"]),
+)
+def test_every_command_fix_clears_its_step_and_the_loop_advances(
+    branches: tuple[str, ...], tag: bool, session: str | None, tmp_path: Path
+) -> None:
+    cwd = Path.cwd()
+    with tempfile.TemporaryDirectory(dir=tmp_path) as scratch:
+        base = Path(scratch)
+        root = base / "ws"
+        root.mkdir()
+        WorkspaceService(
+            public_assets=FileSystemPublicAssetManager(),
+            python_env=VenvPythonEnvironmentManager(),
+        ).init(root, harnesses=L1_ENTRY_HARNESSES)
+        bare = _remote(base, branches, tag and bool(branches))
+        env_before = os.environ.pop("DADAIA_SESSION_ID", None)
+        if session:
+            os.environ["DADAIA_SESSION_ID"] = session
+        os.chdir(root)
+        try:
+            seen: list[int] = []
+            for _ in range(len(STEP_IDS) + 1):
+                step = next_step(root, alive_context_trees(root), None, _bound(root, session))
+                if step is None:
+                    break
+                index = STEP_IDS.index(step.id)
+                assert not seen or index > seen[-1], f"I4: {step.id} after {STEP_IDS[seen[-1]]}"
+                seen.append(index)
+                _run_fix(step, root, bare)
+                after = next_step(root, alive_context_trees(root), None, _bound(root, session))
+                assert after is None or after.id != step.id, f"I3: {step.id} still pending"
+            else:
+                pytest.fail(f"I4: the loop did not end within {len(STEP_IDS)} steps")
+            assert ("bind" in [STEP_IDS[i] for i in seen]) == (session is not None)
+            assert STEP_IDS[seen[-1]] == "publish"
+        finally:
+            os.chdir(cwd)
+            os.environ.pop("DADAIA_SESSION_ID", None)
+            if env_before is not None:
+                os.environ["DADAIA_SESSION_ID"] = env_before

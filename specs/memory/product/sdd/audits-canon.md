@@ -1,44 +1,35 @@
 ---
 slug: audits-canon
 title: audits-canon
-tldr: Audits are committed three-pillar reviews over a sha window, their findings moved by audit.py; decisions are decisions.jsonl records the operator accepts.
-summary: The two governance records that police canonical truth — an audit folder (AUDIT.md plus FINDINGS.jsonl) whose findings move by audit.py disposition and which audit.py close archives, and the decision ledger specs/ADRs/decisions.jsonl whose accepted records admit every canonical memory statement.
-tags: [sdd, audits, findings, adrs, decisions, governance]
+tldr: An audit runs bug-history, spec-compliance and memory-drift pillars over one measured window and stores schema-valid findings until terminal disposition.
+summary: The three-pillar audit, reproducible finding evidence, terminal disposition vocabulary, single remediation release and atomic archive close.
+tags: [audit, findings, bugs, specs, memory]
 sources:
-  - dadaia_workspace/public/skills/dd-audit-project/**
-  - dadaia_workspace/public/schemas/audits/**
   - dadaia_workspace/public/schemas/ADRs/**
-  - dadaia_workspace/features/specs/doctor_closure_audit.py
+  - dadaia_workspace/public/skills/dd-audit-project/**
   - dadaia_workspace/features/specs/doctor_adr.py
 ---
 
-## The audit
+## Three pillars
 
-- The audit is the only full-tree inspection lane; every other quality boundary is diff-scoped. `dd-code-reviewer` runs it under the audit lens, suggested every five releases, never mandatory ([[agent-orchestration]]).
-- An audit is a committed folder `specs/audits/<YYYYMMDD>-<slug>/` holding `AUDIT.md` (scope, the window `[from-sha, HEAD]`, method per pillar, the eight forensic metrics, summary) and `FINDINGS.jsonl`; `specs/audits/**` is ADDITIVE, writable bound or not ([[sdd-gate-v3]]).
-- The window opens at the newest record in `specs/audits/_archive/audits_histo.jsonl`, or covers the whole history when that file is empty; an audit is never a release milestone.
-- All three pillars run together, and fewer than three is not an audit: bug history over every record in the window, stamping `audited` through `bugs.py update --set` ([[bug-ledger]]); spec compliance through `dadaia doctor` plus commit shapes and milestone completeness ([[workspace-doctor]]); memory drift, running every principle's `Measured by:` check and flagging HIGH a canonical memory hunk with no accepted decision in the same commit.
-- `finding-record-v1` keeps `id`, `pillar` (`bugs | specs | memory`), `severity`, `refs`, `claim` and `evidence` immutable and `disposition`, `release`, `reason` mutable; `disposition` is `open` or one of `resolved superseded deferred rejected`; `evidence` is a reproducible command plus a redacted one-line result.
+- An audit is the full-tree inspection lane and always runs bug history, spec compliance and memory drift together.
+- The bug pillar reads current resolution facts and each fix, found by its `fix(bugs)` or `refactor(bugs)` id line (a group line lists several ids; the recorded `fix_sha` is only a hint a rewrite may orphan, and a release squash is reported as coarse evidence), reads a unit's history by the id-line query, never a stored fix-file field, derives recurrence (a later record whose `component` names a path a prior fix commit touches, registered after that fix's resolution) and diff direction from code, groups re-bugs by the paths each fix commit touches, and reports the forensic metrics `PILLAR-BUGS.md` lists, each against the previous audit's `AUDIT.md` read from git history. Audit coverage lives in the audit record rather than a field copied into each bug.
+- The spec pillar combines the doctor's findings at HEAD with commit shapes and job-file checks: tasks with overlapping write sets that ran in parallel, every changed path inside its job's PLAN write set, AC test levels, cancellation reasons and post-approval immutability.
+- The memory pillar runs each canonical principle's measurement and compares product atoms with their source window.
 
-## The writer — `audit.py`
+## Findings
 
-- `python3 .agents/skills/dd-audit-project/scripts/audit.py <verb> [--specs <path>]` is the findings ledger's one writer and validator; `<audit>` is confined to `specs/audits/`, and every refusal carries one `fix:` line.
-- `disposition <audit> <finding-id> --disposition resolved|superseded|deferred|rejected [--release <id>] [--reason <text>]` rewrites one finding's governance triple in place, every other field unchanged; `resolved`/`superseded` need `--release`, `deferred`/`rejected` need `--reason`; an unknown finding is refused naming the known ids.
-- `close <audit> --sha <window-end>` refuses an audit with no findings, with any undispositioned finding (naming it), or whose findings name more than one release; otherwise it appends one `histo-record-v1` to `audits_histo.jsonl` — `disposition: resolved`, the one remediation release, the per-pillar counts as `summary`, `entry = {sha, pillars, dispositions}` — and deletes the folder, the histo append last.
-- `check [--json]` validates every live `FINDINGS.jsonl` and `audits_histo.jsonl`; `dadaia doctor`'s `ledgers` section runs it (`LEDGER-FINDINGS-SCHEMA`), and `SPEC-DOC-036` (an open finding in an archived audit) and `SPEC-DOC-038` (a live audit whose findings are all terminal) police both directions ([[workspace-doctor]]).
-- One audit generates exactly one remediation release, which dispositions every finding at its closure sweep before the audit closes ([[release-lifecycle]]).
+- Every finding is one `finding-record-v1` line with immutable id, pillar, severity, refs, claim and reproducible evidence, appended by hand; `audit.py check` validates the live findings and the archive, printing each finding with its `fix:` line.
+- Evidence is a command plus a redacted one-line result. Scratch may accompany it but is never the sole citation.
+- A finding is born `open` and moves to `resolved`, `superseded` or `rejected`. Resolved and superseded name the remediation release; rejected names the reason.
+- `audit.py disposition` rewrites only the governance triple. It rejects an unknown finding, invalid evidence or a second inconsistent disposition.
 
-## Decisions
+## Close
 
-- `specs/ADRs/decisions.jsonl` (`decision-record-v1`) is the decision ledger: one line per decision, fields `id ts title status context decision consequences measured_by supersedes amends`, `status` one of `proposed accepted rejected superseded`; it has no writer script — agents append with file tools.
-- Any agent appends a `proposed` record; only the operator flips it to `accepted`, and an `accepted` record names a `measured_by` the schema can resolve — a `pytest` or `lint-imports` invocation or a doctor code (`SPEC-DOC-nnn`, `WS-*`, `BL-*`, `RELEASE-TREE-*`, `LEDGER-*`).
-- A canonical memory statement in `ARCHITECTURE.md` or `QUALITY.md` changes only in the commit carrying its accepted decision; a reversal is a new record naming the old one in `supersedes` or `amends`, the superseded line staying in place.
-- `dadaia doctor` runs `LEDGER-ADR-SCHEMA` over every committed line and `ADR-SUPERSEDED-CITATION` over memory atoms, skills, data and scaffold that cite a superseded decision ([[workspace-doctor]]).
-
-## Runtime state
-
-`specs/audits/<dir>/{AUDIT.md,FINDINGS.jsonl}`, `specs/audits/_archive/audits_histo.jsonl`, `specs/ADRs/decisions.jsonl`.
+- `audit.py close <audit> --sha <window-end>` refuses while any finding remains open or the findings name more than one remediation release.
+- Close appends one audit-history record with the window sha, pillar counts and disposition counts, then removes the live audit directory atomically.
+- A closed audit with a remediation release is resolved; without one it is rejected.
 
 ## Dependencies
 
-[[bug-ledger]], [[release-lifecycle]], [[workspace-doctor]], [[sdd-gate-v3]], [[agent-orchestration]].
+[[bug-ledger]], [[release-lifecycle]], [[workspace-doctor]], [[ARCHITECTURE]], [[QUALITY]].

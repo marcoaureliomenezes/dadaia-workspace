@@ -1,54 +1,44 @@
 """SpecsDoctor — thin coordinator for SDD release-lifecycle structural validation.
 
-v0.1.55 FR1 decomposed the former 2,830-line god module into a thin ``SpecsDoctor``
-coordinator (this file) that **owns check()/fix() ORDER** and delegates all LOGIC to six
-single-responsibility validator siblings plus two shared leaf modules:
+A thin ``SpecsDoctor`` coordinator (this file) that **owns check()/fix() ORDER** and delegates all
+LOGIC to five single-responsibility validator siblings plus two shared leaf modules:
 
-  * ``doctor_types``     — ``Severity`` / ``SpecsDoctorIssue`` / ``_MemoryMdSummary``
-  * ``doctor_common``    — cross-validator pure helpers (``resolve_live_release_id`` + release-dir discovery)
-  * ``doctor_structural``   — TREE-1..8 spec-tree invariants; ``fix_tree4``,
-                              ``fix_tree8``
-  * ``doctor_memory``       — memory files/atomicity, CAT-1, LINT-1
+  * ``doctor_types``     — ``Severity`` / ``SectionFinding``
+  * ``doctor_common``    — cross-validator pure helpers (``resolve_active_release`` + release-dir discovery)
+  * ``doctor_structural``   — TREE-3..8 spec-tree invariants; ``fix_tree4``,
+                              ``fix_tree5``
+  * ``doctor_memory``       — memory files, LINT-1
   * ``doctor_release``      — active release (RELEASE.json state document), release artifacts, SemVer + ledger invariants
-  * ``doctor_closure_audit``— orphan specs, audit disposition; ``fix_archive_dir``
-  * ``doctor_governance``   — single-source backlog invariants, bug status/JSONL
+  * ``doctor_closure_audit``— audit naming, archive dirs; ``fix_archive_dir``
   * ``doctor_coherence``    — constitution and pattern-version coherence
 
-The coordinator owns ORDER: ``check()`` invokes the validators' public methods in the exact
-original interleaved sequence (families interleave — coherence→memory→release→…→governance→
-closure→coherence), and ``fix()`` dispatches by issue code. It imports NO ``spec_context``
-(R-1 cap invariant): v0.1.76 T-4 retired the former ``pid_probe``/``workspace_state_dir`` seam
-along with SPEC-DOC-029 (see ``doctor_coherence.py``), so the coordinator holds no
-``spec_context`` cross-feature edge at all — not even via a typed leaf seam. Behavior is
-byte-identical to the pre-split module (golden lock
-``tests/unit/features/specs/test_doctor_golden.py``).
+The coordinator owns ORDER: ``check()`` invokes the validators' public methods in one fixed
+interleaved sequence (families interleave — coherence→memory→release→…→
+closure→coherence), and ``fix()`` dispatches by issue code. It imports NO ``spec_context``: the
+coordinator holds no ``spec_context`` cross-feature edge, not even via a typed leaf seam.
 
 Pure module — no I/O outside the supplied specs_dir / public_dir. No external dependencies.
 """
 
 from __future__ import annotations
 
-from collections.abc import Callable, Collection
+from collections.abc import Collection
 from pathlib import Path
 
-from dadaia_workspace.core.models.bugs import BugRecord
-from dadaia_workspace.core.models.findings import FindingRecord
+from dadaia_workspace.core.doctor_rules import SectionFinding, run_rule
 from dadaia_workspace.features.specs.doctor_closure_audit import ClosureAuditValidator
 from dadaia_workspace.features.specs.doctor_coherence import CoherenceValidator
-from dadaia_workspace.features.specs.doctor_governance import GovernanceValidator
 from dadaia_workspace.features.specs.doctor_memory import MemoryValidator
 from dadaia_workspace.features.specs.doctor_release import ReleaseValidator
 from dadaia_workspace.features.specs.doctor_structural import StructuralValidator
-from dadaia_workspace.features.specs.doctor_types import SpecsDoctorIssue
 from dadaia_workspace.features.specs.rules import FIX_BY_CODE, RULES
 from dadaia_workspace.features.specs.specs_tree import SpecsTree
-from dadaia_workspace.infrastructure.jsonl_record_store import JsonlRecordStore
 
 
 class SpecsDoctor:
     """Diagnose specs/ structure under SDD release-lifecycle.
 
-    Thin coordinator: owns the ``check()``/``fix()`` ORDER and delegates all LOGIC to the six
+    Thin coordinator: owns the ``check()``/``fix()`` ORDER and delegates all LOGIC to the five
     validator siblings (each independently testable). The public surface — the ``__init__``
     signature, ``check()``, ``fix()``, and every issue code — is byte-identical to the
     pre-decomposition module.
@@ -60,24 +50,10 @@ class SpecsDoctor:
             (templates loaded from ``public_dir/templates/``).
             When *not* provided the TREE checks still run but TREE-3 fix and TREE-5
             hash comparison are skipped (issue is still emitted, fix is no-op).
-        findings_store_factory: Optional DI seam for SPEC-DOC-036/038's
-            ``FINDINGS.jsonl`` fold (v0.5.0 T-050-25A, A13.4) — no composition root
-            wires this today (release 0.5.1 K9 deleted the never-called
-            ``container.build_findings_store`` seam as dead code); ``None`` keeps
-            ``ClosureAuditValidator``'s zero-dependency fallback reader (same model).
-        bug_store_factory: Optional DI seam for SPEC-DOC-033/041's ``BUGS.jsonl``
-            read (v0.5.1 K5 deepening, same ``strict``/malformed-line shape as
-            ``findings_store_factory`` — but takes ``specs_dir``, not a file path:
-            a bug ledger is ONE-per-``specs_dir``, unlike the unbounded per-audit-dir
-            ``FINDINGS.jsonl`` set) — a composition root wires
-            ``container.build_bug_record_store`` (the SAME factory ``cli.commands
-            .bugs`` already calls); ``None`` keeps ``GovernanceValidator``'s
-            zero-dependency fallback reader (same model).
         command_paths: Optional live command-path set
             (``cli.help_digest.command_paths()``), walked ONCE by the CLI composition
             root and passed in as plain data — feeds
-            MEM-DRIFT-2 (memory citations, 0.4.7 FR2). ``None`` (default) keeps that
-            check silent.
+            MEM-DRIFT-2 (memory citations). ``None`` (default) keeps that check silent.
     """
 
     def __init__(
@@ -86,18 +62,13 @@ class SpecsDoctor:
         public_dir: Path | None = None,
         templates_dir: Path | None = None,
         repo_root: Path | None = None,
-        findings_store_factory: Callable[[Path], JsonlRecordStore[FindingRecord]] | None = None,
-        bug_store_factory: Callable[[Path], JsonlRecordStore[BugRecord]] | None = None,
         command_paths: Collection[tuple[str, ...]] | None = None,
     ) -> None:
         self.specs_dir: Path = Path(specs_dir)
         self.public_dir: Path | None = Path(public_dir) if public_dir is not None else None
-        # repo_root: when supplied, the constitution file-ref invariant (SPEC-DOC-028)
-        # resolves path-like references against it, and the pyproject-version-vs-
-        # release-id invariant (SPEC-DOC-045) reads pyproject.toml from it. None ->
-        # both checks are a no-op.
+        # repo_root: MEM-DRIFT-2 resolves memory citations against it; None -> no-op.
         self.repo_root: Path | None = Path(repo_root) if repo_root is not None else None
-        # command_paths (0.4.7 FR2): MEM-DRIFT-2's plain-data input — the ONE Typer walk
+        # command_paths: MEM-DRIFT-2's plain-data input — the ONE Typer walk
         # (`cli.help_digest.command_paths`), done by the CLI. None -> that check is a
         # no-op; `features` never imports `cli`.
         self.command_paths: Collection[tuple[str, ...]] | None = command_paths
@@ -110,48 +81,41 @@ class SpecsDoctor:
         else:
             self._templates_dir = None
 
-        # Scaffold source dir (for TREE-4 README content).
-        if self.public_dir is not None:
-            scaffold_candidate = self.public_dir / "scaffold"
-            self._scaffold_dir: Path | None = (
-                scaffold_candidate if scaffold_candidate.is_dir() else None
-            )
-        else:
-            self._scaffold_dir = None
+        # Scaffold source dir (TREE-4/TREE-5 law files): the templates' sibling in the
+        # same shipped ``public/`` tree, so a consumer repo repairs from the package too.
+        source = self.public_dir or (self._templates_dir.parent if self._templates_dir else None)
+        scaffold_candidate = source / "scaffold" if source is not None else None
+        self._scaffold_dir: Path | None = (
+            scaffold_candidate
+            if scaffold_candidate is not None and scaffold_candidate.is_dir()
+            else None
+        )
 
-        # Build the six validators (each independently testable). The coordinator owns the
+        # Build the five validators (each independently testable). The coordinator owns the
         # config resolution; validators own their family LOGIC and family-local helpers.
         self._structural: StructuralValidator = StructuralValidator(
             self.specs_dir, self._scaffold_dir, self._templates_dir
         )
         self._memory: MemoryValidator = MemoryValidator(self.specs_dir)
         self._release: ReleaseValidator = ReleaseValidator(self.specs_dir)
-        self._closure_audit: ClosureAuditValidator = ClosureAuditValidator(
-            self.specs_dir, findings_store_factory
-        )
-        self._governance: GovernanceValidator = GovernanceValidator(
-            self.specs_dir,
-            self.public_dir,
-            bug_store_factory,
-        )
+        self._closure_audit: ClosureAuditValidator = ClosureAuditValidator(self.specs_dir)
         self._coherence: CoherenceValidator = CoherenceValidator(
             self.specs_dir,
             self.public_dir,
-            self.repo_root,
         )
 
-    def check(self) -> list[SpecsDoctorIssue]:
-        """Run every rule in the ONE ordered registry (F012) over a FRESH SpecsTree
-        snapshot (F010) — shared facts are parsed once per run, the registry owns
-        order, and the golden lock pins the rendered output byte-identically."""
+    def check(self) -> list[SectionFinding]:
+        """Run every rule in the ONE ordered registry over a FRESH SpecsTree
+        snapshot — shared facts are parsed once per run, the registry owns order."""
         tree = SpecsTree(self.specs_dir)
         self._release.tree = tree
-        issues: list[SpecsDoctorIssue] = []
+        issues: list[SectionFinding] = []
+        seen: set[str] = set()
         for rule in RULES:
-            issues.extend(rule.run(self))
+            issues.extend(run_rule(rule, self, seen))
         return issues
 
-    def fix(self, issues: list[SpecsDoctorIssue] | None = None) -> list[SpecsDoctorIssue]:
+    def fix(self, issues: list[SectionFinding] | None = None) -> list[SectionFinding]:
         """Apply auto-fixes for all fixable issues.
 
         Dispatch derives from the registry (:data:`~dadaia_workspace.features.specs
@@ -160,7 +124,7 @@ class SpecsDoctor:
         """
         if issues is None:
             issues = self.check()
-        fixed: list[SpecsDoctorIssue] = []
+        fixed: list[SectionFinding] = []
         for issue in issues:
             if not issue.fixable:
                 continue
