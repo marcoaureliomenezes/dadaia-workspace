@@ -61,6 +61,14 @@ def test_a_file_made_executable_on_this_host_is_executable_and_an_absent_one_is_
     assert K.is_executable(tmp_path / "absent") is False
 
 
+def test_git_missing_is_false_on_the_real_path_and_true_when_no_git_is_on_path(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    assert K.git_missing() is False
+    monkeypatch.setenv("PATH", str(tmp_path))
+    assert K.git_missing() is True
+
+
 def test_replace_swaps_a_file_onto_an_existing_one_and_a_directory_onto_a_free_name(
     tmp_path: Path,
 ) -> None:

@@ -43,7 +43,7 @@ def test_importing_the_door_loads_no_dataclasses() -> None:
 
 
 _NO_CAPS_NEEDED = [
-    "Undecodable", "decode", "effective_uid", "file_owner", "is_link", "link",
+    "Undecodable", "decode", "effective_uid", "file_owner", "git_missing", "is_link", "link",
     "make_writable", "norm_sep", "popen", "popen_bytes", "read_text", "replace", "run",
     "run_bytes", "use_utf8_stdio", "write_text", "can_write",
 ]  # fmt: skip
