@@ -15,7 +15,7 @@ from typing import Any
 
 import pytest
 
-from dadaia_workspace.core import clock, session_store
+from dadaia_workspace.core import clock, platform, session_store
 from dadaia_workspace.core.cli_line import fix_line
 from tests.fixtures.harness_env import (
     claude_hook_env,
@@ -23,7 +23,7 @@ from tests.fixtures.harness_env import (
     kimi_hook_env,
     run_hook_subprocess,
 )
-from tests.helpers.oslib import read_text, run, write_text
+from tests.helpers.oslib import read_text, rmtree_readonly, run, write_text
 from tests.helpers.oslib import run as os_run
 from tests.helpers.oslib import write_text as os_write_text
 
@@ -685,3 +685,28 @@ def test_the_next_step_names_a_fix_the_session_can_run(
     assert ("Next (command step bind): This session's record does not read." in out) is (
         fix[0] == "doctor"
     ), out
+
+
+@pytest.mark.parametrize("bound", [True, False], ids=["bound-session", "no-session-id"])
+def test_a_main_repo_that_is_not_a_git_repository_never_crashes_the_session_start(
+    tmp_path: Path, bound: bool
+) -> None:
+    """The first-pass step's git read failing leaves SessionStart exit 0 with no traceback."""
+    _ws(tmp_path, {"name": "alpha", "canonical": True})
+    repo = tmp_path / "repos" / "alpha"
+    rmtree_readonly(repo / ".git")
+    sid = "s" if bound else None
+    if bound:
+        _bind(tmp_path, "s", "alpha")
+    env = claude_hook_env(tmp_path, session_id=sid, extra={"DADAIA_HOOK_EVENT": "SessionStart"})
+    for var in ("DADAIA_CONTEXT", "DADAIA_SESSION_ID", "CLAUDE_CODE_SESSION_ID"):
+        env.pop(var, None)
+    if bound:
+        env["DADAIA_SESSION_ID"] = "s"
+
+    result = run_hook_subprocess("ctx_inject", {"session_id": sid}, env)
+
+    assert result.returncode == 0, result.stderr
+    assert "Traceback" not in result.stderr, result.stderr
+    fix = f"fix: Agent action: run {platform.git_inline(repo, 'status')} and repair what it reports until it exits 0"
+    assert fix in result.stdout, result.stdout

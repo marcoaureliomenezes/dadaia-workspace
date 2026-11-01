@@ -15,6 +15,7 @@ import pytest
 
 from dadaia_workspace.core import workspace_layout
 from dadaia_workspace.core.cli_line import fix_line
+from dadaia_workspace.core.exceptions import DadaiaError
 from dadaia_workspace.core.gitflow import SeveralWorkBranches
 from dadaia_workspace.core.specs_version import CANONICAL_SPECS_VERSION, state
 from dadaia_workspace.features.specs.rules import RULES
@@ -246,6 +247,22 @@ def test_several_work_branches_make_the_first_pass_the_refusals_own_fix(
     step = next_step(tmp_path, {"app": _specs(tmp_path, "proj")})
     assert step is not None and (step.id, step.kind) == ("first-pass", "agent")
     assert step.command == f"Agent action: {first}"
+    assert step.text().count("fix:") == 1
+
+
+def test_a_main_repo_git_cannot_read_makes_the_first_pass_the_refusals_own_fix(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    specs = _specs(tmp_path, "proj")
+    refusal = DadaiaError("git cannot read it", "Agent action: run `git status`")
+
+    def refuse(_s: object, _p: object) -> str:
+        raise refusal
+
+    monkeypatch.setattr(f"{_CLIENT}.work_version", refuse)
+    step = next_step(tmp_path, {"app": specs})
+    assert step is not None and (step.id, step.kind) == ("first-pass", "agent")
+    assert step.command == refusal.fix
     assert step.text().count("fix:") == 1
 
 
