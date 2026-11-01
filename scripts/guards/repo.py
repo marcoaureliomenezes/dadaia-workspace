@@ -481,6 +481,10 @@ def release_workflow_canon(tree: Tree) -> list[str]:
         ["git", "tag", "-l", "v*", "--sort=version:refname"],
         cwd=tree.root, capture_output=True, text=True, encoding="utf-8", errors="replace", check=False,
     ).stdout.split()  # fmt: skip
+
+    def num(v: str) -> tuple[int, ...]:
+        return tuple(map(int, re.findall(r"\d+", v)))
+
     clauses = {
         "push-main": (on.get("push") or {}).get("branches") == ["main"],
         "dispatch": "workflow_dispatch" in on,
@@ -512,8 +516,8 @@ def release_workflow_canon(tree: Tree) -> list[str]:
         "manifest-floor": set(manifest) == {"."},
         "version-label": shipped or minted == expected,
         "version-shipped": not shipped or minted == expected,
-        # the floor is the last published tag (a shallow clone has none)
-        "published-floor": not tags or tags[-1] == f"v{manifest['.']}",
+        # the floor is the last published tag (a shallow clone has none); a release PR is ahead
+        "published-floor": not tags or num(tags[-1]) <= num(manifest["."]),
         "minor-pre-major": config.get("bump-minor-pre-major") is True,
         "patch-below-one": config.get("bump-patch-for-minor-pre-major") is True
         and config.get("include-component-in-tag") is False
@@ -912,6 +916,22 @@ def _tag(root: Path) -> None:
         subprocess.run(["git", "tag", tag], cwd=root, check=True)
 
 
+def _versions(manifest: str, pyproject: str) -> Plant:
+    """CONTROL with the manifest and pyproject versions set; ``{live}`` is the live release id."""
+
+    def plant(root: Path) -> None:
+        CONTROL(root)
+        live = str(live_release_id(root / "specs"))
+        for rel, pat, line in (
+            (".release-please-manifest.json", r'"\.": ".*"', f'".": "{manifest}"'),
+            ("pyproject.toml", r'(?m)^version = ".*"', f'version = "{pyproject}"'),
+        ):
+            text = (root / rel).read_text("utf-8")
+            (root / rel).write_text(re.sub(pat, line.replace("{live}", live), text), "utf-8")
+
+    return plant
+
+
 def _unlink(rel: str) -> Plant:
     def plant(root: Path) -> None:
         CONTROL(root)
@@ -1227,9 +1247,10 @@ CHECKS: dict[str, Check] = {
                 _RELEASE, "    needs: [release-please, ci]\n", "    needs: [release-please]\n"
             ),
             "manifest-floor": _edit(".release-please-manifest.json", '"."', '"x": "1", "."'),
-            "version-label": _re("pyproject.toml", r'(?m)^version = ".*"', 'version = "0.4.7"'),
-            # the release PR moved the manifest to the live id and left pyproject at the rc label
-            "version-shipped": _edit(".release-please-manifest.json", "0.4.7", "0.5.0"),
+            # an un-shipped tree whose pyproject is not the live release's rc label
+            "version-label": _versions("0.0.0", "{live}"),
+            # the manifest at the live id while pyproject keeps an rc label
+            "version-shipped": _versions("{live}", "{live}rc1"),
             "published-floor": _tag,
             "smoke-before-publish": _edit(
                 _RELEASE,
