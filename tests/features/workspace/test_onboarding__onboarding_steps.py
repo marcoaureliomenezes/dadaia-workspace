@@ -7,11 +7,11 @@ from dadaia_workspace.features.workspace.onboarding import STEP_IDS, STEPS
 
 
 def test_the_step_list_is_the_spec_order() -> None:
-    assert STEP_IDS == ("context", "bind", "constitution", "specs", "first-pass", "publish")
+    assert STEP_IDS == ("context", "constitution", "specs", "bind", "first-pass", "publish")
     assert [step_id for step_id, *_ in STEPS] == [
-        "bind",
         "constitution",
         "specs",
+        "bind",
         "first-pass",
         "publish",
     ]

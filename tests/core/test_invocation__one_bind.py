@@ -103,6 +103,11 @@ def test_the_readers_agree_on_the_bind(
     assert (f"[{expected}]" if expected else "[no bound context]") in out
 
     bound = None if not sid else inv.bind.context_name is not None
+    monkeypatch.setattr(  # the walk of a bound session reaches the first pass: git is the boundary
+        "dadaia_workspace.infrastructure.git_subprocess.GitSubprocessClient.work_version",
+        lambda _self, _repo: "0.1.0",
+    )
+    write_text(ws / "repos/alpha/specs/constitution.md", "---\nspecs_pattern_version: 99\n---\n")
     step = next_step(ws, {"alpha": ws / "repos/alpha/specs"}, "alpha", bound)
     assert (step is not None and step.id == "bind") == (sid is not None and expected is None)
 
