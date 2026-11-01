@@ -46,13 +46,11 @@ from tests.helpers.oslib import (
     command,
     detect,
     link,
+    make_writable,
     python_in,
     read_text,
     stub_cli,
     write_text,
-)
-from tests.helpers.oslib import (
-    rmtree_readonly as _rmtree,
 )
 from tests.helpers.oslib import run as os_run
 from tests.helpers.privacy_fixtures import aws_key_shape
@@ -72,6 +70,11 @@ def _repo_cli(*argv: str, caps: Caps | None = None) -> str:
     """The workspace CLI run from a clone two levels under its workspace, as a finished line; the
     path is built POSIX-style so it spells alike whatever host builds it."""
     return command(str(cli_path(PurePosixPath("../.."), caps)), *argv, caps=caps)
+
+
+def _rmtree(path: Path) -> None:
+    """Remove *path*, git's read-only pack files included."""
+    shutil.rmtree(path, onexc=lambda fn, name, _: (make_writable(Path(name)), fn(name)))
 
 
 _FIX_LINE_RE = re.compile(r"^fix: (\S.*)$", re.MULTILINE)

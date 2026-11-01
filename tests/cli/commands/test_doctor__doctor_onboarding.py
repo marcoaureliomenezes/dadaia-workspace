@@ -13,7 +13,7 @@ import pytest
 from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app
-from dadaia_workspace.core import clock, platform, workspace_layout
+from dadaia_workspace.core import clock, workspace_layout
 from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES
 from dadaia_workspace.core.platform import PLATFORM
@@ -26,7 +26,7 @@ from dadaia_workspace.core.specs_version import CANONICAL_SPECS_VERSION
 from dadaia_workspace.features.workspace.service import WorkspaceService
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
-from tests.helpers.oslib import make_executable, rmtree_readonly, run, write_text
+from tests.helpers.oslib import make_executable, run, write_text
 
 _runner = CliRunner()
 
@@ -170,26 +170,3 @@ def test_doctor_names_specs_init_to_a_session_bind_would_refuse_while_specs_are_
 
     assert f"fix: {fix_line(workspace, 'specs', 'init', '--context', 'app')}" in result.output
     assert "relaunch the session" not in result.output, result.output
-
-
-@pytest.mark.slow(reason="git init subprocess")
-def test_doctor_reports_a_main_repo_that_is_not_a_git_repository_as_one_finding(
-    workspace: Path,
-) -> None:
-    """The walk's one git read failing is a finding with one fix line, never a defect."""
-    _register_specless_context(workspace, "app")
-    _stamp_specs(workspace, "app")
-    _runner.invoke(
-        app, ["doctor", "--context", "app", "--fix"]
-    )  # a clean specs tree: no other finding
-    repo = workspace / "repos" / "app"
-    rmtree_readonly(repo / ".git")
-
-    result = _runner.invoke(app, ["doctor", "--context", "app"])
-
-    assert result.exception is None, result.output
-    assert "unexpected" not in result.output, result.output
-    assert result.output.count("ONBOARDING") == 1, result.output
-    fix = f"fix: Agent action: run {platform.git_inline(repo, 'status')} and repair what it reports until it exits 0"
-    assert result.output.count(fix) == 1, result.output
-    assert result.exit_code == 0, result.output

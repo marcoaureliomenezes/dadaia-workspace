@@ -7,7 +7,6 @@ Tests read, write, spawn, spell and probe with these names; none calls `Path.rea
 from __future__ import annotations
 
 import os
-import shutil
 import stat
 import subprocess
 import sys
@@ -64,11 +63,6 @@ def make_readonly(path: Path, *, locked: bool = False) -> None:
     """Take write permission from *path*, every permission with *locked*; `make_writable` gives
     the owner's back."""
     os.chmod(path, 0 if locked else stat.S_IMODE(path.stat().st_mode) & ~0o222)
-
-
-def rmtree_readonly(path: Path) -> None:
-    """Remove *path*, git's read-only pack files included."""
-    shutil.rmtree(path, onexc=lambda fn, name, _: (make_writable(Path(name)), fn(name)))
 
 
 def shells_for(caps: Caps) -> list[str]:
