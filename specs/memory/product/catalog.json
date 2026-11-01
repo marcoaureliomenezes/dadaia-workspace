@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-01T16:29:16Z",
+  "generated_at": "2026-11-01T17:00:37Z",
   "features": [
     {
       "rank": 1,
@@ -560,8 +560,8 @@
       "slug": "cross-platform-portability",
       "title": "cross-platform-portability",
       "area": "platform",
-      "tldr": "Linux, macOS and Windows through one OS boundary, the kernel's _platform.py, deciding the host facts; core/platform.py is the package's door to it.",
-      "summary": "The kernel module dd-bug-resolution/scripts/_platform.py decides the host facts — text codec and newlines, child processes, venv layout, exec bit, process liveness and listeners, filesystem swap and links, the sandbox home, shell spelling and the action labels of a fix line — as functions over one capability value; skill scripts import it as a sibling, the package reaches it through core/platform.py, tests through tests/helpers/oslib.py; no port, adapter pair or file lock exists for portability.",
+      "tldr": "Linux, macOS and Windows through one OS boundary, the kernel's _platform.py, deciding every host fact; core/platform.py is the package's door to it.",
+      "summary": "The kernel module dd-bug-resolution/scripts/_platform.py decides every host fact — text codec and newlines, child processes, whether git is on PATH, venv layout, exec bit, process liveness and listeners, filesystem swap and links, the sandbox home, shell spelling and the action labels of a fix line — as functions over one capability value; skill scripts import it as a sibling, the package reaches it through core/platform.py, tests through tests/helpers/oslib.py; no port, adapter pair or file lock exists for portability.",
       "path": "specs/memory/product/platform/cross-platform-portability.md",
       "tags": [
         "platform",
@@ -571,7 +571,7 @@
         "macos",
         "linux"
       ],
-      "token_estimate": 1068,
+      "token_estimate": 1046,
       "depends_on": [
         "bug-ledger",
         "workspace-doctor",
