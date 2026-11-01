@@ -22,6 +22,7 @@ from dadaia_workspace.core.session_store import (
     session_record_path,
     write_session,
 )
+from dadaia_workspace.core.specs_version import CANONICAL_SPECS_VERSION
 from dadaia_workspace.features.workspace.service import WorkspaceService
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
@@ -45,6 +46,16 @@ def workspace(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     for var in ("DADAIA_CONTEXT", "DADAIA_SESSION_ID", "CLAUDE_CODE_SESSION_ID"):
         monkeypatch.delenv(var, raising=False)
     return tmp_path
+
+
+def _stamp_specs(root: Path, name: str) -> None:
+    """The constitution stamp that makes ``name``'s specs tree canonical."""
+    specs = root / "repos" / name / "specs"
+    specs.mkdir()
+    write_text(
+        specs / "constitution.md",
+        f"---\nspecs_pattern_version: {CANONICAL_SPECS_VERSION}\n---\n# c\n",
+    )
 
 
 def _register_specless_context(root: Path, *names: str) -> None:
@@ -117,6 +128,7 @@ def test_doctor_names_the_bind_only_to_a_session_bind_accepts(
         fix = f"fix: {fix_line(workspace, 'doctor', '--fix')}"
     fix = fix or f"fix: {fix_line(workspace, 'context', 'bind', 'app')}"
     _register_specless_context(workspace, "app")
+    _stamp_specs(workspace, "app")
     monkeypatch.setenv("CLAUDE_CODE_SESSION_ID", "sess-1")
     if live is None:
         write_text(session_record_path(workspace, "sess-1", create=True), "{not json")
@@ -144,3 +156,17 @@ def test_doctor_names_the_bind_only_to_a_session_bind_accepts(
     assert fix in result.output, result.output
     assert ("context bind app" in result.output) == bool(live), result.output
     assert ("relaunch the session" in result.output) == (live is False), result.output
+
+
+@pytest.mark.slow(reason="git init subprocess")
+def test_doctor_names_specs_init_to_a_session_bind_would_refuse_while_specs_are_absent(
+    workspace: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The relaunch waits until the specs are ready: `specs init` needs no binding."""
+    _register_specless_context(workspace, "app")
+    monkeypatch.setenv("CLAUDE_CODE_SESSION_ID", "sess-1")
+
+    result = _runner.invoke(app, ["doctor", "--context", "app"])
+
+    assert f"fix: {fix_line(workspace, 'specs', 'init', '--context', 'app')}" in result.output
+    assert "relaunch the session" not in result.output, result.output

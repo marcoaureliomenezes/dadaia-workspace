@@ -83,7 +83,8 @@ _ATOM = "---\nslug: x\ntitle: x\ntldr: x\nsummary: x\n---\n\n# x\n"
 @pytest.mark.parametrize(("trees", "kwargs", "published", "expected", "command", "in_command"), [
     pytest.param(lambda t: {}, {}, False, ("context", "agent"), None, ["Agent action: run {} with a context name and --main-repo set to the main repo's clone URL"], id="zero-contexts"),
     pytest.param(_bare, {}, False, ("specs", _CMD), ("specs", "init", "--context", "app"), [], id="S1-no-identity-no-bind-step"),
-    pytest.param(_bare, {"bound": False}, False, ("bind", _CMD), ("context", "bind", "app"), [], id="S1-unbound-session-binds"),
+    pytest.param(_bare, {"bound": False}, False, ("specs", _CMD), ("specs", "init", "--context", "app"), [], id="unbound-session-with-no-specs-inits-first"),
+    pytest.param(lambda t: {"app": _specs(t)}, {"bound": False}, False, ("bind", _CMD), ("context", "bind", "app"), [], id="S1-unbound-session-with-specs-ready-binds"),
     pytest.param(_bare, {"bound": True}, False, ("specs", _CMD), ("specs", "init", "--context", "app"), [], id="S1-bound-is-past-bind"),
     pytest.param(_foreign, {}, False, ("specs", _CMD), ("specs", "init", "--context", "app", "--replace-foreign"), [], id="B28-4-foreign-tree-replace-foreign"),
     pytest.param(_v047, {}, False, ("specs", _CMD), ("specs", "init", "--context", "app"), [], id="upgrade-leaves-project-specs-unmigrated-and-silent-0.4.7-tree"),
@@ -116,6 +117,17 @@ def test_next_step_is_derived_from_the_workspace_state(
     assert all(part.format(create) in step.command.replace("\\", "/") for part in in_command)
 
 
+def test_a_refused_bind_with_no_specs_still_names_specs_init(tmp_path: Path) -> None:
+    """The relaunch waits behind the steps the session needs no binding for."""
+    relaunch = "Operator action: relaunch the session at the workspace root"
+
+    step = next_step(tmp_path, _bare(tmp_path), bound=False, refusal=("why", relaunch))
+
+    assert step is not None
+    assert (step.id, step.kind) == ("specs", "command")
+    assert step.command == fix_line(tmp_path, "specs", "init", "--context", "app")
+
+
 def test_a_pending_bind_prints_the_refusal_the_caller_gives_instead_of_the_bind(
     tmp_path: Path,
 ) -> None:
@@ -124,7 +136,7 @@ def test_a_pending_bind_prints_the_refusal_the_caller_gives_instead_of_the_bind(
     relaunch = "Operator action: relaunch the session at the workspace root"
     why = "This session was launched where no workspace hook loaded, so it stands in for no role."
 
-    step = next_step(tmp_path, _bare(tmp_path), bound=False, refusal=(why, relaunch))
+    step = next_step(tmp_path, {"app": _specs(tmp_path)}, bound=False, refusal=(why, relaunch))
 
     assert step is not None
     assert step.text() == f"Next (operator step bind): {why}\nfix: {relaunch}"
