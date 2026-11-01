@@ -907,21 +907,33 @@ def _re(rel: str, pattern: str, repl: str) -> Plant:
 
 
 def _tag(root: Path) -> None:
-    """The manifest's own tag, then a newer one: the floor is behind the last published."""
+    """A tag newer than the manifest: the floor is behind the last published."""
     CONTROL(root)
     git = ["git", "-c", "user.name=g", "-c", "user.email=g@example.invalid"]
     subprocess.run([*git, "commit", "-q", "--allow-empty", "-m", "g"], cwd=root, check=True)
-    floor = json.loads((root / ".release-please-manifest.json").read_text("utf-8"))["."]
-    for tag in (f"v{floor}", "v99.0.0"):
-        subprocess.run(["git", "tag", tag], cwd=root, check=True)
+    subprocess.run(["git", "tag", "v99.0.0"], cwd=root, check=True)
+
+
+def _born(root: Path) -> str:
+    """A live release one minor above the manifest, born in *root*; its id."""
+    major, minor, _ = json.loads((root / ".release-please-manifest.json").read_text("utf-8"))[
+        "."
+    ].split(".")
+    release = f"{major}.{int(minor) + 1}.0"
+    state: dict[str, Any] = {"schema": "release-state-v1", "release": release, "phase": "DEFINITION",
+             "defined": None, "implemented": None, "shipped": None, "log": []}  # fmt: skip
+    (root / "specs/releases" / release).mkdir(parents=True)
+    (root / "specs/releases" / release / "_RELEASE.json").write_text(json.dumps(state), "utf-8")
+    return release
 
 
 def _versions(manifest: str, pyproject: str) -> Plant:
-    """CONTROL with the manifest and pyproject versions set; ``{live}`` is the live release id."""
+    """CONTROL with the manifest and pyproject versions set; ``{live}`` is the live release id,
+    born above the manifest when the tree has none."""
 
     def plant(root: Path) -> None:
         CONTROL(root)
-        live = str(live_release_id(root / "specs"))
+        live = str(live_release_id(root / "specs") or _born(root))
         for rel, pat, line in (
             (".release-please-manifest.json", r'"\.": ".*"', f'".": "{manifest}"'),
             ("pyproject.toml", r'(?m)^version = ".*"', f'version = "{pyproject}"'),
