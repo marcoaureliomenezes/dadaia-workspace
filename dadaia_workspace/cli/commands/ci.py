@@ -16,7 +16,6 @@ from dadaia_workspace.cli._specs_resolution import (
     scope,
 )
 from dadaia_workspace.core.cli_line import fix_line, spell_fix
-from dadaia_workspace.core.exceptions import DadaiaError
 from dadaia_workspace.core.gitflow import Gitflow, SeveralWorkBranches, work_branch
 from dadaia_workspace.core.platform import act
 from dadaia_workspace.core.skill_owner import load_owner
@@ -74,8 +73,8 @@ def _gate_inputs(repo_root: Path, head: str) -> tuple[Gitflow, GateFixes]:
     except SeveralWorkBranches as several:
         typer.echo(f"[pre-push] WARNING: {several.message}\nhint: {several.fix}", err=True)
         work = gitflow.work_prefix + several.keep
-    except DadaiaError as refused:
-        fail(f"[pre-push] BLOCKED: {refused.message}", fix=refused.fix)
+    except load_owner("dd-bug-resolution", "_refusal").Refusal as refusal:
+        fail(f"[pre-push] BLOCKED: {refusal}", fix=refusal.fix)
     fixes = GateFixes(repo=str(repo_root), work=work, head=head)
     return gitflow, fixes
 

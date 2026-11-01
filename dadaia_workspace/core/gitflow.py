@@ -113,34 +113,15 @@ class SeveralWorkBranches(DadaiaError):
 
 def work_branch(repo: Path, flow: Gitflow, main: str) -> str:
     """The repo's work branch by the skill's one rule (``work_version``); with none, the name to
-    create (``next_version``). Raises ``SeveralWorkBranches`` (it carries the skill's text) for
-    several, else ``DadaiaError`` for the skill's only other failures: a ``Refusal``, a ``GitError``
-    and an ``OSError`` (an unreadable path, a missing git). *main* is the main repo's slug."""
+    create (``next_version``); several raise ``SeveralWorkBranches``, which carries the skill's
+    text. *main* is the main repo's slug."""
     rule = {"work": flow.work_prefix, "integration": flow.integration, "main": main}
-    try:
-        if _git.work_versions(repo, rule):
+    if _git.work_versions(repo, rule):
+        try:
             return str(flow.work_prefix + _git.work_version(repo, rule))
-        return str(flow.work_prefix + _git.next_version(repo, rule))
-    except _git.SeveralWork as several:
-        raise SeveralWorkBranches(several.args[0], several.text, several.keep) from several
-    except load_owner("dd-bug-resolution", "_refusal").Refusal as refused:
-        raise DadaiaError(str(refused), refused.fix) from refused
-    except load_owner("dd-bug-resolution", "_git").GitError as failed:
-        raise DadaiaError(
-            ": ".join([f"git cannot read {repo}", *failed.stderr.splitlines()[:1]]),
-            act(
-                "agent",
-                f"run {platform.git_inline(repo, 'status')} and repair what it reports until it exits 0",
-            ),
-        ) from failed
-    except OSError as failed:
-        raise DadaiaError(
-            f"{failed.strerror}: {failed.filename}",
-            act(
-                "agent",
-                f"repair {failed.filename} so that this user can use it ({failed.strerror})",
-            ),
-        ) from failed
+        except _git.SeveralWork as several:
+            raise SeveralWorkBranches(several.args[0], several.text, several.keep) from several
+    return str(flow.work_prefix + _git.next_version(repo, rule))
 
 
 def origin_work_branch(repo: Path, flow: Gitflow) -> str | None:
