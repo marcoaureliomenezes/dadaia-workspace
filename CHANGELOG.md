@@ -54,6 +54,35 @@ for this task, so none is touched here):
 
 Left exactly as written; a future task can pick this up.
 
+## [0.5.0](https://github.com/marcoaureliomenezes/dadaia-workspace/compare/v0.4.7...v0.5.0) (2026-11-01)
+
+
+### Features
+
+* agent-behavior evals (T1 cold onboarding, T2 block-list bug, T3 two-step discovery) on harbor, with an eval workflow run on dispatch and weekly, and an eval deploy gate on PRs to main ([c4bd106](https://github.com/marcoaureliomenezes/dadaia-workspace/commit/c4bd106d5d8014274bfef70e71211b6dcf27ad13))
+* bug lineage derived from git (caused_by by blame, REBUILD-due), terminal transitions as commits, and the agentic-set scorecard bar ([c4bd106](https://github.com/marcoaureliomenezes/dadaia-workspace/commit/c4bd106d5d8014274bfef70e71211b6dcf27ad13))
+* governed onboarding: doctor and SessionStart print one next step (constitution, specs, bind, first pass, publish) with its one fix line, and a refused step shows its refusal ([c4bd106](https://github.com/marcoaureliomenezes/dadaia-workspace/commit/c4bd106d5d8014274bfef70e71211b6dcf27ad13))
+* root canon and `.dadaiaignore` protected section; one deleter; one grammar owner and one text renderer ([c4bd106](https://github.com/marcoaureliomenezes/dadaia-workspace/commit/c4bd106d5d8014274bfef70e71211b6dcf27ad13))
+* the reference-transaction ref gate beside the pre-push gate: a work-branch update must land on origin's sha, and a raw wt/* creation is the worktree runner's alone ([c4bd106](https://github.com/marcoaureliomenezes/dadaia-workspace/commit/c4bd106d5d8014274bfef70e71211b6dcf27ad13))
+* the worktree hierarchy: rc, job, task, hotfix and backlog lanes with `dadaia worktree new|merge|sync|clean|pause|resume`, one job gate (verify) and one review verdict per merge ([c4bd106](https://github.com/marcoaureliomenezes/dadaia-workspace/commit/c4bd106d5d8014274bfef70e71211b6dcf27ad13))
+
+
+### Bug Fixes
+
+* dependency CVEs closed by removing certifi and mcp from the lock ([c4bd106](https://github.com/marcoaureliomenezes/dadaia-workspace/commit/c4bd106d5d8014274bfef70e71211b6dcf27ad13))
+* doctor and SessionStart never crash on an unreadable repo, a skill refusal, an unreadable path or git off PATH ([c4bd106](https://github.com/marcoaureliomenezes/dadaia-workspace/commit/c4bd106d5d8014274bfef70e71211b6dcf27ad13))
+
+
+### Refactoring
+
+* one owner per fact: one fix-line producer, the skill kernel decides every host fact, a missing git is one refusal with one fix ([c4bd106](https://github.com/marcoaureliomenezes/dadaia-workspace/commit/c4bd106d5d8014274bfef70e71211b6dcf27ad13))
+
+
+### Continuous Integration
+
+* the guards pass on the release PR and after the ship ([08243da](https://github.com/marcoaureliomenezes/dadaia-workspace/commit/08243da6a62cc4db6571d50662f99c3246ed5c5e))
+* the publish workflow is release.yml again (ADR 0026) ([#268](https://github.com/marcoaureliomenezes/dadaia-workspace/issues/268)) ([9941038](https://github.com/marcoaureliomenezes/dadaia-workspace/commit/9941038c9642a5bc08ce3c904b45c2657b807f2f))
+
 ## [0.4.7](https://github.com/marcoaureliomenezes/dadaia-workspace/compare/v0.4.6...v0.4.7) (2026-09-23)
 
 
