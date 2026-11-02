@@ -63,7 +63,11 @@ def main(paths):
     pattern = re.compile("|".join(SHAPES + needles))
     roots = map(Path, paths)
     files = [f for p in roots for f in ([p] if p.is_file() else p.rglob("*")) if f.is_file()]
-    hits = [f for f in files if pattern.search(_haystack(f.read_text(encoding="utf-8", errors="replace")))]
+    hits = [
+        f
+        for f in files
+        if pattern.search(_haystack(f.read_text(encoding="utf-8", errors="replace")))
+    ]
     for f in hits:
         print(f"secret found: {f}")  # the path only, never the match
     return 1 if hits else 0

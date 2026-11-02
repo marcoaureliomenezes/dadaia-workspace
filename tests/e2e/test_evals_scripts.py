@@ -49,7 +49,12 @@ def _scan(tmp_path: Path, content: str | bytes, name: str, env: dict[str, str] |
         ("x planted-fake-value x", "transcript.txt", {"SCAN_SECRET": "planted-fake-value"}, 1),
         ("nothing here", "transcript.txt", {"SCAN_SECRET": "planted-fake-value"}, 0),
         (json.dumps({"t": "x\n" + _TOKEN}), "result.json", None, 1),
-        (json.dumps({"out": f"HOME=/root\nCLAUDE_CODE_MESSAGING_TOKEN={_VALUE}\n"}), "t.json", None, 1),
+        (
+            json.dumps({"out": f"HOME=/root\nCLAUDE_CODE_MESSAGING_TOKEN={_VALUE}\n"}),
+            "t.json",
+            None,
+            1,
+        ),
         (json.dumps({"MY_API_KEY": _VALUE}), "cfg.json", None, 1),
         ("X_TOKEN=${{ secrets.X }}\nX_TOKEN=<token>\nX_TOKEN=***", "ci.txt", None, 0),
         (json.dumps({"X_TOKEN": "<token>"}), "cfg.json", None, 0),
