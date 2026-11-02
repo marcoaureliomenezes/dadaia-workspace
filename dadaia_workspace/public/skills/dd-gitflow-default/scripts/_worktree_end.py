@@ -166,10 +166,20 @@ def _undo(tree: Path, work: str, rel: str) -> str:
                f"`{git_inline(tree, 'restore', '-s', work, '-SW', '--', rel)}` and `{git_inline(tree, 'commit')}`")  # fmt: skip
 
 
-def _check_specs_only(tree: Path, work: str) -> None:
-    """A backlog tree lands `specs/` and the repo's `AGENTS.md` alone: its merge runs no test."""
+def _check_specs_only(root: Path, repo: Path, tree: Path, work: str) -> None:
+    """A backlog tree lands `specs/`, the repo's `AGENTS.md` and the paths merging the principal into
+    *work* yields (`git merge-tree`, the principal as the gitflow's step 2 resolves it): its merge runs no test."""
+    principal = flow_for(root, repo)["principal"]
+    ref = f"origin/{principal}" if git(tree, "remote").split() else principal
+    merged = git(tree, "merge-tree", "--write-tree", work, ref, check=False).split("\n")[0]
     for rel in git(tree, "diff", "--name-only", f"{work}...HEAD").splitlines():
-        if rel != "AGENTS.md" and not rel.startswith("specs/"):
+        if rel == "AGENTS.md" or rel.startswith("specs/"):
+            continue
+        held = git(tree, "rev-parse", "-q", "--verify", f"HEAD:{rel}", check=False)
+        if not (
+            merged
+            and held == git(tree, "rev-parse", "-q", "--verify", f"{merged}:{rel}", check=False)
+        ):
             raise Refusal(f"{rel} is code; a backlog tree lands specs/ and AGENTS.md only — "
                           "code lands through a job", _undo(tree, work, rel))  # fmt: skip
 
@@ -449,7 +459,10 @@ def _kind_checks(root: Path, repo: Path, tree: Path, name: str, onto: str, into:
     gate = [ancestor, verdict, job_gate]
     denylist = partial(_refuse_denylisted, root, tree, onto)
     children, scaffold = partial(open_children, repo, name), partial(_scaffold, tree, name)
-    ledgers, specs = partial(_ledgers, root, repo, tree), partial(_check_specs_only, tree, onto)
+    ledgers, specs = (
+        partial(_ledgers, root, repo, tree),
+        partial(_check_specs_only, root, repo, tree, onto),
+    )
     tests = lambda: _refuse_implementation_tests(tree, onto, target(root, str(into))[3])  # noqa: E731
     table: dict[str | None, list[Callable[[], object]]] = {
         "task": [ancestor, tests, denylist, partial(refuse_dirty, into)],
