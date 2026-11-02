@@ -24,6 +24,7 @@ _T2 = "t2-block-list-bug"
 _T3 = "t3-discovery"
 # Composed at runtime: no token-shaped literal is tracked.
 _TOKEN = "sk-ant-" + "oat01-" + "PLANTED" * 6
+_VALUE = "planted" + "value" + "0042"
 
 
 def _run(script: str, *args: Path, env: dict[str, str] | None = None) -> int:
@@ -47,8 +48,24 @@ def _scan(tmp_path: Path, content: str | bytes, name: str, env: dict[str, str] |
         ("log " + _TOKEN, "transcript.txt", None, 1),
         ("x planted-fake-value x", "transcript.txt", {"SCAN_SECRET": "planted-fake-value"}, 1),
         ("nothing here", "transcript.txt", {"SCAN_SECRET": "planted-fake-value"}, 0),
+        (json.dumps({"t": "x\n" + _TOKEN}), "result.json", None, 1),
+        (json.dumps({"out": f"HOME=/root\nCLAUDE_CODE_MESSAGING_TOKEN={_VALUE}\n"}), "t.json", None, 1),
+        (json.dumps({"MY_API_KEY": _VALUE}), "cfg.json", None, 1),
+        ("X_TOKEN=${{ secrets.X }}\nX_TOKEN=<token>\nX_TOKEN=***", "ci.txt", None, 0),
+        (json.dumps({"X_TOKEN": "<token>"}), "cfg.json", None, 0),
     ],
-    ids=["token-in-json", "token-in-binary", "token-shape", "secret-value", "clean-tree"],
+    ids=[
+        "token-in-json",
+        "token-in-binary",
+        "token-shape",
+        "secret-value",
+        "clean-tree",
+        "token-after-escaped-newline",
+        "env-dump-secret-name-in-json",
+        "json-key-names-a-secret",
+        "placeholders-assign",
+        "placeholder-json-key",
+    ],
 )
 def test_scan_exit_code(
     tmp_path: Path, content: str | bytes, name: str, env: dict[str, str] | None, expected: int
