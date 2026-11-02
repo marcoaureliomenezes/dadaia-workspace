@@ -58,6 +58,10 @@ def _scan(tmp_path: Path, content: str | bytes, name: str, env: dict[str, str] |
         (json.dumps({"MY_API_KEY": _VALUE}), "cfg.json", None, 1),
         ("X_TOKEN=${{ secrets.X }}\nX_TOKEN=<token>\nX_TOKEN=***", "ci.txt", None, 0),
         (json.dumps({"X_TOKEN": "<token>"}), "cfg.json", None, 0),
+        ("stderr: boom\n" + json.dumps({"t": "x\n" + _TOKEN}) + "\n{trunc", "t.jsonl", None, 1),
+        (f'GITHUB_TOKEN="{_VALUE}"', "env.txt", None, 1),
+        (f"API_KEY='{_VALUE}'", "env.txt", None, 1),
+        ('X_TOKEN="<token>"', "env.txt", None, 0),
     ],
     ids=[
         "token-in-json",
@@ -70,6 +74,10 @@ def _scan(tmp_path: Path, content: str | bytes, name: str, env: dict[str, str] |
         "json-key-names-a-secret",
         "placeholders-assign",
         "placeholder-json-key",
+        "jsonl-with-a-non-json-line",
+        "double-quoted-assignment",
+        "single-quoted-assignment",
+        "quoted-placeholder",
     ],
 )
 def test_scan_exit_code(
