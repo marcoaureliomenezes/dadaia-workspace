@@ -3,15 +3,17 @@ $SCAN_SECRET (each string leaf when it parses as JSON, else the whole value), a 
 shape, a JWT, a creator id, or a value assigned to a secret-named variable or JSON key. A
 JSON or JSON Lines file is also read with its strings decoded. Prints the file path only."""
 
+import contextlib
 import json
 import os
 import re
 import sys
 from pathlib import Path
 
-# ponytail: plain-text and decoded-JSON match only; misses base64, UTF-16, archives and symlinked dirs.
+# ponytail: raw text plus decoded JSON strings; misses base64, UTF-16, archives, symlinked dirs and
+# escaped forms in a plain-text file that is not JSON or JSON Lines.
 _NAME = r"[A-Z0-9_]*(?:TOKEN|SECRET|PASSWORD|PASSWD|API_KEY|PRIVATE_KEY|CREDENTIALS?)"
-_VALUE = r"(?![$<{*])[^\s\"'<>{}*$]{8}"  # not a placeholder
+_VALUE = r"[\"']?(?![$<{*])[^\s\"'<>{}*$]{8}"  # not a placeholder
 SHAPES = [
     r"\bsk-[\w-]{20,}",  # Anthropic token and OpenAI key shape
     r"\beyJ[\w-]+\.eyJ[\w-]+\.[\w-]+",  # JWT
@@ -34,14 +36,15 @@ def _leaves(node, floor=MIN_LEAF):
 
 
 def _haystack(text):
-    """The text plus every string leaf of a JSON or JSON Lines file, escapes decoded."""
+    """The text plus every string leaf of the JSON documents in it, escapes decoded: the whole
+    text when it parses, else each line that parses on its own."""
     try:
         docs = [json.loads(text)]
     except ValueError:
-        try:
-            docs = [json.loads(line) for line in text.splitlines() if line.strip()]
-        except ValueError:
-            return text
+        docs = []
+        for line in text.splitlines():
+            with contextlib.suppress(ValueError):
+                docs.append(json.loads(line))
     return "\n".join([text, *(leaf for d in docs for leaf in _leaves(d, 0))])
 
 
