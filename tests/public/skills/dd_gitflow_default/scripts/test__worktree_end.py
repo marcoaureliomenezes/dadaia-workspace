@@ -281,6 +281,29 @@ def test_a_backlog_tree_lands_specs_only_through_the_ledger_checks(root: Path) -
     assert "ci " not in landed.stdout and not tree.exists()
 
 
+def test_a_backlog_tree_lands_the_paths_merging_the_principal_yields(root: Path) -> None:
+    """A backlog tree lands the code merging the principal into the work branch yields — the
+    release pipeline's commit — and refuses a code path it sets back to the principal's older content."""
+    repo = root / "repos/r"
+    git(repo, "branch", "trunk")  # the principal, as of the work branch's cut
+    commit(repo, "ver", "2\n")  # the work branch moves past it
+    git(repo, "checkout", "-q", "trunk")
+    commit(repo, "release.json", "0.5.0\n")  # the pipeline's commit on the principal
+    git(repo, "checkout", "-q", "feature/0.5.0")
+    tree = open_tree(root, BACKLOG)
+    git(tree, "merge", "-q", "--no-ff", "-m", "merge trunk", "trunk")
+    approve(root, git(tree, "rev-parse", "HEAD").strip())
+    landed = run(root, "merge", str(tree))
+    assert landed.returncode == 0, landed.stderr
+    assert read_text(repo / "release.json") == "0.5.0\n" and not tree.exists()
+
+    tree = open_tree(root, "0.5.0/wt-backlog-y")
+    git(tree, "merge", "-q", "--no-ff", "-m", "merge trunk", "trunk")
+    commit(tree, "ver", "")  # the principal never held "2": the tree sets the path back
+    approve(root, git(tree, "rev-parse", "HEAD").strip(), name="0.5.0/wt-backlog-y")
+    assert "ver is code" in run(root, "merge", str(tree)).stderr
+
+
 @pytest.mark.parametrize("name", [RC, BACKLOG])
 def test_an_associated_repo_tree_lands_with_no_ledger_check_of_its_own(
     tmp_path: Path, name: str
